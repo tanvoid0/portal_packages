@@ -36,6 +36,9 @@ abstract final class VaultRecoveryService {
       grantToken: grantToken,
       wrapPassword: passwordWrap,
       wrapRecovery: newRecoveryWrap,
+      // Without this the rotated secret is lost and the escrowed wrap can
+      // never be opened again.
+      recoverySecret: newRecoverySecret,
     );
   }
 }

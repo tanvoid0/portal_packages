@@ -70,17 +70,26 @@ class VaultApiClient {
     );
   }
 
+  /// [recoverySecret] must be the secret [wrapRecovery] was sealed with; the
+  /// server escrows the pair and cannot open the wrap without it.
   Future<void> completeRecovery({
     required String grantToken,
     required WrappedKeyBundle wrapPassword,
     WrappedKeyBundle? wrapRecovery,
+    List<int>? recoverySecret,
   }) async {
+    assert(
+      wrapRecovery == null || recoverySecret != null,
+      'wrapRecovery requires the recoverySecret it was sealed with',
+    );
     await _api.post(
       '$_vaultBase/recovery/complete',
       body: {
         'grant_token': grantToken,
         'wrap_password': wrapPassword.toJson(),
         if (wrapRecovery != null) 'wrap_recovery': wrapRecovery.toJson(),
+        if (recoverySecret != null)
+          'recovery_secret': base64Encode(recoverySecret),
       },
     );
   }
@@ -91,7 +100,12 @@ class VaultApiClient {
     required String grantToken,
     required WrappedKeyBundle wrapPassword,
     WrappedKeyBundle? wrapRecovery,
+    List<int>? recoverySecret,
   }) async {
+    assert(
+      wrapRecovery == null || recoverySecret != null,
+      'wrapRecovery requires the recoverySecret it was sealed with',
+    );
     await _api.postPublic(
       '$_vaultBase/recovery/complete-reset',
       body: {
@@ -99,6 +113,8 @@ class VaultApiClient {
         'grant_token': grantToken,
         'wrap_password': wrapPassword.toJson(),
         if (wrapRecovery != null) 'wrap_recovery': wrapRecovery.toJson(),
+        if (recoverySecret != null)
+          'recovery_secret': base64Encode(recoverySecret),
       },
     );
   }
