@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:cryptography/cryptography.dart';
 import 'package:portal_crypto/portal_crypto.dart';
 
 import 'remote/vault_api_client.dart';

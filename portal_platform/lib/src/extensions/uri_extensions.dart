@@ -1,6 +1,10 @@
-/// Normalizes URI paths for HTTP requests (collapses duplicate slashes).
+/// Collapses duplicate slashes in URI paths for HTTP requests.
+///
+/// Named to avoid `Uri.normalizePath`, which exists in dart:core and silently
+/// shadowed this extension — every call site was getting the built-in
+/// (which resolves `.`/`..` segments) and never collapsed a single slash.
 extension PortalUriNormalize on Uri {
-  Uri normalizePath() {
+  Uri collapseSlashes() {
     var p = path;
     if (p.isEmpty) return this;
     while (p.contains('//')) {

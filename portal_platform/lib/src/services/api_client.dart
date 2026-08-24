@@ -270,7 +270,7 @@ class ApiClient extends GetxService {
     try {
       final response = await http
           .post(
-            Uri.parse(url).normalizePath(),
+            Uri.parse(url).collapseSlashes(),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'refresh_token': refreshToken}),
           )
@@ -419,7 +419,7 @@ class ApiClient extends GetxService {
   }) async {
     final uri = endpoint.startsWith('http')
         ? resolveServerAssetUri(endpoint)
-        : Uri.parse('$baseUrl$endpoint').normalizePath();
+        : Uri.parse('$baseUrl$endpoint').collapseSlashes();
     var finalUri = uri;
     if (queryParams != null && queryParams.isNotEmpty) {
       finalUri = uri.replace(queryParameters: queryParams);
@@ -466,7 +466,7 @@ class ApiClient extends GetxService {
   Future<dynamic> post(String endpoint, {dynamic body}) async {
     final uri = endpoint.startsWith('http')
         ? resolveServerAssetUri(endpoint)
-        : Uri.parse('$baseUrl$endpoint').normalizePath();
+        : Uri.parse('$baseUrl$endpoint').collapseSlashes();
 
     return _requestWithRetry(
       'POST',
@@ -479,7 +479,7 @@ class ApiClient extends GetxService {
   Future<dynamic> postPublic(String endpoint, {dynamic body}) async {
     final uri = endpoint.startsWith('http')
         ? resolveServerAssetUri(endpoint)
-        : Uri.parse('$baseUrl$endpoint').normalizePath();
+        : Uri.parse('$baseUrl$endpoint').collapseSlashes();
     return _requestPublic(
       'POST',
       uri.toString(),
@@ -492,7 +492,7 @@ class ApiClient extends GetxService {
   Future<dynamic> put(String endpoint, {dynamic body}) async {
     final uri = endpoint.startsWith('http')
         ? resolveServerAssetUri(endpoint)
-        : Uri.parse('$baseUrl$endpoint').normalizePath();
+        : Uri.parse('$baseUrl$endpoint').collapseSlashes();
 
     return _requestWithRetry(
       'PUT',
@@ -505,7 +505,7 @@ class ApiClient extends GetxService {
   Future<dynamic> patch(String endpoint, {dynamic body}) async {
     final uri = endpoint.startsWith('http')
         ? resolveServerAssetUri(endpoint)
-        : Uri.parse('$baseUrl$endpoint').normalizePath();
+        : Uri.parse('$baseUrl$endpoint').collapseSlashes();
 
     return _requestWithRetry(
       'PATCH',
@@ -522,7 +522,7 @@ class ApiClient extends GetxService {
   }) async {
     final uri = endpoint.startsWith('http')
         ? resolveServerAssetUri(endpoint)
-        : Uri.parse('$baseUrl$endpoint').normalizePath();
+        : Uri.parse('$baseUrl$endpoint').collapseSlashes();
     var finalUri = uri;
     if (queryParams != null && queryParams.isNotEmpty) {
       finalUri = uri.replace(queryParameters: queryParams);
@@ -552,7 +552,7 @@ class ApiClient extends GetxService {
   }) async {
     final uri = endpoint.startsWith('http')
         ? resolveServerAssetUri(endpoint)
-        : Uri.parse('$baseUrl$endpoint').normalizePath();
+        : Uri.parse('$baseUrl$endpoint').collapseSlashes();
 
     return _requestWithRetry('POST', uri.toString(), (headers) async {
       final h = Map<String, String>.from(headers);
@@ -579,7 +579,7 @@ class ApiClient extends GetxService {
   }) async {
     final uri = endpoint.startsWith('http')
         ? resolveServerAssetUri(endpoint)
-        : Uri.parse('$baseUrl$endpoint').normalizePath();
+        : Uri.parse('$baseUrl$endpoint').collapseSlashes();
 
     return _requestWithRetry('POST', uri.toString(), (headers) async {
       final h = Map<String, String>.from(headers);
@@ -607,7 +607,7 @@ class ApiClient extends GetxService {
   Future<String> getUtf8(String absoluteOrRelative) async {
     final uri = absoluteOrRelative.startsWith('http')
         ? resolveServerAssetUri(absoluteOrRelative)
-        : Uri.parse('$baseUrl$absoluteOrRelative').normalizePath();
+        : Uri.parse('$baseUrl$absoluteOrRelative').collapseSlashes();
     final traceId = _newTraceId();
     _logApi(
       'INFO',
@@ -658,7 +658,7 @@ class ApiClient extends GetxService {
   Future<Uint8List> getBytes(String pathUnderWarp) async {
     final uri = pathUnderWarp.startsWith('http')
         ? resolveServerAssetUri(pathUnderWarp)
-        : Uri.parse('$baseUrl$pathUnderWarp').normalizePath();
+        : Uri.parse('$baseUrl$pathUnderWarp').collapseSlashes();
     final traceId = _newTraceId();
     _logApi(
       'INFO',
@@ -713,7 +713,7 @@ class ApiClient extends GetxService {
     try {
       final response = await http
           .get(
-            Uri.parse(url).normalizePath(),
+            Uri.parse(url).collapseSlashes(),
             headers: {'Accept': 'application/json'},
           )
           .timeout(const Duration(seconds: 5));
@@ -736,7 +736,7 @@ class ApiClient extends GetxService {
     try {
       final response = await http
           .get(
-            Uri.parse(url).normalizePath(),
+            Uri.parse(url).collapseSlashes(),
             headers: {'Accept': 'application/json'},
           )
           .timeout(timeout);
@@ -777,7 +777,7 @@ class ApiClient extends GetxService {
       'POST',
       url,
       (headers) => http.post(
-        Uri.parse(url).normalizePath(),
+        Uri.parse(url).collapseSlashes(),
         headers: headers,
         body: jsonEncode({'email': email, 'password': password, 'name': name}),
       ),
@@ -797,7 +797,7 @@ class ApiClient extends GetxService {
       'POST',
       url,
       (headers) => http.post(
-        Uri.parse(url).normalizePath(),
+        Uri.parse(url).collapseSlashes(),
         headers: headers,
         body: jsonEncode({'id_token': idToken}),
       ),
@@ -818,7 +818,7 @@ class ApiClient extends GetxService {
       'POST',
       url,
       (headers) => http.post(
-        Uri.parse(url).normalizePath(),
+        Uri.parse(url).collapseSlashes(),
         headers: headers,
         body: jsonEncode({'username': username, 'hostname': hostname}),
       ),
@@ -839,7 +839,7 @@ class ApiClient extends GetxService {
       'POST',
       url,
       (headers) => http.post(
-        Uri.parse(url).normalizePath(),
+        Uri.parse(url).collapseSlashes(),
         headers: headers,
         body: jsonEncode({'email': email, 'password': password}),
       ),

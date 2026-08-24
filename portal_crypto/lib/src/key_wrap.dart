@@ -4,7 +4,6 @@ import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 
 import 'key_derivation.dart';
-import 'portal_blob.dart';
 import 'secret_box_codec.dart';
 
 /// Wraps a data encryption key (DEK) with a key-encryption key (KEK).

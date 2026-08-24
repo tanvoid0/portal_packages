@@ -10,7 +10,6 @@ import 'backup/backup_settings.dart';
 import 'local/local_vault_dek_store.dart';
 import 'remote/vault_api_client.dart';
 import 'storage/google_drive_vault_backend.dart';
-import 'storage/vault_storage_backend.dart';
 
 /// Holds the vault DEK in memory while the user session is unlocked.
 class VaultService extends GetxService {
