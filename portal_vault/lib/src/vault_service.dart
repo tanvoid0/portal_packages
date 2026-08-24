@@ -140,13 +140,63 @@ class VaultService extends GetxService {
     if (bundle == null) {
       throw StateError('Google wrap not found. Link Google Drive first.');
     }
-    final dek = await KeyWrap.unwrapDekWithGoogleSubject(
-      bundle: bundle,
-      googleSub: googleSub,
-    );
+    final SecretKey dek;
+    if (bundle.kind == KeyWrap.kindGoogleSecret) {
+      final secret = await _googleDrive.fetchGoogleSecret();
+      if (secret == null) {
+        throw StateError(
+          'Google vault secret missing from Drive. Unlock with your password.',
+        );
+      }
+      dek = await KeyWrap.unwrapDekWithGoogleSecret(
+        bundle: bundle,
+        googleSecret: secret,
+      );
+    } else {
+      // Legacy wrap keyed by the Google subject, which is not a secret.
+      // Open it once, then immediately re-seal against a Drive-held secret.
+      // ignore: deprecated_member_use
+      dek = await KeyWrap.unwrapDekWithGoogleSubject(
+        bundle: bundle,
+        googleSub: googleSub,
+      );
+    }
     _dek = dek;
     _userId = userId;
     isUnlocked.value = true;
+    if (bundle.kind != KeyWrap.kindGoogleSecret) {
+      await _upgradeGoogleWrap(dek);
+    }
+  }
+
+  /// Re-seals the Google wrap against a fresh Drive-held secret. Best effort:
+  /// the vault is already unlocked, so a Drive hiccup must not fail the unlock.
+  Future<void> _upgradeGoogleWrap(SecretKey dek) async {
+    try {
+      final googleWrap = await _writeGoogleSecretWrap(dek);
+      final wraps = await _api.fetchWraps();
+      await _api.putWraps(
+        passwordWrap: wraps.passwordWrap,
+        recoveryWrap: wraps.recoveryWrap,
+        googleWrap: googleWrap,
+      );
+    } catch (e) {
+      debugPrint('[VaultService] Google wrap upgrade deferred: $e');
+    }
+  }
+
+  /// Mints a Drive-held secret, seals [dek] with it, and stores both.
+  Future<WrappedKeyBundle> _writeGoogleSecretWrap(SecretKey dek) async {
+    final secret = await SecretBoxCodec.exportKey(
+      await SecretBoxCodec.randomKey(),
+    );
+    final wrap = await KeyWrap.wrapDekWithGoogleSecret(
+      dek: dek,
+      googleSecret: secret,
+    );
+    await _googleDrive.storeGoogleSecret(secret);
+    await _googleDrive.storeWrapBundle(wrap);
+    return wrap;
   }
 
   /// After password reset + recovery grant from server.
@@ -204,11 +254,7 @@ class VaultService extends GetxService {
     }
     WrappedKeyBundle? googleWrap = existingGoogleWrap;
     if (googleSub != null && googleSub != 'linked') {
-      googleWrap = await KeyWrap.wrapDekWithGoogleSubject(
-        dek: dek,
-        googleSub: googleSub,
-      );
-      await _googleDrive.storeWrapBundle(googleWrap);
+      googleWrap = await _writeGoogleSecretWrap(dek);
     }
     if (passwordWrap == null && googleWrap == null) {
       throw StateError('Vault requires at least one of password or Google wrap.');
@@ -284,14 +330,13 @@ class VaultService extends GetxService {
     );
   }
 
+  /// [googleSub] is no longer key material — the wrap is sealed with a secret
+  /// held in Drive appdata. The parameter stays for the existing callers in
+  /// portal_task and to identify the account being linked.
   Future<void> linkGoogleAccount(String googleSub) async {
     final key = _dek;
     if (key == null) throw StateError('Vault is locked');
-    final googleWrap = await KeyWrap.wrapDekWithGoogleSubject(
-      dek: key,
-      googleSub: googleSub,
-    );
-    await _googleDrive.storeWrapBundle(googleWrap);
+    final googleWrap = await _writeGoogleSecretWrap(key);
     final wraps = await _api.fetchWraps();
     await _api.putWraps(
       passwordWrap: wraps.passwordWrap,

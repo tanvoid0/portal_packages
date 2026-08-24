@@ -12,6 +12,7 @@ import 'vault_storage_backend.dart';
 
 const _vaultFolder = 'portal_task_vault';
 const _wrapFileName = 'wrap_google.json';
+const _googleSecretFileName = 'google_kek_secret.json';
 
 /// Google Drive `appDataFolder` encrypted blob storage.
 class GoogleDriveVaultBackend implements VaultStorageBackend {
@@ -91,6 +92,26 @@ class GoogleDriveVaultBackend implements VaultStorageBackend {
     await putEncrypted(
       _wrapFileName,
       Uint8List.fromList(utf8.encode(jsonEncode(bundle.toJson()))),
+    );
+  }
+
+  /// The secret the Google wrap is sealed with. Lives in Drive appdata, which
+  /// only the signed-in Google account can read, so the copy of the wrap held
+  /// server-side is useless on its own.
+  Future<List<int>?> fetchGoogleSecret() async {
+    final bytes = await getEncrypted(_googleSecretFileName);
+    if (bytes == null) return null;
+    final map = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+    final encoded = map['secret'] as String?;
+    return encoded == null ? null : base64Decode(encoded);
+  }
+
+  Future<void> storeGoogleSecret(List<int> secret) async {
+    await putEncrypted(
+      _googleSecretFileName,
+      Uint8List.fromList(
+        utf8.encode(jsonEncode({'v': 1, 'secret': base64Encode(secret)})),
+      ),
     );
   }
 

@@ -41,6 +41,12 @@ class WrappedKeyBundle {
 }
 
 abstract final class KeyWrap {
+  /// [WrappedKeyBundle.kind] for the Drive-secret Google wrap.
+  static const String kindGoogleSecret = 'google_secret';
+
+  /// [WrappedKeyBundle.kind] for the superseded subject-derived Google wrap.
+  static const String kindGoogleSubjectLegacy = 'google';
+
   static Future<WrappedKeyBundle> wrapDekWithPassword({
     required SecretKey dek,
     required String password,
@@ -77,6 +83,10 @@ abstract final class KeyWrap {
     return SecretBoxCodec.importKey(dekBytes);
   }
 
+  @Deprecated(
+    'The Google subject is not a secret. Use wrapDekWithGoogleSecret; this '
+    'remains only to open wraps written before that change.',
+  )
   static Future<WrappedKeyBundle> wrapDekWithGoogleSubject({
     required SecretKey dek,
     required String googleSub,
@@ -113,6 +123,50 @@ abstract final class KeyWrap {
       key: kek,
       packed: bundle.wrappedDek,
       aad: utf8.encode('portal-dek-wrap-google-v1'),
+    );
+    return SecretBoxCodec.importKey(dekBytes);
+  }
+
+  /// Wraps the DEK with a random secret held in the user's Google Drive
+  /// appdata, which only that Google account can read.
+  ///
+  /// Replaces [wrapDekWithGoogleSubject], whose KEK came from the Google
+  /// subject id — an identifier the server and every relying party already
+  /// know, so the wrap it produced could be opened by anyone holding it.
+  static Future<WrappedKeyBundle> wrapDekWithGoogleSecret({
+    required SecretKey dek,
+    required List<int> googleSecret,
+  }) async {
+    final kek = await HkdfExpand.expand(
+      ikm: SecretKey(googleSecret),
+      info: utf8.encode('portal-google-kek-v1'),
+    );
+    final dekBytes = await SecretBoxCodec.exportKey(dek);
+    final wrapped = await SecretBoxCodec.encrypt(
+      key: kek,
+      plaintext: dekBytes,
+      aad: utf8.encode('portal-dek-wrap-google-v2'),
+    );
+    return WrappedKeyBundle(
+      kind: kindGoogleSecret,
+      salt: const [],
+      iterations: 0,
+      wrappedDek: wrapped,
+    );
+  }
+
+  static Future<SecretKey> unwrapDekWithGoogleSecret({
+    required WrappedKeyBundle bundle,
+    required List<int> googleSecret,
+  }) async {
+    final kek = await HkdfExpand.expand(
+      ikm: SecretKey(googleSecret),
+      info: utf8.encode('portal-google-kek-v1'),
+    );
+    final dekBytes = await SecretBoxCodec.decrypt(
+      key: kek,
+      packed: bundle.wrappedDek,
+      aad: utf8.encode('portal-dek-wrap-google-v2'),
     );
     return SecretBoxCodec.importKey(dekBytes);
   }
