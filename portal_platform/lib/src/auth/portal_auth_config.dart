@@ -33,6 +33,8 @@ class PortalAuthConfig {
   /// Typically `true` during development for apps that need it.
   final bool showTestServer;
 
-  /// When set, login mode shows a "Forgot password?" action (e.g. Portal Task).
+  /// Overrides the "Forgot password?" action, which otherwise opens the
+  /// shared [PortalPasswordResetView]. Set it when the app has its own reset
+  /// route (e.g. Portal Task).
   final VoidCallback? onForgotPassword;
 }

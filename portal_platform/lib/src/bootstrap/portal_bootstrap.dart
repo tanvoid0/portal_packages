@@ -38,7 +38,10 @@ class PortalBootstrap {
     final config = configOverride ?? AppConfig.fromEnv();
 
     await Get.putAsync<ApiClient>(
-      () => ApiClient().init(baseUrl: config.apiBaseUrl),
+      () => ApiClient().init(
+        baseUrl: config.apiBaseUrl,
+        appName: config.appTitle,
+      ),
     );
     Get.put<DeepLinkService>(DeepLinkService(), permanent: true);
     Get.put<SessionController>(SessionController(), permanent: true);

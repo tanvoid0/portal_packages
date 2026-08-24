@@ -106,6 +106,7 @@ export 'src/auth/portal_auth_binding.dart';
 export 'src/auth/portal_auth_config.dart';
 export 'src/auth/portal_auth_controller.dart';
 export 'src/auth/portal_auth_view.dart';
+export 'src/auth/portal_password_reset_view.dart';
 export 'src/auth/device_security/device_security_binding.dart';
 export 'src/auth/device_security/device_security_controller.dart';
 export 'src/auth/device_security/device_security_preferences.dart';

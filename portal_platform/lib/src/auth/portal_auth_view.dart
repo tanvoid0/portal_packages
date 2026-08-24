@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import 'portal_auth_config.dart';
 import 'portal_auth_controller.dart';
+import 'portal_password_reset_view.dart';
 
 /// Shared authentication view for all Portal apps using email/password auth.
 ///
@@ -45,7 +46,7 @@ class PortalAuthView extends GetView<PortalAuthController> {
                   children: [
                     _buildHeader(theme, cs),
                     const SizedBox(height: 48),
-                    _buildFormCard(theme, cs),
+                    _buildFormCard(context, theme, cs),
                   ],
                 ),
               ),
@@ -99,7 +100,7 @@ class PortalAuthView extends GetView<PortalAuthController> {
     );
   }
 
-  Widget _buildFormCard(ThemeData theme, ColorScheme cs) {
+  Widget _buildFormCard(BuildContext context, ThemeData theme, ColorScheme cs) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -205,13 +206,17 @@ class PortalAuthView extends GetView<PortalAuthController> {
                     ),
                   ),
                 ),
-                if (controller.isLogin.value && config.onForgotPassword != null) ...[
+                if (controller.isLogin.value) ...[
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: controller.isLoading.value
                           ? null
-                          : config.onForgotPassword,
+                          : config.onForgotPassword ??
+                                () => showPortalPasswordReset(
+                                  context,
+                                  email: controller.emailController.text,
+                                ),
                       child: const Text('Forgot password?'),
                     ),
                   ),

@@ -58,8 +58,24 @@ class ApiClient extends GetxService {
   /// the caller forever. Health checks pass their own shorter budget.
   static const Duration _requestTimeout = Duration(seconds: 30);
 
+  /// Slug sent as `X-Portal-App` so the server knows which app is calling —
+  /// it picks the branding for server-rendered output such as reset emails.
+  String get appSlug => _appSlug;
+  String _appSlug = '';
+
+  /// `Portal Shopping` -> `portal-shopping`. Header values must be ASCII.
+  static String slugifyAppName(String name) => name
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+      .replaceAll(RegExp(r'^-+|-+$'), '');
+
   /// Initialize the API client with [baseUrl] from [AppConfig.fromEnv].
-  Future<ApiClient> init({required String baseUrl}) async {
+  /// [appName] is [AppConfig.appTitle]; it identifies the app to the server.
+  Future<ApiClient> init({
+    required String baseUrl,
+    String appName = '',
+  }) async {
+    _appSlug = slugifyAppName(appName.trim());
     _baseUrl = baseUrl.trim();
     if (_baseUrl.isEmpty) {
       throw StateError(
@@ -107,6 +123,7 @@ class ApiClient extends GetxService {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       'X-Request-Id': traceId,
+      if (_appSlug.isNotEmpty) 'X-Portal-App': _appSlug,
     };
 
     if (requireAuth) {
@@ -124,6 +141,7 @@ class ApiClient extends GetxService {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       'X-Request-Id': traceId,
+      if (_appSlug.isNotEmpty) 'X-Portal-App': _appSlug,
     };
   }
 
