@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'portal_theme_helpers.dart';
 import 'portal_ui_theme.dart';
 
 /// Composable form field shell — label, control, description, and error message.

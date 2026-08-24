@@ -70,7 +70,6 @@ void main() {
           theme: modes.light,
           home: Builder(
             builder: (context) {
-              final portal = PortalUiTheme.of(context);
               return Scaffold(
                 body: TextField(
                   decoration: portalInputDecoration(context, hint: 'Email'),

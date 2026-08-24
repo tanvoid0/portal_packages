@@ -57,12 +57,12 @@ void main() {
   group('PortalStaggeredChild', () {
     testWidgets('returns child without animation when disabled', (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: MediaQuery(
-            data: const MediaQueryData(disableAnimations: true),
+            data: MediaQueryData(disableAnimations: true),
             child: PortalStaggeredChild(
               index: 2,
-              child: const Text('item'),
+              child: Text('item'),
             ),
           ),
         ),
@@ -101,11 +101,11 @@ void main() {
     testWidgets('returns child without shimmer when animations disabled',
         (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: MediaQuery(
-            data: const MediaQueryData(disableAnimations: true),
+            data: MediaQueryData(disableAnimations: true),
             child: PortalShimmer(
-              child: Container(key: const Key('block'), width: 40, height: 12),
+              child: SizedBox(key: Key('block'), width: 40, height: 12),
             ),
           ),
         ),

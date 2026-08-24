@@ -62,6 +62,18 @@ class _AiBackendSelectorState extends State<AiBackendSelector> {
     });
   }
 
+  /// [RadioGroup] hands back the tile's value; map it to the option it came
+  /// from. Unavailable tiles are disabled, so a null or unknown id is a no-op.
+  void _selectById(String? id) {
+    if (id == null) return;
+    for (final option in _options) {
+      if (option.id == id) {
+        _select(option);
+        return;
+      }
+    }
+  }
+
   Future<void> _select(AiBackendOption option) async {
     if (!option.available) return;
     await widget.store.setSelectedKind(option.kind);
@@ -99,10 +111,12 @@ class _AiBackendSelectorState extends State<AiBackendSelector> {
       );
     }
 
-    final inferenceOptions =
-        _options.where((o) => o.supportsInAppInference).toList();
-    final delegateOptions =
-        _options.where((o) => !o.supportsInAppInference).toList();
+    final inferenceOptions = _options
+        .where((o) => o.supportsInAppInference)
+        .toList();
+    final delegateOptions = _options
+        .where((o) => !o.supportsInAppInference)
+        .toList();
 
     if (inferenceOptions.isEmpty) {
       return Padding(
@@ -111,56 +125,58 @@ class _AiBackendSelectorState extends State<AiBackendSelector> {
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          widget.labels.selectProvider,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-        ),
-        const SizedBox(height: 8),
-        ...inferenceOptions.map((option) => _OptionTile(
-              option: option,
-              labels: widget.labels,
-              groupValue: _selectedId,
-              onSelect: () => _select(option),
-              trailing: widget.trailingBuilder?.call(option),
-            )),
-        if (delegateOptions.isNotEmpty) ...[
-          const SizedBox(height: 16),
+    return RadioGroup<String>(
+      groupValue: _selectedId,
+      onChanged: _selectById,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           Text(
-            'External',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            widget.labels.selectProvider,
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
-          ...delegateOptions.map(
+          ...inferenceOptions.map(
             (option) => _OptionTile(
               option: option,
               labels: widget.labels,
-              groupValue: _selectedId,
-              onSelect: () => _select(option),
               trailing: widget.trailingBuilder?.call(option),
             ),
           ),
-        ],
-        if (widget.onRescan != null) ...[
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              onPressed: () {
-                widget.onRescan?.call();
-                _scan();
-              },
-              child: const Text('Rescan providers'),
+          if (delegateOptions.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              'External',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
             ),
-          ),
+            const SizedBox(height: 8),
+            ...delegateOptions.map(
+              (option) => _OptionTile(
+                option: option,
+                labels: widget.labels,
+                trailing: widget.trailingBuilder?.call(option),
+              ),
+            ),
+          ],
+          if (widget.onRescan != null) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () {
+                  widget.onRescan?.call();
+                  _scan();
+                },
+                child: const Text('Rescan providers'),
+              ),
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
@@ -169,15 +185,11 @@ class _OptionTile extends StatelessWidget {
   const _OptionTile({
     required this.option,
     required this.labels,
-    required this.groupValue,
-    required this.onSelect,
     this.trailing,
   });
 
   final AiBackendOption option;
   final AiBackendLabels labels;
-  final String? groupValue;
-  final VoidCallback onSelect;
   final Widget? trailing;
 
   @override
@@ -185,21 +197,16 @@ class _OptionTile extends StatelessWidget {
     final theme = Theme.of(context);
     final title = labels.titleFor(option.kind);
     final description = labels.descriptionFor(option.kind);
-    final canSelect = option.available;
     final modelsSummary = option.modelsSummary;
     final subtitle = option.available
-        ? [
-            description,
-            ?modelsSummary,
-          ].join('\n')
+        ? [description, ?modelsSummary].join('\n')
         : (option.unavailableReason ?? labels.unavailable);
 
     return Opacity(
       opacity: option.available ? 1 : 0.55,
       child: RadioListTile<String>(
         value: option.id,
-        groupValue: groupValue,
-        onChanged: canSelect ? (_) => onSelect() : null,
+        enabled: option.available,
         title: Text(title, style: theme.textTheme.bodyLarge),
         subtitle: Text(
           subtitle,

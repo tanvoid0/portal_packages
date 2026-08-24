@@ -1,4 +1,3 @@
-import 'portal_toast.dart';
 import 'portal_toast_host.dart';
 
 /// Shared toast helpers for Portal apps. Prefer this over raw [Get.snackbar].
