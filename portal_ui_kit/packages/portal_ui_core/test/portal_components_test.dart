@@ -4,10 +4,10 @@ import 'package:portal_ui_core/portal_ui_core.dart';
 
 /// Tokens with values distinct from the defaults, so a component that
 /// hardcodes instead of reading the bundle fails visibly.
-final _tokens = DesignTokens(
-  radii: const PortalRadii(sm: 7, md: 11, lg: 17, xl: 23, full: 999),
-  spacing: const PortalSpacing(xs: 3, sm: 5, md: 9, lg: 13, xl: 21, xxl: 27),
-  layout: const PortalLayoutInsets(
+const _tokens = DesignTokens(
+  radii: PortalRadii(sm: 7, md: 11, lg: 17, xl: 23, full: 999),
+  spacing: PortalSpacing(xs: 3, sm: 5, md: 9, lg: 13, xl: 21, xxl: 27),
+  layout: PortalLayoutInsets(
     pageHorizontal: 20,
     sectionGap: 24,
     listBottomInset: 108,
@@ -133,5 +133,39 @@ void main() {
     expect(padding.bottom, _tokens.layout.listBottomInset);
     expect(find.text('Library'), findsOneWidget);
     expect(find.text('row'), findsOneWidget);
+  });
+
+  testWidgets('list skeleton survives an unbounded sliver when shrinkWrap is set',
+      (t) async {
+    // How every recipe list uses it. Without shrinkWrap the ListView gets
+    // unbounded height inside SliverToBoxAdapter and throws at runtime —
+    // which the analyzer cannot see.
+    await t.pumpWidget(_host(const CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: PortalListSkeleton(itemCount: 3, shrinkWrap: true),
+        ),
+      ],
+    )));
+    await t.pump(const Duration(milliseconds: 100));
+
+    expect(t.takeException(), isNull);
+    expect(find.byType(PortalSkeleton), findsNWidgets(3));
+  });
+
+  testWidgets('empty state paints a well behind the glyph when asked',
+      (t) async {
+    await t.pumpWidget(_host(const PortalEmptyState(
+      icon: Icons.inbox,
+      title: 'Nothing yet',
+    )));
+    expect(find.byType(CircleAvatar), findsNothing);
+
+    await t.pumpWidget(_host(const PortalEmptyState(
+      icon: Icons.inbox,
+      title: 'Nothing yet',
+      iconWellColor: Color(0xFFEADFD0),
+    )));
+    expect(find.byType(CircleAvatar), findsOneWidget);
   });
 }

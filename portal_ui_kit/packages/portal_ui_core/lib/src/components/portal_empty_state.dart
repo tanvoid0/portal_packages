@@ -17,6 +17,7 @@ class PortalEmptyState extends StatelessWidget {
     this.actionLabel,
     this.onAction,
     this.actionIcon,
+    this.iconWellColor,
     this.inCard = true,
   });
 
@@ -28,6 +29,9 @@ class PortalEmptyState extends StatelessWidget {
   final String? actionLabel;
   final VoidCallback? onAction;
   final IconData? actionIcon;
+
+  /// Circular well painted behind the glyph. Omit for a bare icon.
+  final Color? iconWellColor;
 
   /// Wraps the content in a [PortalCard]. Set false when the state already
   /// sits inside a card or fills the page.
@@ -41,7 +45,18 @@ class PortalEmptyState extends StatelessWidget {
     final content = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: tokens.spacing.xxl, color: portal.onSurfaceVariant),
+        if (iconWellColor == null)
+          Icon(icon, size: tokens.spacing.xxl, color: portal.onSurfaceVariant)
+        else
+          CircleAvatar(
+            radius: tokens.spacing.xxl * 1.5,
+            backgroundColor: iconWellColor,
+            child: Icon(
+              icon,
+              size: tokens.spacing.xxl,
+              color: portal.onSurfaceVariant,
+            ),
+          ),
         SizedBox(height: tokens.spacing.md),
         Text(
           title,
