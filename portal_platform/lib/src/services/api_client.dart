@@ -53,6 +53,11 @@ class ApiClient extends GetxService {
   /// waiter.
   static const Duration _refreshTimeout = Duration(seconds: 15);
 
+  /// Applied in the two request funnels rather than at each call site, so a
+  /// black-holed connection surfaces as a TimeoutException instead of hanging
+  /// the caller forever. Health checks pass their own shorter budget.
+  static const Duration _requestTimeout = Duration(seconds: 30);
+
   /// Initialize the API client with [baseUrl] from [AppConfig.fromEnv].
   Future<ApiClient> init({required String baseUrl}) async {
     _baseUrl = baseUrl.trim();
@@ -335,14 +340,14 @@ class ApiClient extends GetxService {
     Future<http.Response> Function(Map<String, String> headers) request,
   ) async {
     var headers = await _getHeaders(traceId: traceId);
-    var response = await request(headers);
+    var response = await request(headers).timeout(_requestTimeout);
 
     if (response.statusCode != 401) return response;
 
     final refreshed = await refreshToken();
     if (refreshed) {
       headers = await _getHeaders(traceId: traceId);
-      response = await request(headers);
+      response = await request(headers).timeout(_requestTimeout);
       if (response.statusCode != 401) return response;
     }
 
@@ -391,7 +396,8 @@ class ApiClient extends GetxService {
       context: {'method': method, 'url': url},
     );
     try {
-      final response = await request(_publicHeaders(traceId));
+      final response =
+          await request(_publicHeaders(traceId)).timeout(_requestTimeout);
       final result = _handleResponse(response, traceId: traceId);
       _logApi(
         'INFO',

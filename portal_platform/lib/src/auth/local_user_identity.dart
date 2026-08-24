@@ -8,7 +8,8 @@ import 'package:uuid/uuid.dart';
 abstract final class LocalUserIdentity {
   static const _deviceIdKey = 'portal_local_device_id_v1';
   static const _secure = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    // encryptedSharedPreferences is deprecated in v10, removed in v11.
+    aOptions: AndroidOptions(),
   );
   static const _uuid = Uuid();
 

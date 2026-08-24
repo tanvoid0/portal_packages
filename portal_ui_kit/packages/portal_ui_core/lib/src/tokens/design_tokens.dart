@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/portal_layout_insets.dart';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Token groups: each is @immutable, const-constructible, and customizable
 // via constructor parameters OR subclassing for richer behaviour.
@@ -294,6 +296,7 @@ class DesignTokens {
     this.textStyles = const PortalTextStyles(),
     this.motion = const PortalMotion(),
     this.elevation = const PortalElevation(),
+    this.layout = const PortalLayoutInsets(),
     this.minTapTarget = 44,
     this.borderWidth = 1,
     this.expressiveCorners = false,
@@ -305,6 +308,10 @@ class DesignTokens {
   final PortalTextStyles textStyles;
   final PortalMotion motion;
   final PortalElevation elevation;
+
+  /// Page gutter, section gap and the clearance a floating nav needs.
+  /// Read this instead of writing a literal inset at a call site.
+  final PortalLayoutInsets layout;
 
   /// Minimum interactive dimension (accessibility).
   final double minTapTarget;

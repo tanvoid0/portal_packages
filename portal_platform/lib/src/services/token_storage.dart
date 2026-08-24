@@ -9,8 +9,10 @@ class TokenStorage {
   static const String _refreshTokenKey = 'portal_refresh_token';
   static const String _userKey = 'portal_user';
 
+  // encryptedSharedPreferences is deprecated in flutter_secure_storage 10 and
+  // removed in 11; v10 already encrypts by default.
   final FlutterSecureStorage _secure = const FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    aOptions: AndroidOptions(),
   );
 
   bool _migrated = false;
@@ -29,8 +31,13 @@ class TokenStorage {
 
     if (access == null && refresh == null && userJson == null) return;
 
-    if (access != null && refresh != null) {
-      await saveTokens(accessToken: access, refreshToken: refresh);
+    // Migrate whatever is there, then clear it unconditionally. Requiring both
+    // tokens left a lone access token sitting in plaintext SharedPreferences
+    // forever, which is exactly what this migration exists to stop.
+    if (access != null || refresh != null) {
+      if (access != null && refresh != null) {
+        await saveTokens(accessToken: access, refreshToken: refresh);
+      }
       await prefs.remove(_accessTokenKey);
       await prefs.remove(_refreshTokenKey);
     }

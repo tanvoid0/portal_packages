@@ -7,8 +7,9 @@ class DeviceSecretStorage {
   DeviceSecretStorage({
     FlutterSecureStorage? storage,
   }) : _storage = storage ??
+            // encryptedSharedPreferences is deprecated in v10, removed in v11.
             const FlutterSecureStorage(
-              aOptions: AndroidOptions(encryptedSharedPreferences: true),
+              aOptions: AndroidOptions(),
             );
 
   final FlutterSecureStorage _storage;
