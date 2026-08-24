@@ -45,6 +45,16 @@ class AppConfig with _$AppConfig {
       dataStorage == DataStorageMode.server ||
       dataStorage == DataStorageMode.googleDrive;
 
+  /// Demo credentials come from --dart-define, never from `.env`.
+  ///
+  /// flutter_dotenv bundles `.env` as a Flutter asset, so anything in it ships
+  /// inside the APK and is trivially extractable. Demo login is debug-only
+  /// (see PortalAuthController.canUseDemoLogin), so pass these at run time:
+  ///
+  ///   flutter run --dart-define=DEMO_EMAIL=... --dart-define=DEMO_PASSWORD=...
+  static const String _demoEmail = String.fromEnvironment('DEMO_EMAIL');
+  static const String _demoPassword = String.fromEnvironment('DEMO_PASSWORD');
+
   /// Build config from current dotenv. Call after [dotenv.load()].
   /// Throws if [API_BASE_URL] is missing or empty.
   factory AppConfig.fromEnv() {
@@ -65,8 +75,8 @@ class AppConfig with _$AppConfig {
 
     return AppConfig(
       apiBaseUrl: apiBaseUrl,
-      demoEmail: dotenv.env['DEMO_EMAIL']?.trim() ?? '',
-      demoPassword: dotenv.env['DEMO_PASSWORD'] ?? '',
+      demoEmail: _demoEmail.trim(),
+      demoPassword: _demoPassword,
       googleSignInServerClientId:
           dotenv.env['GOOGLE_SIGN_IN_SERVER_CLIENT_ID']?.trim() ?? '',
       dataStorage: dataStorage,
