@@ -1,0 +1,6 @@
+name: portal_table
+description: Portal simple data table (shadcn Table).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

@@ -1,0 +1,6 @@
+name: portal_tooltip
+description: Portal tooltip wrapper (shadcn Tooltip).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

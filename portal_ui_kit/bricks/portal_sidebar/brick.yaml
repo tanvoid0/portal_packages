@@ -1,0 +1,6 @@
+name: portal_sidebar
+description: Vertical navigation sidebar (shadcn Sidebar).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

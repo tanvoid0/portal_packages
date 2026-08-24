@@ -1,0 +1,6 @@
+name: portal_switch
+description: Portal switch row (shadcn Switch).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

@@ -1,0 +1,6 @@
+name: portal_radio_group
+description: Portal radio option row (shadcn Radio Group).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

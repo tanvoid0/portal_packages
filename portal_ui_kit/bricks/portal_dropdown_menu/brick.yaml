@@ -1,0 +1,6 @@
+name: portal_dropdown_menu
+description: Portal anchored menu (shadcn Dropdown Menu).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

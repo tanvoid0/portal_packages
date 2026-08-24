@@ -1,0 +1,17 @@
+targets:
+  $default:
+    builders:
+      portal_core|modelGenBuilder:
+        generate_for:
+          - lib/models/*.dart
+        options:
+          enabled: true
+
+builders:
+  modelGenBuilder:
+    import: "package:portal_core/builder.dart"
+    builder_factories: ["modelGenBuilder"]
+    build_extensions: {".dart": [".portal.dart"]}
+    auto_apply: dependents
+    build_to: source
+    applies_builders: ["source_gen|combining_builder"] 

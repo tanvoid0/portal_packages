@@ -1,0 +1,6 @@
+name: portal_snackbar
+description: Portal floating snack bar helper (shadcn Sonner / Toast).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

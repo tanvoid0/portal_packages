@@ -1,0 +1,6 @@
+name: portal_slidable
+description: Portal swipeable list row (flutter_slidable).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

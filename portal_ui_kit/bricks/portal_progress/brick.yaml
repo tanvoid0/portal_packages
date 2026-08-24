@@ -1,0 +1,6 @@
+name: portal_progress
+description: Portal linear progress (shadcn Progress).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

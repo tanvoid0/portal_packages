@@ -1,0 +1,7 @@
+# Mason brick templates under bricks/ are not standalone Dart packages.
+# Analyze packages and example from their own pubspec roots instead.
+analyzer:
+  exclude:
+    - bricks/**
+    - example/**
+    - packages/**

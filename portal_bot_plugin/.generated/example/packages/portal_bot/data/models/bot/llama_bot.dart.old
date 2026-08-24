@@ -1,0 +1,130 @@
+FIXME: ollama_dart is old now. Need to implement my own ollama client
+import 'package:ollama_dart/ollama_dart.dart';
+import 'package:portal_bot/data/env.dart';
+
+import 'bot_model.dart';
+import 'chat_model.dart';
+
+class LlamaBot extends BaseBotModel<OllamaClient, Message> {
+  LlamaBot({
+    final String? name,
+    final String? api,
+    super.systemInstructions,
+    super.room,
+  }) : super(
+          name: name ?? "Llama",
+          api: api ?? Env.ollamaApiKey,
+          modelVersion: 'deepseek-r1:1.5b',
+          type: BotType.ollama,
+        );
+
+  @override
+  Future<QueryModel> chat(
+    final String message, {
+    required List<QueryModel> history,
+  }) async {
+    final response = await getModel().generateChatCompletion(
+      request: GenerateChatCompletionRequest(
+        model: modelVersion,
+        messages: convertHistoryModels(history),
+      ),
+    );
+    return QueryModel.empty(
+      query: message,
+      response: response.message.content,
+    );
+  }
+
+  @override
+  Stream<String> chatStream(String message) {
+    final List<Message> history = [
+      ...convertHistoryModels(getHistory()),
+      Message(role: MessageRole.user, content: message)
+    ];
+    print("System instructions: ${getInstructions()}");
+    if (getInstructions().isNotEmpty) {
+      history.add(Message(role: MessageRole.system, content: getInstructions()));
+    }
+    return getModel()
+        .generateChatCompletionStream(
+          request: GenerateChatCompletionRequest(
+            model: modelVersion,
+            messages: history,
+          ),
+        )
+        .map((GenerateChatCompletionResponse item) =>
+            item.message.content ?? "");
+  }
+
+  @override
+  List<Message> convertHistoryModels(List<QueryModel> history) {
+    return history.isEmpty
+        ? []
+        : history.mapMany<Message>((item) {
+            final List<Message> contents = [
+              Message(role: MessageRole.user, content: item.query.data)
+            ];
+            if (item.response != null) {
+              contents.add(Message(
+                  role: MessageRole.assistant, content: item.response!.data));
+            }
+            return contents;
+          }).toList();
+  }
+
+  @override
+  OllamaClient getModel() {
+    return OllamaClient();
+  }
+}
+
+final _client = OllamaClient();
+// demo
+llamaBot({
+  final String? apiKey,
+  required final String message,
+  final String? instructions,
+}) async {
+  final response = await _client.generateChatCompletion(
+      request: const GenerateChatCompletionRequest(
+    model: 'mistreal:latest',
+    messages: [
+      Message(
+        role: MessageRole.user,
+        content: 'You are a helpful assistant.',
+      ),
+      Message(
+        role: MessageRole.assistant,
+        content: 'Why is the sky blue?',
+      ),
+      Message(
+        role: MessageRole.user,
+        content: 'You are a helpful assistant.',
+      ),
+    ],
+  ));
+  return response.message.content;
+}
+
+llamaBotStream() async {
+  final stream = _client.generateChatCompletionStream(
+    request: const GenerateChatCompletionRequest(
+      model: 'llama3.1',
+      messages: [
+        Message(
+          role: MessageRole.system,
+          content: 'You are a helpful assistant.',
+        ),
+        Message(
+          role: MessageRole.user,
+          content: 'Why is the sky blue?',
+        ),
+      ],
+    ),
+  );
+  String text = '';
+  await for (final res in stream) {
+    text += res.message.content.trim();
+  }
+  print(text);
+}

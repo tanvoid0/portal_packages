@@ -1,0 +1,116 @@
+// import 'package:test/test.dart';
+// import 'package:portal_core/models/cache_annotated_user.dart';
+//
+// // In-memory implementation for collection cache
+// class InMemoryCacheUserDefaultCollectionRepository {
+//   final List<CacheUserDefaultCollection> _data = [];
+//
+//   Future<List<CacheUserDefaultCollection>> getAll() async => _data;
+//   Future<CacheUserDefaultCollection?> getById(String id) async {
+//     try {
+//       return _data.firstWhere((u) => u.id == id);
+//     } catch (_) {
+//       return null;
+//     }
+//   }
+//
+//   Future<CacheUserDefaultCollection> create(
+//     CacheUserDefaultCollection user,
+//   ) async {
+//     _data.add(user);
+//     return user;
+//   }
+//
+//   Future<CacheUserDefaultCollection> update(
+//     CacheUserDefaultCollection user,
+//   ) async {
+//     final idx = _data.indexWhere((u) => u.id == user.id);
+//     if (idx != -1) _data[idx] = user;
+//     return user;
+//   }
+//
+//   Future<void> delete(String id) async {
+//     _data.removeWhere((u) => u.id == id);
+//   }
+//
+//   Future<void> clearAll() async {
+//     _data.clear();
+//   }
+// }
+//
+// // In-memory implementation for single cache
+// class InMemoryCacheUserSingleRepository {
+//   CacheUserSingle? _user;
+//
+//   Future<CacheUserSingle?> get() async => _user;
+//   Future<CacheUserSingle> create(CacheUserSingle user) async {
+//     if (_user != null) throw Exception('Entity already exists');
+//     _user = user;
+//     return user;
+//   }
+//
+//   Future<CacheUserSingle> update(CacheUserSingle user) async {
+//     if (_user == null) throw Exception('No entity to update');
+//     _user = user;
+//     return user;
+//   }
+//
+//   Future<void> delete() async {
+//     _user = null;
+//   }
+//
+//   Future<void> clearAll() async => delete();
+// }
+//
+// void main() {
+//   group('CacheUserDefaultCollectionCacheRepository (collection)', () {
+//     late InMemoryCacheUserDefaultCollectionRepository repo;
+//     setUp(() => repo = InMemoryCacheUserDefaultCollectionRepository());
+//
+//     test('CRUD and clearAll', () async {
+//       final user1 = CacheUserDefaultCollection(id: '1', name: 'A');
+//       final user2 = CacheUserDefaultCollection(id: '2', name: 'B');
+//       await repo.create(user1);
+//       await repo.create(user2);
+//       expect(await repo.getAll(), containsAll([user1, user2]));
+//       expect(await repo.getById('1'), equals(user1));
+//       final updated = await repo.update(
+//         CacheUserDefaultCollection(id: '1', name: 'AA'),
+//       );
+//       expect(updated.name, equals('AA'));
+//       await repo.delete('2');
+//       expect(await repo.getAll(), contains(user1));
+//       await repo.clearAll();
+//       expect(await repo.getAll(), isEmpty);
+//     });
+//   });
+//
+//   group('CacheUserSingleCacheRepository (single)', () {
+//     late InMemoryCacheUserSingleRepository repo;
+//     setUp(() => repo = InMemoryCacheUserSingleRepository());
+//
+//     test('CRUD and clearAll', () async {
+//       final user = CacheUserSingle(id: '1', name: 'A');
+//       expect(await repo.get(), isNull);
+//       await repo.create(user);
+//       expect(await repo.get(), equals(user));
+//       final updated = await repo.update(CacheUserSingle(id: '1', name: 'AA'));
+//       expect(updated.name, equals('AA'));
+//       await repo.delete();
+//       expect(await repo.get(), isNull);
+//       await repo.create(user);
+//       await repo.clearAll();
+//       expect(await repo.get(), isNull);
+//     });
+//
+//     test('create fails if already exists', () async {
+//       final user = CacheUserSingle(id: '1', name: 'A');
+//       await repo.create(user);
+//       expect(() => repo.create(user), throwsException);
+//     });
+//     test('update fails if no entity', () async {
+//       final user = CacheUserSingle(id: '1', name: 'A');
+//       expect(() => repo.update(user), throwsException);
+//     });
+//   });
+// }

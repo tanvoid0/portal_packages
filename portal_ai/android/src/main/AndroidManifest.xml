@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.tanvoid0.portal_ai">
+    <!-- Required on API 30+ for isPackageInstalled(Edge Gallery). -->
+    <queries>
+        <package android:name="com.google.ai.edge.gallery" />
+    </queries>
+</manifest>

@@ -1,0 +1,6 @@
+name: portal_card
+description: Portal surface card using PortalUiTheme.
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

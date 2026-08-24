@@ -1,0 +1,27 @@
+name: portal_ai
+description: Platform-aware local and cloud AI backend discovery for Portal apps.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ">=3.12.0 <4.0.0"
+  flutter: ">=3.44.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  google_generative_ai: ^0.4.7
+  http: ^1.2.0
+  shared_preferences: ^2.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.tanvoid0.portal_ai
+        pluginClass: PortalAiPlugin

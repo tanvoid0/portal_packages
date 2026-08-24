@@ -1,0 +1,18 @@
+import 'package:test/test.dart';
+import 'package:portal_core/models/cache_user.dart';
+
+void main() {
+  test('CacheUser toJson/fromJson roundtrip', () async {
+    final user = CacheUser(id: '1', name: 'Alice');
+    final json = user.toJson();
+    final user2 = cacheUserFromJson(json);
+    expect(user2.id, equals(user.id));
+    expect(user2.name, equals(user.name));
+  }, tags: ['cache']);
+
+  test('CacheUser copyWith works', () {
+    final user = CacheUser(id: '1', name: 'Alice');
+    final user2 = user.copyWith(name: 'Bob');
+    expect(user2.name, equals('Bob'));
+  }, tags: ['cache']);
+}

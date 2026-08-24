@@ -1,0 +1,165 @@
+import 'package:test/test.dart';
+import 'package:portal_core/models/user.dart';
+import 'package:uuid/uuid.dart';
+
+void main() {
+  test('User toJson/fromJson roundtrip', () {
+    final user = User(
+      id: '1',
+      name: 'Alice',
+      age: 30,
+      tags: [],
+      scores: {1, 2},
+      metadata: {'role': 'user'},
+      tagsSet: {'a', 'b'},
+      stats: {'count': 1},
+    );
+    final json = user.toJson();
+    final user2 = userFromJson(json);
+    expect(user2.id, equals(user.id));
+    expect(user2.name, equals(user.name));
+    expect(user2.age, equals(user.age));
+  });
+
+  test('User getId returns id', () {
+    final user = User(
+      id: '1',
+      name: 'Alice',
+      age: 30,
+      tags: [],
+      scores: {1, 2},
+      metadata: {'role': 'user'},
+      tagsSet: {'a', 'b'},
+      stats: {'count': 1},
+    );
+    expect(user.getId(), equals('1'));
+  });
+
+  test('UserFactory.auto generates a UUID if id is not provided', () {
+    final user = UserFactory.auto(name: 'Alice', age: 30, scores: {1, 2});
+    expect(user.id, isNotNull);
+    expect(user.id, isA<String>());
+    expect(user.id.length, greaterThanOrEqualTo(30)); // UUID v4 length check
+  });
+
+  test('UserFactory.auto uses provided id if given', () {
+    final customId = Uuid().v4();
+    final user = UserFactory.auto(
+      id: customId,
+      name: 'Bob',
+      age: 25,
+      scores: {1, 2},
+    );
+    expect(user.id, equals(customId));
+  });
+
+  test('UserFactory.auto uses @Default value for age if not provided', () {
+    final user = UserFactory.auto(name: 'Alice', scores: {1, 2});
+    expect(user.age, equals(18));
+  });
+
+  test('UserFactory.auto allows overriding @Default value for age', () {
+    final user = UserFactory.auto(name: 'Alice', age: 99, scores: {1, 2});
+    expect(user.age, equals(99));
+  });
+
+  test(
+    'UserFactory.auto uses @Default value for tags (List) if not provided',
+    () {
+      final user = UserFactory.auto(name: 'Alice', scores: {1, 2});
+      expect(user.tags, equals([]));
+    },
+  );
+
+  test('UserFactory.auto allows overriding @Default value for tags (List)', () {
+    final user = UserFactory.auto(
+      name: 'Alice',
+      tags: ['a', 'b'],
+      scores: {1, 2},
+    );
+    expect(user.tags, equals(['a', 'b']));
+  });
+
+  test(
+    'UserFactory.auto uses @Default value for metadata (Map) if not provided',
+    () {
+      final user = UserFactory.auto(name: 'Alice', scores: {1, 2});
+      expect(user.metadata, equals({'role': 'user'}));
+    },
+  );
+
+  test(
+    'UserFactory.auto allows overriding @Default value for metadata (Map)',
+    () {
+      final user = UserFactory.auto(
+        name: 'Alice',
+        scores: {1, 2},
+        metadata: {'role': 'admin'},
+      );
+      expect(user.metadata, equals({'role': 'admin'}));
+    },
+  );
+
+  test('User copyWith updates fields correctly', () {
+    final user = User(
+      id: '1',
+      name: 'Alice',
+      age: 20,
+      tags: [],
+      scores: {1, 2},
+      metadata: {'role': 'user'},
+    );
+    final updatedId = user.copyWith(id: '2', scores: {1, 2});
+    final updatedName = user.copyWith(name: 'Bob', scores: {1, 2});
+    final updatedAge = user.copyWith(age: 30, scores: {1, 2});
+    expect(updatedId.id, equals('2'));
+    expect(updatedId.name, equals('Alice'));
+    expect(updatedName.name, equals('Bob'));
+    expect(updatedName.id, equals('1'));
+    expect(updatedAge.age, equals(30));
+    expect(updatedAge.id, equals('1'));
+    expect(updatedId.scores, equals({1, 2}));
+    expect(updatedName.scores, equals({1, 2}));
+    expect(updatedAge.scores, equals({1, 2}));
+  });
+
+  test(
+    'UserFactory.auto uses @Default value for tagsSet (Set) if not provided',
+    () {
+      final user = UserFactory.auto(name: 'Alice', scores: {1, 2});
+      expect(user.tagsSet, equals({'a', 'b'}));
+    },
+  );
+
+  test(
+    'UserFactory.auto allows overriding @Default value for tagsSet (Set)',
+    () {
+      final user = UserFactory.auto(
+        name: 'Alice',
+        tagsSet: {'z'},
+        scores: {1, 2},
+      );
+      expect(user.tagsSet, equals({'z'}));
+    },
+  );
+
+  test(
+    'UserFactory.auto uses @Default value for stats (Map<String, int>) if not provided',
+    () {
+      final user = UserFactory.auto(name: 'Alice', scores: {1, 2});
+      expect(user.stats, equals({'count': 1}));
+    },
+  );
+
+  test(
+    'UserFactory.auto allows overriding @Default value for stats (Map<String, int>)',
+    () {
+      final user = UserFactory.auto(
+        name: 'Alice',
+        stats: {'other': 2},
+        scores: {1, 2},
+      );
+      expect(user.stats, equals({'other': 2}));
+    },
+  );
+}

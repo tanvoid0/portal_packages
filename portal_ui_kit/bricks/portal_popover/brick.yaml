@@ -1,0 +1,6 @@
+name: portal_popover
+description: Anchored popover overlay (shadcn Popover).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

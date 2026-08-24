@@ -1,0 +1,6 @@
+name: portal_text_area
+description: Portal multiline text field (shadcn Textarea).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

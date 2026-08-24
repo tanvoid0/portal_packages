@@ -1,0 +1,6 @@
+name: portal_collapsible
+description: Portal expand/collapse section (shadcn Collapsible).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

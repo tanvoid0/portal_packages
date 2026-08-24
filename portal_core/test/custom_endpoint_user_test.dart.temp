@@ -1,0 +1,110 @@
+import 'package:test/test.dart';
+import 'package:portal_core/models/custom_endpoint_user.dart';
+
+class MockCustomEndpointUserRepository {
+  final List<String> calls = [];
+  final List<dynamic> params = [];
+
+  String get endpoint => '/api/v1/custom-users';
+
+  Future<List<CustomEndpointUser>> getAll() async {
+    calls.add('getAll');
+    return [];
+  }
+
+  Future<CustomEndpointUser?> getById(String id) async {
+    calls.add('getById');
+    params.add(id);
+    return null;
+  }
+
+  Future<CustomEndpointUser> create(CustomEndpointUser user) async {
+    calls.add('create');
+    params.add(user);
+    return user;
+  }
+
+  Future<CustomEndpointUser> update(CustomEndpointUser user) async {
+    calls.add('update');
+    params.add(user);
+    return user;
+  }
+
+  Future<void> delete(String id) async {
+    calls.add('delete');
+    params.add(id);
+  }
+}
+
+void main() {
+  test('CustomEndpointUserRepository uses custom endpoint', () {
+    final repo = MockCustomEndpointUserRepository();
+    expect(repo.endpoint, equals('/api/v1/custom-users'));
+  });
+
+  test('CustomEndpointUserRepository getAll invokes correct API', () async {
+    final repo = MockCustomEndpointUserRepository();
+    await repo.getAll();
+    expect(repo.calls, contains('getAll'));
+  });
+
+  test('CustomEndpointUserRepository getById passes id', () async {
+    final repo = MockCustomEndpointUserRepository();
+    await repo.getById('abc');
+    expect(repo.calls, contains('getById'));
+    expect(repo.params, contains('abc'));
+  });
+
+  test('CustomEndpointUserRepository create passes user', () async {
+    final repo = MockCustomEndpointUserRepository();
+    final user = CustomEndpointUser(
+      id: '1',
+      name: 'Test',
+      email: 'test@example.com',
+    );
+    await repo.create(user);
+    expect(repo.calls, contains('create'));
+    expect(repo.params, contains(user));
+  });
+
+  test('CustomEndpointUserRepository update passes user', () async {
+    final repo = MockCustomEndpointUserRepository();
+    final user = CustomEndpointUser(
+      id: '2',
+      name: 'Update',
+      email: 'update@example.com',
+    );
+    await repo.update(user);
+    expect(repo.calls, contains('update'));
+    expect(repo.params, contains(user));
+  });
+
+  test('CustomEndpointUserRepository delete passes id', () async {
+    final repo = MockCustomEndpointUserRepository();
+    await repo.delete('xyz');
+    expect(repo.calls, contains('delete'));
+    expect(repo.params, contains('xyz'));
+  });
+
+  test('CustomEndpointUser toJson/fromJson roundtrip', () {
+    final user = CustomEndpointUser(
+      id: '1',
+      name: 'Alice',
+      email: 'alice@example.com',
+    );
+    final json = user.toJson();
+    final user2 = customEndpointUserFromJson(json);
+    expect(user2.id, equals(user.id));
+    expect(user2.name, equals(user.name));
+    expect(user2.email, equals(user.email));
+  });
+
+  test('CustomEndpointUser getId returns id', () {
+    final user = CustomEndpointUser(
+      id: '1',
+      name: 'Alice',
+      email: 'alice@example.com',
+    );
+    expect(user.getId(), equals('1'));
+  });
+}

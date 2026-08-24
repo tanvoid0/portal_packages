@@ -1,0 +1,6 @@
+name: portal_scroll_area
+description: Portal scrollable region with optional scrollbar (shadcn Scroll Area).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

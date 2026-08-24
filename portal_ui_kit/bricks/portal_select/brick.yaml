@@ -1,0 +1,6 @@
+name: portal_select
+description: Portal dropdown select (shadcn Select).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

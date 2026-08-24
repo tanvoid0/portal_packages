@@ -1,0 +1,18 @@
+name: portal_ui_compat
+description: Deprecated token aliases mapping to portal_ui_core for legacy apps.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  portal_ui_core:
+    path: ../portal_ui_core
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0

@@ -1,0 +1,6 @@
+name: portal_pagination
+description: Portal page controls (shadcn Pagination).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

@@ -1,0 +1,62 @@
+name: portal_bot
+description: "A new chatbot helper client"
+version: 0.0.1
+homepage:
+
+environment:
+  sdk: ^3.8.1
+  flutter: '>=3.3.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+  web: ^1.0.0
+  plugin_platform_interface: ^2.0.2
+  freezed: ^3.1.0
+  freezed_annotation: ^3.1.0
+  uuid: ^4.5.1
+  chat_gpt_sdk: ^3.1.5
+  envied: ^1.1.1
+  google_generative_ai: ^0.4.7
+  json_annotation: ^4.9.0
+  json_serializable: ^6.9.5
+  font_awesome_flutter: ^10.8.0
+  http: ^1.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  envied_generator: ^1.1.1
+  build_runner: ^2.5.4
+  source_gen: ^2.0.0
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+# The following section is specific to Flutter packages.
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.tanvoid0.portal_bot
+        pluginClass: PortalBotPlugin
+      ios:
+        pluginClass: PortalBotPlugin
+      linux:
+        pluginClass: PortalBotPlugin
+      macos:
+        pluginClass: PortalBotPlugin
+      windows:
+        pluginClass: PortalBotPluginCApi
+      web:
+        pluginClass: PortalBotWeb
+        fileName: portal_bot_web.dart
+
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/
+  uses-material-design: true

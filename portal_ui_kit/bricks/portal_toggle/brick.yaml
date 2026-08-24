@@ -1,0 +1,6 @@
+name: portal_toggle
+description: Portal icon/text toggle (shadcn Toggle).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

@@ -1,0 +1,6 @@
+name: portal_avatar
+description: Portal avatar (shadcn Avatar).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

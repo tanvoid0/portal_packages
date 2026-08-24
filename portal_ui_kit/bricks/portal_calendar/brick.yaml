@@ -1,0 +1,6 @@
+name: portal_calendar
+description: Portal month calendar (shadcn Calendar — month grid only).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

@@ -1,0 +1,6 @@
+name: portal_text_field
+description: Portal-styled text field using PortalUiTheme.
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

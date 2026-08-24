@@ -1,0 +1,6 @@
+name: portal_aspect_ratio
+description: Portal aspect ratio wrapper (shadcn Aspect Ratio).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

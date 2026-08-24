@@ -1,0 +1,82 @@
+# Register local bricks. Run `dart pub global activate mason_cli` then `mason get`.
+bricks:
+  portal_button:
+    path: bricks/portal_button
+  portal_text_field:
+    path: bricks/portal_text_field
+  portal_card:
+    path: bricks/portal_card
+  portal_badge:
+    path: bricks/portal_badge
+  portal_divider:
+    path: bricks/portal_divider
+  portal_alert:
+    path: bricks/portal_alert
+  portal_avatar:
+    path: bricks/portal_avatar
+  portal_checkbox:
+    path: bricks/portal_checkbox
+  portal_dialog:
+    path: bricks/portal_dialog
+  portal_label:
+    path: bricks/portal_label
+  portal_progress:
+    path: bricks/portal_progress
+  portal_radio_group:
+    path: bricks/portal_radio_group
+  portal_select:
+    path: bricks/portal_select
+  portal_skeleton:
+    path: bricks/portal_skeleton
+  portal_spinner:
+    path: bricks/portal_spinner
+  portal_slidable:
+    path: bricks/portal_slidable
+  portal_slider:
+    path: bricks/portal_slider
+  portal_switch:
+    path: bricks/portal_switch
+  portal_tabs:
+    path: bricks/portal_tabs
+  portal_text_area:
+    path: bricks/portal_text_area
+  portal_tooltip:
+    path: bricks/portal_tooltip
+  portal_accordion:
+    path: bricks/portal_accordion
+  portal_sheet:
+    path: bricks/portal_sheet
+  portal_breadcrumb:
+    path: bricks/portal_breadcrumb
+  portal_toggle:
+    path: bricks/portal_toggle
+  portal_separator:
+    path: bricks/portal_separator
+  portal_table:
+    path: bricks/portal_table
+  portal_aspect_ratio:
+    path: bricks/portal_aspect_ratio
+  portal_collapsible:
+    path: bricks/portal_collapsible
+  portal_pagination:
+    path: bricks/portal_pagination
+  portal_snackbar:
+    path: bricks/portal_snackbar
+  portal_scroll_area:
+    path: bricks/portal_scroll_area
+  portal_command:
+    path: bricks/portal_command
+  portal_dropdown_menu:
+    path: bricks/portal_dropdown_menu
+  portal_calendar:
+    path: bricks/portal_calendar
+  portal_form:
+    path: bricks/portal_form
+  portal_popover:
+    path: bricks/portal_popover
+  portal_combobox:
+    path: bricks/portal_combobox
+  portal_input_otp:
+    path: bricks/portal_input_otp
+  portal_sidebar:
+    path: bricks/portal_sidebar

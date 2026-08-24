@@ -1,0 +1,6 @@
+name: portal_alert
+description: Portal alert / callout using PortalUiTheme (shadcn-style Alert).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

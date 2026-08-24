@@ -1,0 +1,6 @@
+name: portal_input_otp
+description: One-time passcode input (shadcn Input OTP).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

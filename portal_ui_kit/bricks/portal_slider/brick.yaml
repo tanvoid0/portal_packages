@@ -1,0 +1,6 @@
+name: portal_slider
+description: Portal slider (shadcn Slider).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

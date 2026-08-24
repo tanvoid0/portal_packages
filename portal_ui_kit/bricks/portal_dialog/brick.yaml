@@ -1,0 +1,6 @@
+name: portal_dialog
+description: Portal alert dialog helpers (shadcn Alert Dialog).
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0

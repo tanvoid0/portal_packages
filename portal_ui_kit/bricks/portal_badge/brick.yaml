@@ -1,0 +1,6 @@
+name: portal_badge
+description: Portal status badge using PortalUiTheme.
+version: 0.1.0
+
+environment:
+  mason: ^0.1.0
