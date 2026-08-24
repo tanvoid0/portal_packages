@@ -80,6 +80,12 @@ abstract final class PortalSentry {
     await Sentry.captureException(exception, stackTrace: stackTrace);
   }
 
+  /// Attaches the signed-in user to the Sentry scope.
+  ///
+  /// Only the opaque id goes up unless [PortalSentryEnv.sendPii] is set —
+  /// sending email and display name by default contradicted
+  /// `sendDefaultPii = false` and put identifiable data in a third-party
+  /// service for apps holding financial and health records.
   static void syncUser(Map<String, dynamic>? user) {
     if (!_initialized) return;
 
@@ -92,11 +98,16 @@ abstract final class PortalSentry {
       scope.setUser(
         SentryUser(
           id: _userId(user),
-          email: user['email'] as String?,
-          username: (user['name'] as String?)?.trim(),
+          email: _sendPii ? user['email'] as String? : null,
+          username: _sendPii ? (user['name'] as String?)?.trim() : null,
         ),
       );
     });
+  }
+
+  static bool get _sendPii {
+    final raw = _env(PortalSentryEnv.sendPii)?.toLowerCase();
+    return raw == 'true' || raw == '1' || raw == 'yes';
   }
 
   static String? _env(String key) => dotenv.env[key]?.trim();
