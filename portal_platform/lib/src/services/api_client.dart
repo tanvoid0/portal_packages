@@ -42,7 +42,16 @@ class ApiClient extends GetxService {
   final TokenStorage _tokenStorage = TokenStorage();
   final Uuid _uuid = const Uuid();
 
+  /// Reset by [_storeSession] and a successful refresh so a later expiry on a
+  /// new session still clears tokens and redirects.
   bool _handlingSessionExpiry = false;
+
+  /// Set while a refresh is running so concurrent 401s await the same call.
+  Future<bool>? _refreshInFlight;
+
+  /// Refresh must not hang: with single-flight, one stuck call blocks every
+  /// waiter.
+  static const Duration _refreshTimeout = Duration(seconds: 15);
 
   /// Initialize the API client with [baseUrl] from [AppConfig.fromEnv].
   Future<ApiClient> init({required String baseUrl}) async {
@@ -237,31 +246,56 @@ class ApiClient extends GetxService {
     }
   }
 
-  /// Refresh access token using refresh token
-  Future<bool> refreshToken() async {
+  /// Refresh access token using refresh token.
+  ///
+  /// Single-flight: concurrent 401s share one refresh call. Refresh tokens
+  /// rotate server-side, so parallel refreshes invalidate each other and the
+  /// losers get signed out mid-session.
+  Future<bool> refreshToken() {
+    return _refreshInFlight ??= _performRefresh().whenComplete(() {
+      _refreshInFlight = null;
+    });
+  }
+
+  Future<bool> _performRefresh() async {
     final refreshToken = await _tokenStorage.getRefreshToken();
     if (refreshToken == null) return false;
 
+    final url = '$baseUrl/auth/refresh';
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/auth/refresh').normalizePath(),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'refresh_token': refreshToken}),
-      );
+      final response = await http
+          .post(
+            Uri.parse(url).normalizePath(),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'refresh_token': refreshToken}),
+          )
+          .timeout(_refreshTimeout);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         await _tokenStorage.saveTokens(
-          accessToken: data['access_token'],
-          refreshToken: data['refresh_token'],
+          accessToken: data['access_token'] as String,
+          refreshToken: data['refresh_token'] as String,
         );
+        _handlingSessionExpiry = false;
         return true;
       }
-    } catch (e) {
-      // Refresh failed
+    } catch (e, st) {
+      _logRequestError('POST', url, e, st);
     }
 
     return false;
+  }
+
+  /// Persists tokens and profile from an auth response and marks the session
+  /// live again, so a later expiry is handled instead of silently swallowed.
+  Future<void> _storeSession(dynamic data) async {
+    await _tokenStorage.saveTokens(
+      accessToken: data['tokens']['access_token'] as String,
+      refreshToken: data['tokens']['refresh_token'] as String,
+    );
+    await _tokenStorage.saveUser(data['user']);
+    _handlingSessionExpiry = false;
   }
 
   /// Clears stored credentials and returns the user to login when refresh fails.
@@ -743,11 +777,7 @@ class ApiClient extends GetxService {
       ),
     );
 
-    await _tokenStorage.saveTokens(
-      accessToken: data['tokens']['access_token'],
-      refreshToken: data['tokens']['refresh_token'],
-    );
-    await _tokenStorage.saveUser(data['user']);
+    await _storeSession(data);
 
     return Map<String, dynamic>.from(data as Map);
   }
@@ -767,11 +797,7 @@ class ApiClient extends GetxService {
       ),
     );
 
-    await _tokenStorage.saveTokens(
-      accessToken: data['tokens']['access_token'],
-      refreshToken: data['tokens']['refresh_token'],
-    );
-    await _tokenStorage.saveUser(data['user']);
+    await _storeSession(data);
 
     return Map<String, dynamic>.from(data as Map);
   }
@@ -792,11 +818,7 @@ class ApiClient extends GetxService {
       ),
     );
 
-    await _tokenStorage.saveTokens(
-      accessToken: data['tokens']['access_token'],
-      refreshToken: data['tokens']['refresh_token'],
-    );
-    await _tokenStorage.saveUser(data['user']);
+    await _storeSession(data);
 
     return Map<String, dynamic>.from(data as Map);
   }
@@ -817,11 +839,7 @@ class ApiClient extends GetxService {
       ),
     );
 
-    await _tokenStorage.saveTokens(
-      accessToken: data['tokens']['access_token'],
-      refreshToken: data['tokens']['refresh_token'],
-    );
-    await _tokenStorage.saveUser(data['user']);
+    await _storeSession(data);
 
     return Map<String, dynamic>.from(data as Map);
   }
