@@ -52,7 +52,7 @@ class OllamaCompletionClient implements AiCompletionClient {
     };
 
     final response = await _client.post(
-      Uri.parse('${_normalizedBaseUrl}/api/chat'),
+      Uri.parse('$_normalizedBaseUrl/api/chat'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(body),
     );
@@ -94,7 +94,7 @@ class OllamaCompletionClient implements AiCompletionClient {
 
     final request = http.Request(
       'POST',
-      Uri.parse('${_normalizedBaseUrl}/api/chat'),
+      Uri.parse('$_normalizedBaseUrl/api/chat'),
     );
     request.headers['Content-Type'] = 'application/json';
     request.body = jsonEncode(body);

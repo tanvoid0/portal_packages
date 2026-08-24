@@ -8,8 +8,7 @@ import 'ollama_completion_client.dart';
 
 /// Builds an [AiCompletionClient] for the selected backend.
 class AiCompletionClientFactory {
-  AiCompletionClientFactory({GeminiModelCatalog? geminiCatalog})
-      : _geminiCatalog = geminiCatalog;
+  AiCompletionClientFactory({this._geminiCatalog});
 
   final GeminiModelCatalog? _geminiCatalog;
 

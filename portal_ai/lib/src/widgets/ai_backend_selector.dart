@@ -190,7 +190,7 @@ class _OptionTile extends StatelessWidget {
     final subtitle = option.available
         ? [
             description,
-            if (modelsSummary != null) modelsSummary,
+            ?modelsSummary,
           ].join('\n')
         : (option.unavailableReason ?? labels.unavailable);
 

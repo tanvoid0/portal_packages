@@ -6,9 +6,9 @@ import '../models/ai_backend_option.dart';
 /// Persists AI backend preferences per app.
 class AiBackendStore {
   AiBackendStore({
-    required SharedPreferences prefs,
+    required this._prefs,
     this.keyPrefix = 'portal_ai',
-  }) : _prefs = prefs;
+  });
 
   final SharedPreferences _prefs;
   final String keyPrefix;

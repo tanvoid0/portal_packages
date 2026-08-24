@@ -13,13 +13,11 @@ class AiBackendDiscovery {
     OllamaProbe? ollamaProbe,
     EdgeGalleryProbe? edgeGalleryProbe,
     LiteRtProbe? liteRtProbe,
-    GeminiModelCatalog? geminiCatalog,
-    List<String> onDeviceModels = const [],
+    this._geminiCatalog,
+    this._onDeviceModels = const [],
   })  : _ollamaProbe = ollamaProbe ?? OllamaProbe(),
         _edgeGalleryProbe = edgeGalleryProbe ?? EdgeGalleryProbe(),
-        _liteRtProbe = liteRtProbe ?? LiteRtProbe(),
-        _geminiCatalog = geminiCatalog,
-        _onDeviceModels = onDeviceModels;
+        _liteRtProbe = liteRtProbe ?? LiteRtProbe();
 
   final OllamaProbe _ollamaProbe;
   final EdgeGalleryProbe _edgeGalleryProbe;
@@ -63,7 +61,7 @@ class AiBackendDiscovery {
         metadata: {
           'capable': liteRtResult.isCapable,
           'configured': liteRtResult.isConfigured,
-          if (onDeviceModelPath != null) 'modelPath': onDeviceModelPath,
+          'modelPath': ?onDeviceModelPath,
         },
       ),
     );
