@@ -1,4 +1,4 @@
-library portal_crypto;
+library;
 
 export 'src/key_derivation.dart';
 export 'src/key_wrap.dart';

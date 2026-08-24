@@ -1,4 +1,4 @@
-library portal_vault;
+library;
 
 export 'src/backup/backup_orchestrator.dart';
 export 'src/local/local_vault_dek_store.dart';
