@@ -11,11 +11,18 @@ import 'sync_operation.dart';
 abstract final class EncryptedSyncQueueCodec {
   static final DeviceSecretStorage _secrets = DeviceSecretStorage();
 
+  /// Reads the device key, minting one only on first use. Writing on every
+  /// call put a secure-storage write on the path of every encrypt and decrypt
+  /// for no gain.
   static Future<SecretKey> _queueKey() async {
-    var raw = await _secrets.getSyncQueueKey();
-    raw ??= await SecretBoxCodec.exportKey(await SecretBoxCodec.randomKey());
-    await _secrets.setSyncQueueKey(raw);
-    return SecretBoxCodec.importKey(raw);
+    final existing = await _secrets.getSyncQueueKey();
+    if (existing != null) return SecretBoxCodec.importKey(existing);
+
+    final fresh = await SecretBoxCodec.exportKey(
+      await SecretBoxCodec.randomKey(),
+    );
+    await _secrets.setSyncQueueKey(fresh);
+    return SecretBoxCodec.importKey(fresh);
   }
 
   static Future<String> encryptOperations(List<SyncOperation> ops) async {

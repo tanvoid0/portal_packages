@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -53,11 +55,41 @@ class SyncQueue extends GetxService {
   /// Reactive count of operations still waiting to be pushed.
   final pendingCount = 0.obs;
 
+  /// Serialises access so concurrent callers cannot interleave a
+  /// load → modify → save cycle and drop each other's operations.
+  ///
+  /// ponytail: one lock for the whole queue. Every mutation is a single
+  /// SharedPreferences write, so contention is not worth per-entity locks
+  /// unless a profile says otherwise.
+  Future<void> _lock = Future<void>.value();
+
+  Future<T> _withLock<T>(Future<T> Function() action) {
+    final result = Completer<T>();
+    // The chain must never carry an error forward or every later caller
+    // inherits it, so failures land on [result] and the lock stays clean.
+    _lock = _lock.then((_) async {
+      try {
+        result.complete(await action());
+      } catch (e, st) {
+        result.completeError(e, st);
+      }
+    });
+    return result.future;
+  }
+
   /// Load the persisted queue length and return `this` for use with
   /// [Get.putAsync].
   Future<SyncQueue> init() async {
-    final ops = await _load();
-    pendingCount.value = ops.length;
+    try {
+      final ops = await _withLock(_load);
+      pendingCount.value = ops.length;
+    } catch (e) {
+      // Startup must not fail on an unreadable queue. The badge count is
+      // cosmetic; mutating calls surface the real error and the persisted
+      // operations are left untouched.
+      debugPrint('[SyncQueue] Failed to read queue length: $e');
+      pendingCount.value = 0;
+    }
     return this;
   }
 
@@ -65,51 +97,55 @@ class SyncQueue extends GetxService {
   /// any existing pending operation for the same entity.
   ///
   /// See the class-level documentation for the full merge table.
-  Future<void> enqueue(SyncOperation op) async {
-    final ops = await _load();
-    final idx = ops.indexWhere(
-      (o) => o.entityType == op.entityType && o.entityId == op.entityId,
-    );
+  Future<void> enqueue(SyncOperation op) => _withLock(() async {
+        final ops = await _load();
+        final idx = ops.indexWhere(
+          (o) => o.entityType == op.entityType && o.entityId == op.entityId,
+        );
 
-    if (idx >= 0) {
-      final existing = ops[idx];
-      final merged = _merge(existing, op);
-      if (merged == null) {
-        ops.removeAt(idx);
-      } else {
-        ops[idx] = merged;
-      }
-    } else {
-      ops.add(op);
-    }
+        if (idx >= 0) {
+          final existing = ops[idx];
+          final merged = _merge(existing, op);
+          if (merged == null) {
+            ops.removeAt(idx);
+          } else {
+            ops[idx] = merged;
+          }
+        } else {
+          ops.add(op);
+        }
 
-    await _save(ops);
-    pendingCount.value = ops.length;
-  }
+        await _save(ops);
+        pendingCount.value = ops.length;
+      });
 
   /// Return all pending operations for [entityType], sorted by
   /// [SyncOperation.createdAt] ascending (oldest first).
-  Future<List<SyncOperation>> getByEntityType(String entityType) async {
-    final ops = await _load();
-    return ops.where((o) => o.entityType == entityType).toList()
-      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-  }
+  ///
+  /// Takes the lock too: [_load] rewrites the entry when it migrates a
+  /// legacy plaintext queue.
+  Future<List<SyncOperation>> getByEntityType(String entityType) =>
+      _withLock(() async {
+        final ops = await _load();
+        return ops.where((o) => o.entityType == entityType).toList()
+          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      });
 
   /// Remove a single completed operation by its [operationId].
-  Future<void> remove(String operationId) async {
-    final ops = await _load();
-    ops.removeWhere((o) => o.id == operationId);
-    await _save(ops);
-    pendingCount.value = ops.length;
-  }
+  Future<void> remove(String operationId) => _withLock(() async {
+        final ops = await _load();
+        ops.removeWhere((o) => o.id == operationId);
+        await _save(ops);
+        pendingCount.value = ops.length;
+      });
 
   /// Remove **all** pending operations for [entityType].
-  Future<void> clearEntityType(String entityType) async {
-    final ops = await _load();
-    ops.removeWhere((o) => o.entityType == entityType);
-    await _save(ops);
-    pendingCount.value = ops.length;
-  }
+  Future<void> clearEntityType(String entityType) => _withLock(() async {
+        final ops = await _load();
+        ops.removeWhere((o) => o.entityType == entityType);
+        await _save(ops);
+        pendingCount.value = ops.length;
+      });
 
   // ─── Deduplication ──────────────────────────────────────────────────
 
@@ -134,20 +170,20 @@ class SyncQueue extends GetxService {
 
   // ─── Persistence ───────────────────────────────────────────────────
 
+  /// Throws when the persisted queue cannot be read or decrypted.
+  ///
+  /// Deliberately not swallowed: every mutating caller does load → modify →
+  /// save, so returning an empty list on a transient read failure would
+  /// overwrite the pending operations with whatever survived that call.
   Future<List<SyncOperation>> _load() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_storageKey);
-      if (raw == null || raw.isEmpty) return [];
-      final migrated = await EncryptedSyncQueueCodec.migrateIfNeeded(raw);
-      if (migrated != raw) {
-        await prefs.setString(_storageKey, migrated);
-      }
-      return EncryptedSyncQueueCodec.decryptOperations(migrated);
-    } catch (e) {
-      debugPrint('[SyncQueue] Failed to load queue: $e');
-      return [];
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_storageKey);
+    if (raw == null || raw.isEmpty) return [];
+    final migrated = await EncryptedSyncQueueCodec.migrateIfNeeded(raw);
+    if (migrated != raw) {
+      await prefs.setString(_storageKey, migrated);
     }
+    return await EncryptedSyncQueueCodec.decryptOperations(migrated);
   }
 
   Future<void> _save(List<SyncOperation> ops) async {

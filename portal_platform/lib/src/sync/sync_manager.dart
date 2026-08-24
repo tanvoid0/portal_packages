@@ -95,13 +95,22 @@ class SyncManager extends GetxService {
     isSyncing.value = true;
 
     try {
+      var failed = 0;
       for (final repo in _repositories) {
-        await repo.sync();
+        // Isolate per repository: one unreadable queue or dead endpoint must
+        // not skip every repository behind it in the cycle.
+        try {
+          await repo.sync();
+        } catch (e) {
+          failed++;
+          debugPrint('[SyncManager] Sync error in ${repo.runtimeType}: $e');
+        }
       }
       lastSyncAt.value = DateTime.now();
-      debugPrint('[SyncManager] Sync completed at ${lastSyncAt.value}');
-    } catch (e) {
-      debugPrint('[SyncManager] Sync error: $e');
+      debugPrint(
+        '[SyncManager] Sync completed at ${lastSyncAt.value}'
+        '${failed > 0 ? ' ($failed of ${_repositories.length} failed)' : ''}',
+      );
     } finally {
       isSyncing.value = false;
     }
