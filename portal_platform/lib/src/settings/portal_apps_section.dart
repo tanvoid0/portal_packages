@@ -58,7 +58,8 @@ class PortalAppsSection extends StatefulWidget {
   State<PortalAppsSection> createState() => _PortalAppsSectionState();
 }
 
-class _PortalAppsSectionState extends State<PortalAppsSection> {
+class _PortalAppsSectionState extends State<PortalAppsSection>
+    with WidgetsBindingObserver {
   List<PortalRelease>? _apps;
   String? _error;
 
@@ -68,10 +69,48 @@ class _PortalAppsSectionState extends State<PortalAppsSection> {
   /// update rather than a failure.
   final _installed = <String>{};
 
+  bool _refreshing = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (portalCanInstallApps(widget.service)) _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Installing leaves for Android's installer and comes back, so resuming is
+  /// the one moment this list is reliably wrong: the row that was just
+  /// installed still says Install. Re-probing here is what makes the state
+  /// look after itself; nothing else notices the install happened.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _apps != null) _probeInstalled();
+  }
+
+  /// Asks each listed app whether it is there. Cheap enough to repeat, but not
+  /// per-rebuild: it is a platform round-trip per app and the list rebuilds on
+  /// every scroll frame.
+  Future<void> _probeInstalled() async {
+    final apps = _apps;
+    if (apps == null) return;
+    if (mounted) setState(() => _refreshing = true);
+    final found = <String>{};
+    for (final app in apps) {
+      if (await _isInstalled(app.slug)) found.add(app.slug);
+    }
+    if (!mounted) return;
+    setState(() {
+      _refreshing = false;
+      _installed
+        ..clear()
+        ..addAll(found);
+    });
   }
 
   Future<void> _load() async {
@@ -81,22 +120,9 @@ class _PortalAppsSectionState extends State<PortalAppsSection> {
     });
     try {
       final manifest = await widget.service.fetchManifest();
-      final apps = manifest.others(widget.service.slug);
-
-      // Probed once per load, not per rebuild: canLaunchUrl is a platform
-      // round-trip and the list rebuilds on every scroll frame.
-      final installed = <String>{};
-      for (final app in apps) {
-        if (await _isInstalled(app.slug)) installed.add(app.slug);
-      }
-
       if (!mounted) return;
-      setState(() {
-        _apps = apps;
-        _installed
-          ..clear()
-          ..addAll(installed);
-      });
+      setState(() => _apps = manifest.others(widget.service.slug));
+      await _probeInstalled();
     } on PortalUpdateException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
@@ -134,6 +160,10 @@ class _PortalAppsSectionState extends State<PortalAppsSection> {
       // dismissed-version key.
       rememberRefusal: false,
     );
+    // Belt to the lifecycle braces: the dialog can finish without the app ever
+    // having been backgrounded (a refusal, a failed download), and then no
+    // resume fires to correct the row.
+    await _probeInstalled();
   }
 
   @override
@@ -220,6 +250,20 @@ class _PortalAppsSectionState extends State<PortalAppsSection> {
                         child: Text(labels.install),
                       ),
               ),
+        // A force-check. Resuming re-probes on its own, but an app installed
+        // through some other route while this screen was already open leaves
+        // no signal at all, and "why does it still say Install" is not
+        // something a user should have to guess their way out of.
+        TextButton.icon(
+          onPressed: _refreshing ? null : _probeInstalled,
+          icon: _refreshing
+              ? const SizedBox.square(
+                  dimension: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh_rounded, size: 18),
+          label: Text(labels.checkAgain),
+        ),
       ],
     );
   }

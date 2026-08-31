@@ -126,3 +126,34 @@ ScrollbarThemeData portalScrollbarTheme(PortalUiTheme portal) {
     thumbColor: WidgetStatePropertyAll(portal.border),
   );
 }
+
+/// [base] with only its primary family replaced by one derived from [seed].
+///
+/// For an app whose [ColorScheme] is hand-tuned rather than generated: it lets
+/// the user pick an accent without giving up the surfaces someone chose on
+/// purpose. Surfaces, neutrals, secondary, tertiary and error are untouched —
+/// a palette picks an accent, not a new skin. Rebuilding the whole scheme from
+/// the seed is the obvious move and the wrong one: it moves every surface too,
+/// which turns a settings toggle into a restyle.
+///
+/// The five roles come from Material's own algorithm, so the contrast pairs
+/// are correct for any seed. That is the half that is easy to get wrong by
+/// hand and the reason this does not just set `primary`.
+///
+/// Contrast *against the app's own surfaces* is the part no algorithm here can
+/// check — a seed tuned for Material's neutrals may sit differently on a hand
+/// -picked canvas. Look at a light seed and a dark one, in both brightnesses,
+/// before shipping a new palette.
+ColorScheme portalSchemeWithSeed(ColorScheme base, Color seed) {
+  final derived = ColorScheme.fromSeed(
+    seedColor: seed,
+    brightness: base.brightness,
+  );
+  return base.copyWith(
+    primary: derived.primary,
+    onPrimary: derived.onPrimary,
+    primaryContainer: derived.primaryContainer,
+    onPrimaryContainer: derived.onPrimaryContainer,
+    inversePrimary: derived.inversePrimary,
+  );
+}
