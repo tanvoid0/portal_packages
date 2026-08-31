@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../services/api_client.dart';
+import 'portal_settings_labels.dart';
 
 /// What one dependency looked like the last time it was asked.
 enum PortalStatusState { checking, ok, degraded, down }
@@ -12,10 +13,18 @@ enum PortalStatusState { checking, ok, degraded, down }
 /// page opens, and again only if the user taps refresh — the point is to
 /// answer "is it me or is it them", not to keep a heartbeat running behind
 /// every screen.
+///
+/// Safe to drop into an app's own settings screen; `portal_task` does exactly
+/// that. Pass [labels] to translate it.
 class PortalStatusSection extends StatefulWidget {
-  const PortalStatusSection({super.key, this.contentPadding});
+  const PortalStatusSection({
+    super.key,
+    this.contentPadding,
+    this.labels = const PortalSettingsLabels(),
+  });
 
   final EdgeInsetsGeometry? contentPadding;
+  final PortalSettingsLabels labels;
 
   @override
   State<PortalStatusSection> createState() => _PortalStatusSectionState();
@@ -35,6 +44,20 @@ class _PortalStatusSectionState extends State<PortalStatusSection> {
   }
 
   Future<void> _refresh() async {
+    final labels = widget.labels;
+
+    // An app that mounts this without PortalBootstrap has no client to ask.
+    // Reporting "down" would blame the server for a wiring mistake.
+    if (!Get.isRegistered<ApiClient>()) {
+      setState(() {
+        _server = PortalStatusState.degraded;
+        _serverDetail = labels.assistantUnknown;
+        _ai = PortalStatusState.degraded;
+        _aiDetail = labels.assistantUnknown;
+      });
+      return;
+    }
+
     setState(() {
       _server = PortalStatusState.checking;
       _ai = PortalStatusState.checking;
@@ -43,15 +66,14 @@ class _PortalStatusSectionState extends State<PortalStatusSection> {
     });
 
     final api = Get.find<ApiClient>();
-
     final readiness = await api.checkBackendReadiness();
     if (!mounted) return;
     setState(() {
-      _server = readiness.isReady
-          ? PortalStatusState.ok
-          : PortalStatusState.down;
-      _serverDetail =
-          readiness.isReady ? 'Online' : (readiness.errorMessage ?? 'Unreachable');
+      _server =
+          readiness.isReady ? PortalStatusState.ok : PortalStatusState.down;
+      _serverDetail = readiness.isReady
+          ? labels.serverOnline
+          : (readiness.errorMessage ?? labels.serverUnreachable);
     });
 
     // An unreachable server tells us nothing about the assistant, and asking
@@ -59,7 +81,7 @@ class _PortalStatusSectionState extends State<PortalStatusSection> {
     if (!readiness.isReady) {
       setState(() {
         _ai = PortalStatusState.down;
-        _aiDetail = 'Needs the server';
+        _aiDetail = labels.assistantNeedsServer;
       });
       return;
     }
@@ -74,42 +96,49 @@ class _PortalStatusSectionState extends State<PortalStatusSection> {
       setState(() {
         _ai = configured ? PortalStatusState.ok : PortalStatusState.degraded;
         _aiDetail = configured
-            ? [provider, model].whereType<String>().where((s) => s.isNotEmpty).join(' · ')
-            : 'No model configured on the server';
+            ? [provider, model]
+                .whereType<String>()
+                .where((s) => s.isNotEmpty)
+                .join('  ·  ')
+            : labels.assistantNotConfigured;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _ai = PortalStatusState.down;
-        _aiDetail = 'Could not read assistant status';
+        _aiDetail = labels.assistantUnknown;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final labels = widget.labels;
     final busy = _server == PortalStatusState.checking ||
         _ai == PortalStatusState.checking;
 
     return Column(
       children: [
-        _StatusTile(
+        PortalStatusTile(
           icon: Icons.dns_outlined,
-          title: 'Server',
+          title: labels.serverTitle,
           state: _server,
           detail: _serverDetail,
+          checkingLabel: labels.checking,
           contentPadding: widget.contentPadding,
           trailing: IconButton(
-            tooltip: 'Check again',
+            tooltip: labels.checkAgain,
             onPressed: busy ? null : _refresh,
             icon: const Icon(Icons.refresh_rounded),
+            visualDensity: VisualDensity.compact,
           ),
         ),
-        _StatusTile(
+        PortalStatusTile(
           icon: Icons.auto_awesome_outlined,
-          title: 'Assistant',
+          title: labels.assistant,
           state: _ai,
           detail: _aiDetail,
+          checkingLabel: labels.checking,
           contentPadding: widget.contentPadding,
         ),
       ],
@@ -117,14 +146,20 @@ class _PortalStatusSectionState extends State<PortalStatusSection> {
   }
 }
 
-class _StatusTile extends StatelessWidget {
-  const _StatusTile({
+/// One "is this thing up" row: icon, name, detail, and a state dot.
+///
+/// Public so an app can show the same row for something of its own — a bank
+/// connection, a sync backend — and have it read identically.
+class PortalStatusTile extends StatelessWidget {
+  const PortalStatusTile({
+    super.key,
     required this.icon,
     required this.title,
     required this.state,
     this.detail,
     this.trailing,
     this.contentPadding,
+    this.checkingLabel = 'Checking…',
   });
 
   final IconData icon;
@@ -133,40 +168,50 @@ class _StatusTile extends StatelessWidget {
   final String? detail;
   final Widget? trailing;
   final EdgeInsetsGeometry? contentPadding;
+  final String checkingLabel;
+
+  /// Green / amber / red, resolved against the theme where one fits.
+  ///
+  /// `ok` and `degraded` are literals because no `ColorScheme` role means
+  /// "healthy" or "working but not fully": `primary` is whatever the app's
+  /// brand is, and on a green-branded app a red error and a green primary
+  /// would be indistinguishable in meaning.
+  Color _colour(ColorScheme cs) => switch (state) {
+        PortalStatusState.checking => cs.onSurfaceVariant,
+        PortalStatusState.ok => const Color(0xFF2E7D32),
+        PortalStatusState.degraded => const Color(0xFFED6C02),
+        PortalStatusState.down => cs.error,
+      };
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final colour = switch (state) {
-      PortalStatusState.checking => cs.onSurfaceVariant,
-      PortalStatusState.ok => const Color(0xFF2E7D32),
-      PortalStatusState.degraded => const Color(0xFFED6C02),
-      PortalStatusState.down => cs.error,
-    };
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final checking = state == PortalStatusState.checking;
 
     return ListTile(
       contentPadding: contentPadding,
       leading: Icon(icon, color: cs.onSurfaceVariant),
       title: Text(title),
       subtitle: Text(
-        state == PortalStatusState.checking ? 'Checking…' : (detail ?? ''),
-        style: Theme.of(context)
-            .textTheme
-            .bodySmall
-            ?.copyWith(color: cs.onSurfaceVariant),
+        checking ? checkingLabel : (detail ?? ''),
+        style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (state == PortalStatusState.checking)
-            const SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          else
-            Icon(Icons.circle, size: 12, color: colour),
-          if (trailing != null) trailing!,
+          SizedBox.square(
+            dimension: 16,
+            child: Center(
+              child: checking
+                  ? const SizedBox.square(
+                      dimension: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(Icons.circle, size: 10, color: _colour(cs)),
+            ),
+          ),
+          if (trailing != null) ...[const SizedBox(width: 4), trailing!],
         ],
       ),
     );

@@ -205,6 +205,17 @@ void main() {
     });
   });
 
+  group('portalAppUri', () {
+    test('is the slug as a scheme, matching the manifests', () {
+      // The <data android:scheme> in each app manifest and the <queries>
+      // entries in every other one are written from this same slug. If this
+      // shape changes, canLaunchUrl silently answers false for every app and
+      // the list quietly says Install for things that are installed.
+      expect(portalAppUri('portal-gym').toString(), 'portal-gym://open');
+      expect(portalAppUri('portal-recipe').scheme, 'portal-recipe');
+    });
+  });
+
   group('parseVersionCode', () {
     test('reads a numeric build number', () {
       expect(parseVersionCode('44'), 44);

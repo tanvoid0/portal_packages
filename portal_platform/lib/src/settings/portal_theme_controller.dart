@@ -12,10 +12,26 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// the UI kit and must not know what a palette is; the host app maps the id
 /// back to a theme.
 class PortalThemeController extends GetxController {
+  PortalThemeController({
+    this.defaultMode = ThemeMode.system,
+    this.legacyKeys = const [],
+  });
+
   static const _modeKey = 'portal_theme_mode';
   static const _paletteKey = 'portal_theme_palette';
 
-  final themeMode = ThemeMode.system.obs;
+  /// What an app starts on before the user has chosen. `portal_gym` ships
+  /// dark; everything else follows the system.
+  final ThemeMode defaultMode;
+
+  /// `shared_preferences` keys an app used before it moved to this controller,
+  /// newest first. Read once, then written under [_modeKey] and deleted.
+  ///
+  /// Without this, migrating an app silently resets everyone who had chosen a
+  /// theme — the setting does not look broken, it just quietly reverts.
+  final List<String> legacyKeys;
+
+  late final themeMode = defaultMode.obs;
   final paletteId = RxnString();
 
   @override
@@ -28,8 +44,24 @@ class PortalThemeController extends GetxController {
   /// theme before the first frame instead of flashing the default.
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    themeMode.value = parseMode(prefs.getString(_modeKey));
     paletteId.value = prefs.getString(_paletteKey);
+
+    final stored = prefs.getString(_modeKey);
+    if (stored != null) {
+      themeMode.value = parseMode(stored, fallback: defaultMode);
+      return;
+    }
+
+    for (final key in legacyKeys) {
+      final legacy = prefs.getString(key);
+      if (legacy == null) continue;
+      themeMode.value = parseMode(legacy, fallback: defaultMode);
+      await prefs.setString(_modeKey, themeMode.value.name);
+      await prefs.remove(key);
+      return;
+    }
+
+    themeMode.value = defaultMode;
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -48,11 +80,31 @@ class PortalThemeController extends GetxController {
     }
   }
 
-  /// Unknown or missing values fall back to [ThemeMode.system] — a stored
-  /// string from an older build should not be able to crash a launch.
-  static ThemeMode parseMode(String? stored) => ThemeMode.values.firstWhere(
+  /// Whether the app is currently dark *on screen*, which is not the same as
+  /// `themeMode == dark`: under [ThemeMode.system] only the platform knows.
+  bool isDarkIn(BuildContext context) => switch (themeMode.value) {
+        ThemeMode.dark => true,
+        ThemeMode.light => false,
+        ThemeMode.system =>
+          MediaQuery.platformBrightnessOf(context) == Brightness.dark,
+      };
+
+  /// One-tap light/dark for apps that keep a toggle outside settings.
+  ///
+  /// Resolves [ThemeMode.system] against what is actually on screen first, so
+  /// the first tap always visibly flips rather than sometimes doing nothing.
+  Future<void> toggleLightDark(BuildContext context) =>
+      setThemeMode(isDarkIn(context) ? ThemeMode.light : ThemeMode.dark);
+
+  /// Unknown or missing values fall back to [fallback] — a stored string from
+  /// an older build should not be able to crash a launch.
+  static ThemeMode parseMode(
+    String? stored, {
+    ThemeMode fallback = ThemeMode.system,
+  }) =>
+      ThemeMode.values.firstWhere(
         (m) => m.name == stored,
-        orElse: () => ThemeMode.system,
+        orElse: () => fallback,
       );
 
   static String labelFor(ThemeMode mode) => switch (mode) {
