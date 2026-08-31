@@ -38,6 +38,17 @@ class PortalRelease {
   final int sizeBytes;
   final String? notes;
 
+  /// `portal-gym` -> `Gym`. The manifest carries no label, and adding one
+  /// would mean every client had to tolerate it being absent anyway.
+  String get displayName {
+    final bare = slug.startsWith('portal-') ? slug.substring(7) : slug;
+    return bare
+        .split('-')
+        .where((w) => w.isNotEmpty)
+        .map((w) => '${w[0].toUpperCase()}${w.substring(1)}')
+        .join(' ');
+  }
+
   /// `12.4 MB`, for a download prompt.
   String get readableSize {
     if (sizeBytes <= 0) return '';
@@ -150,6 +161,17 @@ class PortalUpdateManifest {
       if (release != null) releases[slug] = release;
     });
     return PortalUpdateManifest(releases);
+  }
+
+  /// Every published app except [excludeSlug], in display order.
+  ///
+  /// The host app excludes itself: its own build is handled by the update
+  /// tile, which knows the running version. Nothing here does - the manifest
+  /// says what is published, not what this device has installed.
+  List<PortalRelease> others(String excludeSlug) {
+    final skip = excludeSlug.trim().toLowerCase();
+    return releases.values.where((r) => r.slug != skip).toList()
+      ..sort((a, b) => a.displayName.compareTo(b.displayName));
   }
 
   /// The release for [slug] when it is newer than [currentVersionCode].

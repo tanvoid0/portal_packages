@@ -137,6 +137,13 @@ export 'src/update/portal_release.dart';
 export 'src/update/portal_update_service.dart';
 export 'src/update/portal_update_tile.dart';
 
+// The settings page every app shares: profile, theme, backend status, the
+// other Portal apps, and this app's own version.
+export 'src/settings/portal_settings_page.dart';
+export 'src/settings/portal_status_tile.dart';
+export 'src/settings/portal_apps_section.dart';
+export 'src/settings/portal_theme_controller.dart';
+
 // ─── Routing ───────────────────────────────────────────────────────
 export 'portal_deep_link.dart';
 export 'src/routing/deep_link_service.dart';

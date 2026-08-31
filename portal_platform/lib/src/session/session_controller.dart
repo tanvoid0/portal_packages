@@ -31,6 +31,20 @@ class SessionController extends GetxController {
     PortalSentry.syncUser(user.value);
   }
 
+  /// Renames the signed-in profile.
+  ///
+  /// The profile is one record shared by every Portal app, so this is not a
+  /// per-app display name — changing it here changes it everywhere. Re-reads
+  /// from the server afterwards rather than assuming the write took the value
+  /// verbatim; the server trims and length-caps it.
+  Future<void> updateName(String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    await _api.put('/auth/me', body: {'name': trimmed});
+    await _api.syncProfileFromServer();
+    await reloadFromStorage();
+  }
+
   /// Clears tokens, session cache, pending deep links, and returns to login.
   Future<void> signOut() async {
     await _api.logout();

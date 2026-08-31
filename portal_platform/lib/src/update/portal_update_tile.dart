@@ -79,12 +79,14 @@ class _PortalUpdateTileState extends State<PortalUpdateTile> {
 Future<bool> showPortalUpdateDialog(
   BuildContext context,
   PortalUpdateService service,
-  PortalRelease release,
-) async {
+  PortalRelease release, {
+  String? title,
+  bool rememberRefusal = true,
+}) async {
   final accepted = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      title: Text('Update to ${release.versionName}'),
+      title: Text(title ?? 'Update to ${release.versionName}'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -118,8 +120,10 @@ Future<bool> showPortalUpdateDialog(
   if (accepted != true) {
     // Remember the refusal so the launch check does not re-ask every start.
     // The manual tile ignores this, and a newer publish clears it by having a
-    // higher versionCode.
-    await service.markDismissed(release.versionCode);
+    // higher versionCode. Off when the release is a *different* app: the key
+    // is per-package, so recording someone else's versionCode there would
+    // silence this app's own update prompt.
+    if (rememberRefusal) await service.markDismissed(release.versionCode);
     return false;
   }
   if (!context.mounted) return false;

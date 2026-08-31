@@ -68,6 +68,39 @@ class PortalUpdateService {
     return uri != null && uri.scheme == 'https' && uri.host.isNotEmpty;
   }
 
+  /// This app's manifest key — `Portal Gym` becomes `portal-gym`.
+  String get slug => ApiClient.slugifyAppName(appName);
+
+  /// Fetches and validates `updates.json`.
+  ///
+  /// Throws [PortalUpdateException] rather than returning a status, because
+  /// both callers — the update check and the app list — want to say something
+  /// different about a failure. [check] swallows it; the list shows it.
+  Future<PortalUpdateManifest> fetchManifest() async {
+    if (!isEnabled) {
+      throw const PortalUpdateException(
+        'UPDATE_MANIFEST_URL is not set to an https:// URL in this build.',
+      );
+    }
+    final manifestUri = Uri.parse(manifestUrl.trim());
+    final response = await _client.get(manifestUri).timeout(_manifestTimeout);
+    if (response.statusCode != 200) {
+      throw PortalUpdateException(
+        'Update server returned ${response.statusCode}.',
+      );
+    }
+    final manifest = PortalUpdateManifest.fromJson(
+      jsonDecode(response.body) as Object?,
+      requiredHost: manifestUri.host,
+    );
+    if (manifest == null) {
+      throw const PortalUpdateException(
+        'Update manifest is not readable by this build.',
+      );
+    }
+    return manifest;
+  }
+
   /// Fetches the manifest and compares it with the running build.
   ///
   /// Never throws: a failed update check must not break a launch.
@@ -98,28 +131,7 @@ class PortalUpdateService {
         );
       }
 
-      final manifestUri = Uri.parse(manifestUrl.trim());
-      final response =
-          await _client.get(manifestUri).timeout(_manifestTimeout);
-      if (response.statusCode != 200) {
-        return PortalUpdateCheck(
-          PortalUpdateStatus.failed,
-          message: 'Update server returned ${response.statusCode}.',
-        );
-      }
-
-      final manifest = PortalUpdateManifest.fromJson(
-        jsonDecode(response.body) as Object?,
-        requiredHost: manifestUri.host,
-      );
-      if (manifest == null) {
-        return const PortalUpdateCheck(
-          PortalUpdateStatus.failed,
-          message: 'Update manifest is not readable by this build.',
-        );
-      }
-
-      final slug = ApiClient.slugifyAppName(appName);
+      final manifest = await fetchManifest();
       final release = manifest.updateFor(slug, current);
       return release == null
           ? const PortalUpdateCheck(PortalUpdateStatus.upToDate)

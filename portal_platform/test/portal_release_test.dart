@@ -167,6 +167,44 @@ void main() {
     });
   });
 
+  group('the app list', () {
+    Map<String, Object?> entry(int code) => {
+          'versionCode': code,
+          'versionName': '1.0.0',
+          'apk': 'https://example.com/app.apk',
+          'sha256': _sha,
+          'size': 1024,
+        };
+
+    final m = PortalUpdateManifest.fromJson(manifest(apps: {
+      'portal-shopping': entry(44),
+      'portal-gym': entry(44),
+      'portal-meal-plan': entry(44),
+    }))!;
+
+    test('lists every app except the one asking, in display order', () {
+      expect(
+        m.others('portal-gym').map((r) => r.displayName),
+        ['Meal Plan', 'Shopping'],
+      );
+    });
+
+    test('excludes the host app case-insensitively', () {
+      expect(m.others('Portal-Gym ').length, 2);
+    });
+
+    test('lists everything when the host is not in the manifest', () {
+      expect(m.others('portal-finance').length, 3);
+    });
+
+    test('titles a slug it does not recognise rather than dropping it', () {
+      final other = PortalUpdateManifest.fromJson(manifest(apps: {
+        'someapp': entry(1),
+      }))!;
+      expect(other.others('portal-gym').single.displayName, 'Someapp');
+    });
+  });
+
   group('parseVersionCode', () {
     test('reads a numeric build number', () {
       expect(parseVersionCode('44'), 44);
