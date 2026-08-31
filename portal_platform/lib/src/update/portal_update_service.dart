@@ -158,16 +158,12 @@ class PortalUpdateService {
     }
 
     final expectedBytes = response.contentLength ?? release.sizeBytes;
-    // Hashed chunk by chunk as it arrives, so a 100 MB APK never has to be
-    // held in memory to be verified.
-    final hashSink = Sha256().newHashSink();
     final out = file.openWrite();
     var received = 0;
 
     try {
       await for (final chunk in response.stream) {
         out.add(chunk);
-        hashSink.add(chunk);
         received += chunk.length;
         onProgress?.call(expectedBytes > 0 ? received / expectedBytes : -1);
       }
@@ -176,6 +172,24 @@ class PortalUpdateService {
       await out.close();
     }
 
+    // Hashed by reading the file back, not by digesting the chunks on their
+    // way past. Those are not the same check: a short or failed write leaves a
+    // truncated APK on disk that a stream digest still calls valid, and the
+    // installer then rejects it with nothing more useful than "App not
+    // installed". Streamed off disk, so a large APK is never held in memory.
+    final onDisk = await file.length();
+    if (release.sizeBytes > 0 && onDisk != release.sizeBytes) {
+      await file.delete();
+      throw PortalUpdateException(
+        'The download is $onDisk bytes but should be ${release.sizeBytes}. '
+        'It was discarded.',
+      );
+    }
+
+    final hashSink = Sha256().newHashSink();
+    await for (final chunk in file.openRead()) {
+      hashSink.add(chunk);
+    }
     hashSink.close();
     final digest = await hashSink.hash();
     final actual = _hex(digest.bytes);
