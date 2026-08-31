@@ -55,13 +55,28 @@ class AppConfig with _$AppConfig {
   static const String _demoEmail = String.fromEnvironment('DEMO_EMAIL');
   static const String _demoPassword = String.fromEnvironment('DEMO_PASSWORD');
 
+  /// Compile-time override for the API base URL, for local development.
+  ///
+  /// `.env` is bundled into the APK as a Flutter asset, so whatever it holds is
+  /// what a release build ships. It therefore stays on the production URL
+  /// permanently and is never edited to point somewhere else — an edit that is
+  /// easy to make and easy to forget is how a dev URL reaches the store.
+  /// Point a debug run at a local server at run time instead:
+  ///
+  ///   flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3001/api
+  static const String _apiBaseUrlOverride =
+      String.fromEnvironment('API_BASE_URL');
+
   /// Build config from current dotenv. Call after [dotenv.load()].
   /// Throws if [API_BASE_URL] is missing or empty.
   factory AppConfig.fromEnv() {
-    final apiBaseUrl = dotenv.env['API_BASE_URL']?.trim();
+    final override = _apiBaseUrlOverride.trim();
+    final apiBaseUrl =
+        override.isNotEmpty ? override : dotenv.env['API_BASE_URL']?.trim();
     if (apiBaseUrl == null || apiBaseUrl.isEmpty) {
       throw StateError(
-        'API_BASE_URL is not set. Set it in .env (see .env.example).',
+        'API_BASE_URL is not set. Set it in .env (see .env.example), or pass '
+        '--dart-define=API_BASE_URL=... for a local run.',
       );
     }
     final disableOfflineSyncEnv =
