@@ -29,6 +29,10 @@ mixin _$AppConfig {
   /// Web OAuth client ID for Google Sign-In on the auth screen.
   String get googleSignInServerClientId => throw _privateConstructorUsedError;
 
+  /// Absolute URL of the sideload `updates.json`. Empty disables update
+  /// checks, which is correct for a Play Store build — the store updates it.
+  String get updateManifestUrl => throw _privateConstructorUsedError;
+
   /// Where entity lists are stored (mutually exclusive). Default: server.
   DataStorageMode get dataStorage => throw _privateConstructorUsedError;
 
@@ -61,6 +65,7 @@ abstract class $AppConfigCopyWith<$Res> {
     String demoEmail,
     String demoPassword,
     String googleSignInServerClientId,
+    String updateManifestUrl,
     DataStorageMode dataStorage,
     bool dataEncrypted,
     @Deprecated('Use dataStorage and dataEncrypted') bool disableOfflineSync,
@@ -91,6 +96,7 @@ class _$AppConfigCopyWithImpl<$Res, $Val extends AppConfig>
     Object? demoEmail = null,
     Object? demoPassword = null,
     Object? googleSignInServerClientId = null,
+    Object? updateManifestUrl = null,
     Object? dataStorage = null,
     Object? dataEncrypted = null,
     Object? disableOfflineSync = null,
@@ -133,6 +139,10 @@ class _$AppConfigCopyWithImpl<$Res, $Val extends AppConfig>
                 ? _value.googleSignInServerClientId
                 : googleSignInServerClientId // ignore: cast_nullable_to_non_nullable
                       as String,
+            updateManifestUrl: null == updateManifestUrl
+                ? _value.updateManifestUrl
+                : updateManifestUrl // ignore: cast_nullable_to_non_nullable
+                      as String,
             dataStorage: null == dataStorage
                 ? _value.dataStorage
                 : dataStorage // ignore: cast_nullable_to_non_nullable
@@ -170,6 +180,7 @@ abstract class _$$AppConfigImplCopyWith<$Res>
     String demoEmail,
     String demoPassword,
     String googleSignInServerClientId,
+    String updateManifestUrl,
     DataStorageMode dataStorage,
     bool dataEncrypted,
     @Deprecated('Use dataStorage and dataEncrypted') bool disableOfflineSync,
@@ -199,6 +210,7 @@ class __$$AppConfigImplCopyWithImpl<$Res>
     Object? demoEmail = null,
     Object? demoPassword = null,
     Object? googleSignInServerClientId = null,
+    Object? updateManifestUrl = null,
     Object? dataStorage = null,
     Object? dataEncrypted = null,
     Object? disableOfflineSync = null,
@@ -241,6 +253,10 @@ class __$$AppConfigImplCopyWithImpl<$Res>
             ? _value.googleSignInServerClientId
             : googleSignInServerClientId // ignore: cast_nullable_to_non_nullable
                   as String,
+        updateManifestUrl: null == updateManifestUrl
+            ? _value.updateManifestUrl
+            : updateManifestUrl // ignore: cast_nullable_to_non_nullable
+                  as String,
         dataStorage: null == dataStorage
             ? _value.dataStorage
             : dataStorage // ignore: cast_nullable_to_non_nullable
@@ -271,6 +287,7 @@ class _$AppConfigImpl extends _AppConfig {
     this.demoEmail = '',
     this.demoPassword = '',
     this.googleSignInServerClientId = '',
+    this.updateManifestUrl = '',
     this.dataStorage = DataStorageMode.server,
     this.dataEncrypted = true,
     @Deprecated('Use dataStorage and dataEncrypted')
@@ -306,6 +323,12 @@ class _$AppConfigImpl extends _AppConfig {
   @JsonKey()
   final String googleSignInServerClientId;
 
+  /// Absolute URL of the sideload `updates.json`. Empty disables update
+  /// checks, which is correct for a Play Store build — the store updates it.
+  @override
+  @JsonKey()
+  final String updateManifestUrl;
+
   /// Where entity lists are stored (mutually exclusive). Default: server.
   @override
   @JsonKey()
@@ -324,7 +347,7 @@ class _$AppConfigImpl extends _AppConfig {
 
   @override
   String toString() {
-    return 'AppConfig(apiBaseUrl: $apiBaseUrl, appTitle: $appTitle, themeMode: $themeMode, debugShowCheckedModeBanner: $debugShowCheckedModeBanner, routeLoggedIn: $routeLoggedIn, routeLoggedOut: $routeLoggedOut, demoEmail: $demoEmail, demoPassword: $demoPassword, googleSignInServerClientId: $googleSignInServerClientId, dataStorage: $dataStorage, dataEncrypted: $dataEncrypted, disableOfflineSync: $disableOfflineSync)';
+    return 'AppConfig(apiBaseUrl: $apiBaseUrl, appTitle: $appTitle, themeMode: $themeMode, debugShowCheckedModeBanner: $debugShowCheckedModeBanner, routeLoggedIn: $routeLoggedIn, routeLoggedOut: $routeLoggedOut, demoEmail: $demoEmail, demoPassword: $demoPassword, googleSignInServerClientId: $googleSignInServerClientId, updateManifestUrl: $updateManifestUrl, dataStorage: $dataStorage, dataEncrypted: $dataEncrypted, disableOfflineSync: $disableOfflineSync)';
   }
 
   @override
@@ -358,6 +381,8 @@ class _$AppConfigImpl extends _AppConfig {
                 ) ||
                 other.googleSignInServerClientId ==
                     googleSignInServerClientId) &&
+            (identical(other.updateManifestUrl, updateManifestUrl) ||
+                other.updateManifestUrl == updateManifestUrl) &&
             (identical(other.dataStorage, dataStorage) ||
                 other.dataStorage == dataStorage) &&
             (identical(other.dataEncrypted, dataEncrypted) ||
@@ -378,6 +403,7 @@ class _$AppConfigImpl extends _AppConfig {
     demoEmail,
     demoPassword,
     googleSignInServerClientId,
+    updateManifestUrl,
     dataStorage,
     dataEncrypted,
     disableOfflineSync,
@@ -403,6 +429,7 @@ abstract class _AppConfig extends AppConfig {
     final String demoEmail,
     final String demoPassword,
     final String googleSignInServerClientId,
+    final String updateManifestUrl,
     final DataStorageMode dataStorage,
     final bool dataEncrypted,
     @Deprecated('Use dataStorage and dataEncrypted')
@@ -430,6 +457,11 @@ abstract class _AppConfig extends AppConfig {
   /// Web OAuth client ID for Google Sign-In on the auth screen.
   @override
   String get googleSignInServerClientId;
+
+  /// Absolute URL of the sideload `updates.json`. Empty disables update
+  /// checks, which is correct for a Play Store build — the store updates it.
+  @override
+  String get updateManifestUrl;
 
   /// Where entity lists are stored (mutually exclusive). Default: server.
   @override

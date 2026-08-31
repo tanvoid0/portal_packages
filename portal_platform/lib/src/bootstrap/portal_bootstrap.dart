@@ -10,6 +10,8 @@ import '../observability/portal_sentry.dart';
 import '../routing/deep_link_service.dart';
 import '../services/api_client.dart';
 import '../session/session_controller.dart';
+import '../update/portal_update_service.dart';
+import '../update/portal_update_tile.dart';
 
 /// Registers shared platform services used by standalone Portal apps.
 class PortalBootstrap {
@@ -22,6 +24,7 @@ class PortalBootstrap {
     AppConfig? configOverride,
     bool registerNotifications = false,
     String sourceName = 'portal-app',
+    bool checkForUpdatesOnLaunch = true,
   }) async {
     WidgetsFlutterBinding.ensureInitialized();
     if (!dotenv.isInitialized) {
@@ -46,6 +49,14 @@ class PortalBootstrap {
     Get.put<DeepLinkService>(DeepLinkService(), permanent: true);
     Get.put<SessionController>(SessionController(), permanent: true);
     Get.put<AppConfig>(config, permanent: true);
+    Get.put<PortalUpdateService>(
+      PortalUpdateService(
+        manifestUrl: config.updateManifestUrl,
+        appName: config.appTitle,
+      ),
+      permanent: true,
+    );
+    if (checkForUpdatesOnLaunch) _scheduleUpdateCheck();
 
     var isLoggedIn = await Get.find<ApiClient>().isLoggedIn();
     if (!isLoggedIn && config.autoLocalAuth) {
@@ -56,5 +67,23 @@ class PortalBootstrap {
     }
 
     return isLoggedIn;
+  }
+
+  /// Prompts for a sideload update after the first frame.
+  ///
+  /// Portal ships outside the Play Store for now, so nothing else tells an
+  /// installed build that a newer one exists. Deferred to a post-frame
+  /// callback because there is no navigator to show a dialog on until the app
+  /// has actually built one, and left entirely to
+  /// [portalPromptForUpdateOnLaunch] to stay quiet: it asks once per published
+  /// version, never re-asks one the user refused, and swallows every failure.
+  static void _scheduleUpdateCheck() {
+    final service = Get.find<PortalUpdateService>();
+    if (!service.isEnabled) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final context = Get.context;
+      if (context == null || !context.mounted) return;
+      await portalPromptForUpdateOnLaunch(context, service);
+    });
   }
 }

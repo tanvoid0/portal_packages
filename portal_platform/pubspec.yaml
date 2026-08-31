@@ -30,6 +30,9 @@ dependencies:
   package_info_plus: ^10.1.0
   local_auth: ^2.3.0
   google_sign_in: ^6.2.2
+  # Hands a downloaded APK to the system package installer for sideload
+  # updates. Ships its own FileProvider, so no per-app provider config.
+  open_filex: ^4.5.0
 
 dev_dependencies:
   flutter_test:

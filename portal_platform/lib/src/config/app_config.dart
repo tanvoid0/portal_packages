@@ -23,6 +23,10 @@ class AppConfig with _$AppConfig {
     /// Web OAuth client ID for Google Sign-In on the auth screen.
     @Default('') String googleSignInServerClientId,
 
+    /// Absolute URL of the sideload `updates.json`. Empty disables update
+    /// checks, which is correct for a Play Store build — the store updates it.
+    @Default('') String updateManifestUrl,
+
     /// Where entity lists are stored (mutually exclusive). Default: server.
     @Default(DataStorageMode.server) DataStorageMode dataStorage,
 
@@ -67,6 +71,17 @@ class AppConfig with _$AppConfig {
   static const String _apiBaseUrlOverride =
       String.fromEnvironment('API_BASE_URL');
 
+  /// Compile-time override for the update manifest, so a build can be pointed
+  /// at a staging channel without editing the `.env` that ships:
+  ///
+  ///   flutter build apk --dart-define=UPDATE_MANIFEST_URL=https://...
+  ///
+  /// Passing an empty value cannot switch updates *off* — an unset
+  /// `String.fromEnvironment` is also empty, so the two are indistinguishable.
+  /// Remove the key from `.env` for that.
+  static const String _updateManifestUrlOverride =
+      String.fromEnvironment('UPDATE_MANIFEST_URL');
+
   /// Build config from current dotenv. Call after [dotenv.load()].
   /// Throws if [API_BASE_URL] is missing or empty.
   factory AppConfig.fromEnv() {
@@ -94,6 +109,9 @@ class AppConfig with _$AppConfig {
       demoPassword: _demoPassword,
       googleSignInServerClientId:
           dotenv.env['GOOGLE_SIGN_IN_SERVER_CLIENT_ID']?.trim() ?? '',
+      updateManifestUrl: _updateManifestUrlOverride.trim().isNotEmpty
+          ? _updateManifestUrlOverride.trim()
+          : dotenv.env['UPDATE_MANIFEST_URL']?.trim() ?? '',
       dataStorage: dataStorage,
       dataEncrypted: dataEncrypted,
       disableOfflineSync: disableOfflineSyncEnv,
