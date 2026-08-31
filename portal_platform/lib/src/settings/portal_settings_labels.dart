@@ -39,6 +39,10 @@ class PortalSettingsLabels {
     this.tryAgain = 'Try again',
     this.install = 'Install',
     this.open = 'Open',
+    this.installAll = 'Install all',
+    this.downloading = 'Downloading',
+    this.installAllDone = 'Installed',
+    this.installAllFailed = 'skipped',
     this.noOtherApps = 'No other apps published yet',
     this.appListFailed = 'Could not load the app list.',
   });
@@ -80,6 +84,10 @@ class PortalSettingsLabels {
   final String tryAgain;
   final String install;
   final String open;
+  final String installAll;
+  final String downloading;
+  final String installAllDone;
+  final String installAllFailed;
   final String noOtherApps;
   final String appListFailed;
 }
