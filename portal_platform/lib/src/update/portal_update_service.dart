@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:cryptography/cryptography.dart';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
@@ -58,13 +57,29 @@ class PortalUpdateService {
 
   static const Duration _manifestTimeout = Duration(seconds: 15);
 
-  /// True when this build was configured with a manifest URL.
-  bool get isEnabled => manifestUrl.trim().isNotEmpty;
+  /// True when this build was configured with a usable manifest URL.
+  ///
+  /// https only. The manifest decides which bytes get handed to the package
+  /// installer, so fetching it over plain http would let anyone on the network
+  /// choose them — and `UPDATE_MANIFEST_URL` is a config string that is easy
+  /// to paste in without a scheme.
+  bool get isEnabled {
+    final uri = Uri.tryParse(manifestUrl.trim());
+    return uri != null && uri.scheme == 'https' && uri.host.isNotEmpty;
+  }
 
   /// Fetches the manifest and compares it with the running build.
   ///
   /// Never throws: a failed update check must not break a launch.
   Future<PortalUpdateCheck> check() async {
+    if (manifestUrl.trim().isNotEmpty && !isEnabled) {
+      // Configured, but not with something safe to fetch. Say so rather than
+      // reporting "updates unavailable", which reads as intentional.
+      return const PortalUpdateCheck(
+        PortalUpdateStatus.failed,
+        message: 'UPDATE_MANIFEST_URL must be an https:// URL.',
+      );
+    }
     if (!isEnabled) {
       return const PortalUpdateCheck(PortalUpdateStatus.unsupported);
     }
@@ -83,9 +98,9 @@ class PortalUpdateService {
         );
       }
 
-      final response = await _client
-          .get(Uri.parse(manifestUrl.trim()))
-          .timeout(_manifestTimeout);
+      final manifestUri = Uri.parse(manifestUrl.trim());
+      final response =
+          await _client.get(manifestUri).timeout(_manifestTimeout);
       if (response.statusCode != 200) {
         return PortalUpdateCheck(
           PortalUpdateStatus.failed,
@@ -93,8 +108,10 @@ class PortalUpdateService {
         );
       }
 
-      final manifest =
-          PortalUpdateManifest.fromJson(jsonDecode(response.body) as Object?);
+      final manifest = PortalUpdateManifest.fromJson(
+        jsonDecode(response.body) as Object?,
+        requiredHost: manifestUri.host,
+      );
       if (manifest == null) {
         return const PortalUpdateCheck(
           PortalUpdateStatus.failed,
@@ -163,16 +180,12 @@ class PortalUpdateService {
     final digest = await hashSink.hash();
     final actual = _hex(digest.bytes);
 
-    if (release.sha256.isNotEmpty && actual != release.sha256) {
+    // A release with no usable checksum never survives parsing, so this is a
+    // real comparison every time rather than one that quietly skips itself.
+    if (actual != release.sha256) {
       await file.delete();
-      throw PortalUpdateException(
+      throw const PortalUpdateException(
         'The download did not match its checksum and was discarded.',
-      );
-    }
-    if (release.sha256.isEmpty) {
-      debugPrint(
-        'PortalUpdateService: ${release.slug} has no sha256 in the manifest; '
-        'download integrity was not verified.',
       );
     }
     return file;

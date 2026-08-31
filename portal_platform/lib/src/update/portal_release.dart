@@ -52,7 +52,14 @@ class PortalRelease {
     return '${value.toStringAsFixed(decimals)} ${units[unit]}';
   }
 
-  static PortalRelease? _tryParse(String slug, Object? raw) {
+  /// Manifest text is untrusted: it is fetched over the network and its keys
+  /// and values are whatever the host served. Anything that fails a check here
+  /// is dropped rather than repaired.
+  static PortalRelease? _tryParse(
+    String slug,
+    Object? raw, {
+    String? requiredHost,
+  }) {
     if (raw is! Map) return null;
 
     final versionCode = _asInt(raw['versionCode']);
@@ -64,17 +71,37 @@ class PortalRelease {
     // at plain http and a network attacker could swap the bytes.
     if (apk.scheme != 'https') return null;
 
+    // The APK must come from the same host as the manifest that named it.
+    // Defence in depth: it does not stop whoever controls the manifest, but it
+    // stops a manifest that is merely *wrong* from sending an installer to an
+    // unrelated host.
+    if (requiredHost != null && apk.host.toLowerCase() != requiredHost) {
+      return null;
+    }
+
+    // A missing checksum is refused rather than warned about. Every manifest
+    // this project publishes has one, so an entry without it is a malformed or
+    // tampered manifest, not a legitimate publish that skipped a field.
+    final sha = (raw['sha256'] as String?)?.trim().toLowerCase() ?? '';
+    if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(sha)) return null;
+
     return PortalRelease(
       slug: slug,
       versionCode: versionCode,
-      versionName: (raw['versionName'] as String?)?.trim() ?? '',
+      versionName: _clamp(raw['versionName'] as String?, 32) ?? '',
       apkUrl: apk,
-      sha256: (raw['sha256'] as String?)?.trim().toLowerCase() ?? '',
+      sha256: sha,
       sizeBytes: _asInt(raw['size']) ?? 0,
-      notes: (raw['notes'] as String?)?.trim().isNotEmpty == true
-          ? (raw['notes'] as String).trim()
-          : null,
+      // Rendered in a dialog, so it is length-capped: an unbounded string from
+      // the network should not be able to push the buttons off the screen.
+      notes: _clamp(raw['notes'] as String?, 500),
     );
+  }
+
+  static String? _clamp(String? v, int max) {
+    final t = v?.trim();
+    if (t == null || t.isEmpty) return null;
+    return t.length <= max ? t : '${t.substring(0, max)}…';
   }
 
   static int? _asInt(Object? v) {
@@ -98,7 +125,10 @@ class PortalUpdateManifest {
   final Map<String, PortalRelease> releases;
 
   /// Parses a decoded manifest body. Returns null when it is unusable.
-  static PortalUpdateManifest? fromJson(Object? decoded) {
+  ///
+  /// [requiredHost], when given, is the host the manifest itself was fetched
+  /// from; releases pointing anywhere else are dropped.
+  static PortalUpdateManifest? fromJson(Object? decoded, {String? requiredHost}) {
     if (decoded is! Map) return null;
     if (PortalRelease._asInt(decoded['schema']) != kPortalUpdateSchema) {
       return null;
@@ -106,11 +136,17 @@ class PortalUpdateManifest {
     final apps = decoded['apps'];
     if (apps is! Map) return null;
 
+    final host = requiredHost?.trim().toLowerCase();
     final releases = <String, PortalRelease>{};
     apps.forEach((key, value) {
       if (key is! String) return;
       final slug = key.trim().toLowerCase();
-      final release = PortalRelease._tryParse(slug, value);
+      // Keys reach a filename on disk. Today a lookup can only ever return the
+      // caller's own already-sanitised slug, so a hostile key cannot be
+      // selected — but the sanitising belongs where the untrusted value
+      // enters, not in an argument about why it cannot escape.
+      if (!RegExp(r'^[a-z0-9-]{1,64}$').hasMatch(slug)) return;
+      final release = PortalRelease._tryParse(slug, value, requiredHost: host);
       if (release != null) releases[slug] = release;
     });
     return PortalUpdateManifest(releases);

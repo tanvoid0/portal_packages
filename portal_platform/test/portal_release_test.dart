@@ -4,6 +4,9 @@ import 'package:portal_platform/portal_platform.dart';
 /// The comparison rules decide whether a user is offered a download, so they
 /// are the part worth pinning. Everything else in the update path is HTTP and
 /// platform calls.
+const _sha =
+    '670455155fb04174d7d47f57e5af2745e2c316293ca1ed94f04e7f9e07df163d';
+
 void main() {
   Map<String, Object?> manifest({
     int schema = 1,
@@ -17,7 +20,7 @@ void main() {
                 'versionCode': 44,
                 'versionName': '1.0.0',
                 'apk': 'https://example.com/portal_gym.apk',
-                'sha256': 'ab12',
+                'sha256': _sha,
                 'size': 12 * 1024 * 1024,
               },
             },
@@ -40,6 +43,7 @@ void main() {
         'portal-gym': {
           'versionCode': 44,
           'apk': 'http://example.com/portal_gym.apk',
+          'sha256': _sha,
         },
       }))!;
       expect(m.releases, isEmpty);
@@ -47,11 +51,87 @@ void main() {
 
     test('drops one malformed app without losing the others', () {
       final m = PortalUpdateManifest.fromJson(manifest(apps: {
-        'portal-gym': {'versionCode': 44, 'apk': 'https://e.com/g.apk'},
-        'portal-recipe': {'versionCode': 'not a number', 'apk': 'https://e.com/r.apk'},
+        'portal-gym': {
+          'versionCode': 44,
+          'apk': 'https://e.com/g.apk',
+          'sha256': _sha,
+        },
+        'portal-recipe': {
+          'versionCode': 'not a number',
+          'apk': 'https://e.com/r.apk',
+          'sha256': _sha,
+        },
         'portal-task': {'versionCode': 9},
       }))!;
       expect(m.releases.keys, ['portal-gym']);
+    });
+
+    test('rejects a release with no usable sha256', () {
+      // The manifest picks the bytes handed to the package installer. Every
+      // real publish carries a checksum, so a missing or malformed one is a
+      // tampered or broken manifest, not a publish that skipped a field.
+      for (final sha in [null, '', 'ab12', 'z' * 64]) {
+        final m = PortalUpdateManifest.fromJson(manifest(apps: {
+          'portal-gym': {
+            'versionCode': 44,
+            'apk': 'https://example.com/g.apk',
+            if (sha != null) 'sha256': sha,
+          },
+        }))!;
+        expect(m.releases, isEmpty, reason: 'sha256=$sha');
+      }
+    });
+
+    test('drops an apk hosted somewhere other than the manifest', () {
+      final m = PortalUpdateManifest.fromJson(
+        manifest(apps: {
+          'portal-gym': {
+            'versionCode': 44,
+            'apk': 'https://elsewhere.example/g.apk',
+            'sha256': _sha,
+          },
+        }),
+        requiredHost: 'github.com',
+      )!;
+      expect(m.releases, isEmpty);
+    });
+
+    test('keeps an apk on the manifest host', () {
+      final m = PortalUpdateManifest.fromJson(
+        manifest(apps: {
+          'portal-gym': {
+            'versionCode': 44,
+            'apk': 'https://github.com/o/r/releases/download/v1/g.apk',
+            'sha256': _sha,
+          },
+        }),
+        requiredHost: 'github.com',
+      )!;
+      expect(m.releases.keys, ['portal-gym']);
+    });
+
+    test('drops a slug that could escape a file path', () {
+      // The slug reaches a filename in the temp directory.
+      final m = PortalUpdateManifest.fromJson(manifest(apps: {
+        '../../evil': {
+          'versionCode': 99,
+          'apk': 'https://example.com/e.apk',
+          'sha256': _sha,
+        },
+      }))!;
+      expect(m.releases, isEmpty);
+    });
+
+    test('caps notes so a dialog cannot be pushed off screen', () {
+      final m = PortalUpdateManifest.fromJson(manifest(apps: {
+        'portal-gym': {
+          'versionCode': 44,
+          'apk': 'https://example.com/g.apk',
+          'sha256': _sha,
+          'notes': 'x' * 5000,
+        },
+      }))!;
+      expect(m.releases['portal-gym']!.notes!.length, lessThanOrEqualTo(501));
     });
 
     test('returns null for junk instead of throwing at a launch', () {
