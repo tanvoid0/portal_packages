@@ -5,18 +5,31 @@ import '../models/ai_sampler_config.dart';
 import 'ai_tool.dart';
 
 /// Extracts the outermost JSON object from a model reply that may be wrapped
-/// in prose or markdown fences. Returns null when there is nothing to parse.
+/// in prose or markdown fences. A reply that is a JSON array of objects (a
+/// model batching several tool calls into one turn) yields its first object;
+/// the agent loop asks again for the rest. Returns null when there is nothing
+/// to parse.
 Map<String, dynamic>? extractJsonObject(String raw) {
   final trimmed = raw.trim();
-  final start = trimmed.indexOf('{');
-  final end = trimmed.lastIndexOf('}');
-  if (start == -1 || end <= start) return null;
-  try {
-    final decoded = jsonDecode(trimmed.substring(start, end + 1));
-    return decoded is Map<String, dynamic> ? decoded : null;
-  } catch (_) {
-    return null;
+  for (final delimiters in const [
+    ['{', '}'],
+    ['[', ']'],
+  ]) {
+    final start = trimmed.indexOf(delimiters[0]);
+    final end = trimmed.lastIndexOf(delimiters[1]);
+    if (start == -1 || end <= start) continue;
+    try {
+      final decoded = jsonDecode(trimmed.substring(start, end + 1));
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is List) {
+        final first = decoded.firstOrNull;
+        if (first is Map<String, dynamic>) return first;
+      }
+    } catch (_) {
+      // Try the next delimiter pair.
+    }
   }
+  return null;
 }
 
 class AiAgentResult {

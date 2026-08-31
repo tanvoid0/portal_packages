@@ -53,6 +53,14 @@ void main() {
     expect(extractJsonObject('```json\n{"final":"hi"}\n```'), {'final': 'hi'});
     expect(extractJsonObject('Sure! {"tool":"a","args":{}} done'),
         {'tool': 'a', 'args': <String, dynamic>{}});
+    expect(
+      extractJsonObject(
+          '[{"tool":"a","args":{"name":"pasta"}},{"tool":"a","args":{}}]'),
+      {
+        'tool': 'a',
+        'args': {'name': 'pasta'}
+      },
+    );
     expect(extractJsonObject('no json here'), isNull);
     expect(extractJsonObject('{broken'), isNull);
   });
