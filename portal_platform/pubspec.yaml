@@ -30,9 +30,17 @@ dependencies:
   package_info_plus: ^10.1.0
   local_auth: ^2.3.0
   google_sign_in: ^6.2.2
-  # Hands a downloaded APK to the system package installer for sideload
-  # updates. Ships its own FileProvider, so no per-app provider config.
-  open_filex: ^4.5.0
+  # Sideload updates: installs a downloaded APK through Android's
+  # PackageInstaller *session* API. The obvious route — an ACTION_VIEW intent
+  # with the apk mime type — opens the installer UI and then fails the commit
+  # on current Android; this is the supported path.
+  #
+  # Its README also asks for READ_/MANAGE_EXTERNAL_STORAGE and a FileProvider.
+  # None of that applies here: the plugin reads the file with a plain
+  # FileInputStream inside our own process, and the APK is downloaded to this
+  # app's cache directory. MANAGE_EXTERNAL_STORAGE is a Play-restricted
+  # permission and must not be added for this.
+  android_package_installer: ^0.0.3
 
 dev_dependencies:
   flutter_test:

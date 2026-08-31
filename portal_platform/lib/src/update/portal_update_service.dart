@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:http/http.dart' as http;
-import 'package:open_filex/open_filex.dart';
+import 'package:android_package_installer/android_package_installer.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -205,22 +205,44 @@ class PortalUpdateService {
     return file;
   }
 
-  /// Hands [apk] to the system package installer.
+  /// Hands [apk] to Android's package installer and waits for its verdict.
   ///
   /// Android shows its own confirmation, and the first time will send the user
   /// to "Install unknown apps" for this app. Nothing installs silently.
+  ///
+  /// Goes through the PackageInstaller *session* API. An `ACTION_VIEW` intent
+  /// with the apk mime type is the older, more obvious route, and on current
+  /// Android it opens the installer and then fails the commit with nothing but
+  /// "App not installed" — which is indistinguishable from a corrupt download.
+  ///
+  /// The status arrives on the host activity's `onNewIntent`, so each app's
+  /// launcher activity must declare the plugin's intent filter (see the app
+  /// manifests). Without it this call never completes.
   Future<void> install(File apk) async {
-    final result = await OpenFilex.open(
-      apk.path,
-      type: 'application/vnd.android.package-archive',
-    );
-    if (result.type != ResultType.done) {
-      throw PortalUpdateException(
-        'Could not open the installer: ${result.message}. '
-        'Allow this app to install unknown apps in Android settings, then '
-        'try again.',
-      );
+    final code = await AndroidPackageInstaller.installApk(apkFilePath: apk.path);
+    if (code == null) {
+      throw const PortalUpdateException('The installer did not respond.');
     }
+    final status = PackageInstallerStatus.byCode(code);
+    if (status == PackageInstallerStatus.success) return;
+
+    throw PortalUpdateException(switch (status) {
+      PackageInstallerStatus.failureAborted =>
+        'Installation was cancelled.',
+      PackageInstallerStatus.failureBlocked =>
+        'Android blocked the install. Check Play Protect and that this app is '
+            'allowed to install unknown apps.',
+      PackageInstallerStatus.failureConflict =>
+        'A conflicting copy of this app is already installed. Uninstall it, '
+            'then try again.',
+      PackageInstallerStatus.failureIncompatible =>
+        'That build is not compatible with this device.',
+      PackageInstallerStatus.failureStorage =>
+        'Not enough storage to install the update.',
+      PackageInstallerStatus.failureInvalid =>
+        'The downloaded package was rejected as invalid.',
+      _ => 'The install did not complete (${status.name}).',
+    });
   }
 
   /// Version the user said "Not now" to, so the launch check stays quiet.
