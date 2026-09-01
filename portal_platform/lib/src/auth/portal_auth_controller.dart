@@ -159,9 +159,9 @@ class PortalAuthController extends GetxController {
     // Android: com.google.android.gms.common.api.ApiException: 10 (DEVELOPER_ERROR)
     if (details.contains('ApiException: 10') ||
         details.contains('DEVELOPER_ERROR')) {
-      return 'Google Sign-In is misconfigured in Google Cloud. '
-          'Create an Android OAuth client for package com.tanvoid0.portal_task '
-          'with your debug SHA-1 (see apps/portal_task/docs/GOOGLE_SIGN_IN.md).';
+      return 'Google Sign-In is misconfigured in Google Cloud. Create an '
+          'Android OAuth client for this app package name with the SHA-1 '
+          'of the keystore that signed this build (see docs/GOOGLE_SIGN_IN.md).';
     }
     return e.message?.trim().isNotEmpty == true
         ? e.message!.trim()
