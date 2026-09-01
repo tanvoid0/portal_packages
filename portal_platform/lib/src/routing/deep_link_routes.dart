@@ -51,11 +51,31 @@ String normalizeDeepLinkPath(String path) {
   return p;
 }
 
-/// Extracts app path from a deep link [uri] (path only; fragment ignored).
-String pathFromDeepLinkUri(Uri uri) => normalizeDeepLinkPath(uri.path);
+/// Extracts app path from a deep link [uri] (fragment ignored).
+///
+/// `portal-gym://gym` parses with an empty path and `gym` as the *host*, which
+/// is how people actually write these links, so a custom-scheme link with no
+/// path falls back to its host. Web links keep using the path alone -- there
+/// the host is the domain, not a route.
+String pathFromDeepLinkUri(Uri uri) {
+  final scheme = uri.scheme.toLowerCase();
+  if (uri.path.isEmpty && scheme != 'http' && scheme != 'https') {
+    return normalizeDeepLinkPath(uri.host);
+  }
+  return normalizeDeepLinkPath(uri.path);
+}
 
 bool deepLinkUriIsAllowed(Uri uri) {
-  if (uri.scheme.toLowerCase() == DeepLinkEnv.scheme.toLowerCase()) {
+  final scheme = uri.scheme.toLowerCase();
+  if (scheme == DeepLinkEnv.scheme.toLowerCase()) {
+    return true;
+  }
+  // Every Portal app registers `portal-<app>` in its manifest, and Android
+  // only delivers URIs matching this app's own intent-filter -- so accepting
+  // the family here costs nothing and saves every app from silently dropping
+  // its own links when DEEP_LINK_SCHEME is unset (the default is the legacy
+  // `portalwarp`).
+  if (scheme.startsWith('portal-')) {
     return true;
   }
   final host = DeepLinkEnv.httpsHost;

@@ -190,6 +190,13 @@ class PortalAuthView extends GetView<PortalAuthController> {
                   textInputAction: controller.isLogin.value
                       ? TextInputAction.done
                       : TextInputAction.next,
+                  // The keyboard's done key is the last field's submit: without
+                  // this it only dismisses the keyboard and the form sits there.
+                  onFieldSubmitted: (_) {
+                    if (controller.isLogin.value && !controller.isLoading.value) {
+                      controller.submit();
+                    }
+                  },
                   decoration: InputDecoration(
                     labelText: 'Password',
                     prefixIcon: const Icon(Icons.lock_outline),
@@ -228,6 +235,9 @@ class PortalAuthView extends GetView<PortalAuthController> {
                     validator: controller.validateConfirmPassword,
                     obscureText: controller.obscureConfirmPassword.value,
                     textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) {
+                      if (!controller.isLoading.value) controller.submit();
+                    },
                     decoration: InputDecoration(
                       labelText: 'Confirm Password',
                       prefixIcon: const Icon(Icons.lock_outline),

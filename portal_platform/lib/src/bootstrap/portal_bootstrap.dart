@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
@@ -57,6 +59,7 @@ class PortalBootstrap {
       permanent: true,
     );
     if (checkForUpdatesOnLaunch) _scheduleUpdateCheck();
+    _scheduleDeepLinkAttach();
 
     var isLoggedIn = await Get.find<ApiClient>().isLoggedIn();
     if (!isLoggedIn && config.autoLocalAuth) {
@@ -67,6 +70,20 @@ class PortalBootstrap {
     }
 
     return isLoggedIn;
+  }
+
+  /// Starts deep-link handling after the first frame.
+  ///
+  /// [DeepLinkService.attach] both consumes the URI the app was launched with
+  /// and subscribes to later ones, and it navigates -- so it has to wait until
+  /// there is a navigator to navigate. Every app got this wrong in the same
+  /// way (only one of them called it at all), so bootstrap does it for them;
+  /// an app that calls [DeepLinkService.attach] itself is unaffected, the
+  /// initial link is consumed once either way.
+  static void _scheduleDeepLinkAttach() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(Get.find<DeepLinkService>().attach());
+    });
   }
 
   /// Prompts for a sideload update after the first frame.

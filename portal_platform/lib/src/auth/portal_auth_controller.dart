@@ -109,6 +109,11 @@ class PortalAuthController extends GetxController {
     isLoading.value = true;
     errorMessage.value = '';
 
+    // The session is stored by login()/register() itself, so a failure after
+    // that point is not a failure to sign in -- saying "check your internet"
+    // there sends people hunting a network problem that does not exist while
+    // the next launch drops them straight into the app.
+    var authenticated = false;
     try {
       if (isLogin.value) {
         await _apiClient.login(
@@ -122,6 +127,7 @@ class PortalAuthController extends GetxController {
           name: nameController.text.trim(),
         );
       }
+      authenticated = true;
 
       await Get.find<SessionController>().reloadFromStorage();
       final fallback = Get.find<AppConfig>().routeLoggedIn;
@@ -139,7 +145,9 @@ class PortalAuthController extends GetxController {
         debugPrint('[PortalAuthController] URL: ${_apiClient.baseUrl}');
         debugPrint('[PortalAuthController] Error: $e');
       }
-      errorMessage.value = 'Connection error. Please check your internet.';
+      errorMessage.value = authenticated
+          ? 'Signed in, but this app could not open. Reopen it to continue.'
+          : 'Connection error. Please check your internet.';
     } finally {
       isLoading.value = false;
     }

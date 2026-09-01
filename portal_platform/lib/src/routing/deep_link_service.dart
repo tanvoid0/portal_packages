@@ -104,26 +104,34 @@ class DeepLinkService extends GetxService {
     final loggedIn = await api.isLoggedIn();
     final config = Get.find<AppConfig>();
 
+    final current = PortalNavigation.require.currentPath;
+
     if (resolution.isPublic) {
-      if (loggedIn) {
-        _goAll(config.routeLoggedIn);
-      } else {
-        _goAll(config.routeLoggedOut);
-      }
+      // A public link (login) means "go where this session belongs". Skip it
+      // when that is already the route on screen: re-navigating tears the page
+      // down and rebuilds it without its binding.
+      _goAllUnlessThere(
+        loggedIn ? config.routeLoggedIn : config.routeLoggedOut,
+        current,
+      );
       return;
     }
 
     if (!loggedIn) {
       _pendingWhileLoggedOut = uri;
-      _goAll(config.routeLoggedOut);
+      _goAllUnlessThere(config.routeLoggedOut, current);
       return;
     }
 
-    final current = PortalNavigation.require.currentPath;
     if (resolution.routePath == current && resolution.extra == null) {
       return;
     }
     _navigateTo(resolution);
+  }
+
+  void _goAllUnlessThere(String path, String? current) {
+    if (path == current) return;
+    _goAll(path);
   }
 
   void _navigateTo(DeepLinkResolution resolution) {

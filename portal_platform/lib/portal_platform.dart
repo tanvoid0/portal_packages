@@ -150,6 +150,7 @@ export 'src/settings/portal_theme_controller.dart';
 export 'portal_deep_link.dart';
 export 'src/routing/deep_link_service.dart';
 export 'src/routing/portal_navigation.dart';
+export 'src/routing/portal_get_navigation.dart';
 export 'src/routing/portal_auth_middleware.dart';
 
 // ─── Services ──────────────────────────────────────────────────────
