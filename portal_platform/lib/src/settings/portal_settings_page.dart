@@ -8,6 +8,7 @@ import '../update/portal_update_service.dart';
 import '../update/portal_update_tile.dart';
 import '../widgets/portal_app_version.dart';
 import 'portal_apps_section.dart';
+import 'portal_avatar.dart';
 import 'portal_settings_labels.dart';
 import 'portal_status_tile.dart';
 import 'portal_theme_controller.dart';
@@ -290,7 +291,6 @@ class _ProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final session = Get.find<SessionController>();
-    final cs = Theme.of(context).colorScheme;
 
     return Obx(() {
       final user = session.user.value;
@@ -300,17 +300,7 @@ class _ProfileCard extends StatelessWidget {
 
       return ListTile(
         contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        leading: CircleAvatar(
-          radius: 24,
-          backgroundColor: cs.primaryContainer,
-          child: Text(
-            SessionController.initialsFor(user),
-            style: TextStyle(
-              color: cs.onPrimaryContainer,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
+        leading: PortalAvatar(user: user, radius: 24),
         title: Text(name.isEmpty ? labels.profileFallbackTitle : name),
         subtitle: Text(email, maxLines: 1, overflow: TextOverflow.ellipsis),
         trailing: const Icon(Icons.edit_outlined),

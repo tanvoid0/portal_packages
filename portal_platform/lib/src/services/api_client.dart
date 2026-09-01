@@ -927,10 +927,12 @@ class ApiClient extends GetxService {
     if (raw is! Map) return;
     final m = Map<String, dynamic>.from(raw);
     final id = m['id']?.toString() ?? '';
+    final avatarUrl = m['avatar_url']?.toString();
     await _tokenStorage.saveUser({
       'id': id,
       'email': m['email']?.toString() ?? '',
       'name': m['name']?.toString() ?? '',
+      if (avatarUrl != null && avatarUrl.isNotEmpty) 'avatar_url': avatarUrl,
     });
   }
 }

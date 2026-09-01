@@ -54,6 +54,14 @@ class SessionController extends GetxController {
     PortalNavigation.require.go(Get.find<AppConfig>().routeLoggedOut);
   }
 
+  /// Google profile photo for the signed-in user, or null when the account has
+  /// none (password-only sign-up, or a Google account with no photo). Callers
+  /// still need [initialsFor] as the fallback.
+  static String? avatarUrlFor(Map<String, dynamic>? u) {
+    final url = (u?['avatar_url'] as String?)?.trim();
+    return (url == null || url.isEmpty) ? null : url;
+  }
+
   static String initialsFor(Map<String, dynamic>? u) {
     if (u == null) return '?';
     final name = (u['name'] as String?)?.trim();

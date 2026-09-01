@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../session/session_controller.dart';
+import 'portal_avatar.dart';
 import 'portal_settings_labels.dart';
 
 /// App-bar avatar with a menu: who is signed in, settings, sign out.
@@ -123,20 +124,7 @@ class PortalAccountMenuButton extends StatelessWidget {
               ),
             ),
           ],
-          child: CircleAvatar(
-            radius: radius,
-            backgroundColor:
-                signedIn ? cs.primaryContainer : cs.surfaceContainerHighest,
-            foregroundColor:
-                signedIn ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-            child: Text(
-              SessionController.initialsFor(user),
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
-          ),
+          child: PortalAvatar(user: user, radius: radius, fontSize: 14),
         ),
       );
     });

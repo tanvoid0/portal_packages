@@ -144,6 +144,7 @@ export 'src/settings/portal_settings_labels.dart';
 export 'src/settings/portal_status_tile.dart';
 export 'src/settings/portal_apps_section.dart';
 export 'src/settings/portal_account_menu_button.dart';
+export 'src/settings/portal_avatar.dart';
 export 'src/settings/portal_theme_controller.dart';
 
 // ─── Routing ───────────────────────────────────────────────────────
