@@ -27,6 +27,8 @@ class _DeadClient implements AiCompletionClient {
 }
 
 void main() {
+  _hostRewindTests();
+
   late List<String> accepted;
   late List<String> discarded;
 
@@ -38,7 +40,7 @@ void main() {
   Future<void> pump(WidgetTester tester) => tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: AiAssistantSheet(
+            body: AiAssistantPage(
               runtime: PortalAiRuntime(
                 client: _DeadClient(),
 
@@ -106,7 +108,7 @@ void _hostDrivenTests() {
       MaterialApp(
         home: StatefulBuilder(
           builder: (context, setState) => Scaffold(
-            body: AiAssistantSheet(
+            body: AiAssistantPage(
               turns: turns,
               onSend: (prompt) async {
                 sent.add(prompt);
@@ -131,5 +133,52 @@ void _hostDrivenTests() {
     expect(sent, ['plan my monday']);
     expect(find.text('plan my monday'), findsOneWidget);
     expect(find.text('planned it'), findsOneWidget);
+  });
+}
+
+void _hostRewindTests() {
+  testWidgets('a host that owns the transcript gets edit and retry too',
+      (tester) async {
+    final rewound = <int>[];
+    final turns = [
+      AiChatTurn(role: 'user', content: 'plan my week', at: DateTime(2026, 9)),
+      const AiChatTurn(role: 'assistant', content: 'Here you go.'),
+    ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AiAssistantPage(
+            turns: turns,
+            onSend: (_) async {},
+            onRewind: (index) async => rewound.add(index),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.pumpAndSettle();
+
+    expect(rewound, [0]);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller?.text,
+      'plan my week',
+    );
+  });
+
+  testWidgets('without onRewind a host transcript stays read-only',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AiAssistantPage(
+            turns: const [AiChatTurn(role: 'user', content: 'plan my week')],
+            onSend: (_) async {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byIcon(Icons.edit_outlined), findsNothing);
   });
 }

@@ -258,6 +258,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
   Widget _tile(AiBackendOption option) => _OptionTile(
     option: option,
     labels: widget.labels,
+    selected: option.kind == _selected,
     trailing: _trailingFor(option),
   );
 
@@ -375,16 +376,24 @@ class _OptionTile extends StatelessWidget {
   const _OptionTile({
     required this.option,
     required this.labels,
+    required this.selected,
     this.trailing,
   });
 
   final AiBackendOption option;
   final AiBackendLabels labels;
+
+  /// Whether this is the account's current provider — draws the card's
+  /// highlight and the "Selected" badge, independent of the radio's own dot
+  /// so the choice reads at a glance while scanning the list.
+  final bool selected;
+
   final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     final title = labels.titleFor(option.kind);
     final description = labels.descriptionFor(option.kind);
     final modelsSummary = option.modelsSummary;
@@ -392,20 +401,94 @@ class _OptionTile extends StatelessWidget {
         ? [description, ?modelsSummary].join('\n')
         : (option.unavailableReason ?? labels.unavailable);
 
+    final highlighted = selected && option.available;
+    final borderColor = highlighted
+        ? cs.primary
+        : option.available
+            ? cs.outlineVariant
+            : cs.outlineVariant.withValues(alpha: 0.5);
+    final fillColor = highlighted
+        ? cs.primaryContainer.withValues(alpha: 0.45)
+        : cs.surfaceContainerHigh.withValues(alpha: 0.5);
+
     return Opacity(
       opacity: option.available ? 1 : 0.55,
-      child: RadioListTile<String>(
-        value: option.id,
-        enabled: option.available,
-        title: Text(title, style: theme.textTheme.bodyLarge),
-        subtitle: Text(
-          subtitle,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: RadioListTile<String>(
+          value: option.id,
+          enabled: option.available,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: borderColor, width: highlighted ? 1.5 : 1),
           ),
+          tileColor: fillColor,
+          contentPadding: const EdgeInsets.fromLTRB(14, 6, 12, 6),
+          title: Row(
+            children: [
+              Icon(
+                labels.iconFor(option.kind),
+                size: 18,
+                color: cs.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyLarge
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+              if (highlighted) ...[
+                const SizedBox(width: 8),
+                _StatusBadge(label: labels.selectedBadge, color: cs.primary),
+              ] else if (!option.available) ...[
+                const SizedBox(width: 8),
+                _StatusBadge(label: labels.unavailable, color: cs.error),
+              ],
+            ],
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 4, left: 26),
+            child: Text(
+              subtitle,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          secondary: trailing,
         ),
-        secondary: trailing,
-        contentPadding: EdgeInsets.zero,
+      ),
+    );
+  }
+}
+
+/// A short, coloured status pill next to a provider's title.
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
       ),
     );
   }

@@ -34,6 +34,8 @@ class _ScriptedClient implements AiCompletionClient {
 }
 
 void main() {
+  _statsTests();
+
   final added = <String>[];
 
   AiTool addItem() => AiTool(
@@ -159,5 +161,70 @@ void main() {
 
     expect(result.steps, hasLength(3));
     expect(result.message, contains('Stopped after 3 steps'));
+  });
+}
+
+/// A client that reports usage, to prove a multi-call run sums it.
+class _CountingClient with AiCompletionStatsSource implements AiCompletionClient {
+  _CountingClient(this.replies);
+
+  final List<String> replies;
+  var _index = 0;
+
+  @override
+  Future<bool> isAvailable() async => true;
+
+  @override
+  Future<String> complete({
+    required String systemPrompt,
+    required String userPrompt,
+    AiSamplerConfig sampler = const AiSamplerConfig(),
+    bool jsonMode = false,
+  }) async {
+    lastStats = const AiCompletionStats(
+      model: 'gemma4',
+      promptTokens: 10,
+      replyTokens: 5,
+    );
+    return replies[_index++];
+  }
+
+  @override
+  Stream<String> completeStream({
+    required String systemPrompt,
+    required String userPrompt,
+    AiSamplerConfig sampler = const AiSamplerConfig(),
+  }) async* {
+    yield await complete(systemPrompt: systemPrompt, userPrompt: userPrompt);
+  }
+}
+
+void _statsTests() {
+  test('usage is summed over every call a run makes', () async {
+    final client = _CountingClient([
+      '{"tool": "echo", "args": {}}',
+      '{"final": "done"}',
+    ]);
+    final agent = AiAgent(
+      client: client,
+      tools: [
+        AiTool(
+          name: 'echo',
+          description: 'echo',
+          run: (_) async => 'ok',
+        ),
+      ],
+    );
+    final result = await agent.run('go');
+    expect(result.stats?.totalTokens, 30);
+    expect(result.stats?.model, 'gemma4');
+  });
+
+  test('a backend that reports nothing leaves the stats null', () async {
+    final agent = AiAgent(
+      client: _ScriptedClient(['{"final": "done"}']),
+      tools: const [],
+    );
+    expect((await agent.run('go')).stats, isNull);
   });
 }

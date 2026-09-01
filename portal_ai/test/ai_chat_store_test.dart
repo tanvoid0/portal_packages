@@ -36,6 +36,8 @@ class _ScriptedClient implements AiCompletionClient {
 }
 
 void main() {
+  _turnMetadataTests();
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   Future<PrefsAiChatStore> freshStore() async {
@@ -82,7 +84,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: AiAssistantSheet(
+          body: AiAssistantPage(
             store: store,
             runtime: PortalAiRuntime(
               client: client,
@@ -156,7 +158,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: AiAssistantSheet(
+          body: AiAssistantPage(
             store: store,
             runtime: PortalAiRuntime(
               client: _ScriptedClient(const []),
@@ -174,5 +176,26 @@ void main() {
 
     final saved = store.listSummaries().single;
     expect(store.load(saved.id)!.turns.single.content, 'this will fail');
+  });
+}
+
+void _turnMetadataTests() {
+  test('a turn keeps its time and duration across a save and reload', () {
+    final at = DateTime.utc(2026, 9, 1, 9, 14, 30);
+    final turn = AiChatTurn(
+      role: 'assistant',
+      content: 'done',
+      at: at,
+      took: const Duration(milliseconds: 4200),
+    );
+    final back = aiChatTurnFromJson(turn.toJson());
+    expect(back.at, at);
+    expect(back.took, const Duration(milliseconds: 4200));
+  });
+
+  test('a turn saved before turns were stamped reloads without a time', () {
+    final back = aiChatTurnFromJson({'role': 'user', 'content': 'hi'});
+    expect(back.at, isNull);
+    expect(back.took, isNull);
   });
 }

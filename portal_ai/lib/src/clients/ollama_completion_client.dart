@@ -4,9 +4,12 @@ import 'package:http/http.dart' as http;
 
 import '../models/ai_sampler_config.dart';
 import 'ai_completion_client.dart';
+import 'ai_completion_stats.dart';
 
 /// Talks to a local or remote Ollama daemon.
-class OllamaCompletionClient implements AiCompletionClient {
+class OllamaCompletionClient
+    with AiCompletionStatsSource
+    implements AiCompletionClient {
   OllamaCompletionClient({
     required this.baseUrl,
     required this.model,
@@ -36,26 +39,36 @@ class OllamaCompletionClient implements AiCompletionClient {
     AiSamplerConfig sampler = const AiSamplerConfig(),
     bool jsonMode = false,
   }) async {
-    final body = <String, dynamic>{
-      'model': model,
-      'stream': false,
-      'messages': [
-        {'role': 'system', 'content': systemPrompt},
-        {'role': 'user', 'content': userPrompt},
-      ],
-      'options': {
-        'temperature': sampler.temperature,
-        'top_p': sampler.topP,
-        if (sampler.topK != null) 'top_k': sampler.topK,
-      },
-      if (jsonMode) 'format': 'json',
-    };
+    Map<String, dynamic> body({required bool think}) => {
+          'model': model,
+          'stream': false,
+          if (think) 'think': true,
+          'messages': [
+            {'role': 'system', 'content': systemPrompt},
+            {'role': 'user', 'content': userPrompt},
+          ],
+          'options': {
+            'temperature': sampler.temperature,
+            'top_p': sampler.topP,
+            if (sampler.topK != null) 'top_k': sampler.topK,
+          },
+          if (jsonMode) 'format': 'json',
+        };
 
-    final response = await _client.post(
-      Uri.parse('$_normalizedBaseUrl/api/chat'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
+    Future<http.Response> post(bool think) => _client.post(
+          Uri.parse('$_normalizedBaseUrl/api/chat'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(body(think: think)),
+        );
+
+    // Ask for the reasoning, but never at the cost of the answer: a model
+    // without thinking support rejects the flag outright, so fall back to a
+    // plain call rather than failing the request.
+    var response = await post(true);
+    if (response.statusCode != 200 &&
+        response.body.toLowerCase().contains('think')) {
+      response = await post(false);
+    }
 
     if (response.statusCode != 200) {
       throw AiCompletionException(
@@ -64,10 +77,22 @@ class OllamaCompletionClient implements AiCompletionClient {
     }
 
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    lastStats = AiCompletionStats(
+      model: decoded['model'] as String? ?? model,
+      promptTokens: decoded['prompt_eval_count'] as int?,
+      replyTokens: decoded['eval_count'] as int?,
+    );
     final message = decoded['message'];
     if (message is Map) {
       final content = message['content'] as String?;
-      if (content != null && content.isNotEmpty) return content;
+      if (content != null && content.isNotEmpty) {
+        // Ollama returns reasoning in its own field. Fold it back into the
+        // text as a <think> block so one parser in the agent handles both
+        // this and the models that inline the tag themselves.
+        final thinking = (message['thinking'] as String?)?.trim();
+        if (thinking == null || thinking.isEmpty) return content;
+        return '<think>$thinking</think>$content';
+      }
     }
     throw const AiCompletionException('Ollama returned an empty response');
   }

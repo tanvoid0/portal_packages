@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 import 'ai_backend_kind.dart';
 
 /// User-visible labels for [AiBackendOption] rows.
@@ -16,6 +18,7 @@ class AiBackendLabels {
     this.edgeGalleryDescription =
         'Opens the Edge Gallery app for on-device chat (external).',
     this.unavailable = 'Unavailable',
+    this.selectedBadge = 'Selected',
     this.scanning = 'Checking available providers…',
     this.noProviders = 'No AI providers are available on this device.',
     this.selectProvider = 'AI provider',
@@ -42,6 +45,7 @@ class AiBackendLabels {
   final String edgeGalleryTitle;
   final String edgeGalleryDescription;
   final String unavailable;
+  final String selectedBadge;
   final String scanning;
   final String noProviders;
   final String selectProvider;
@@ -68,5 +72,14 @@ class AiBackendLabels {
         AiBackendKind.ollama => ollamaDescription,
         AiBackendKind.systemOnDevice => onDeviceDescription,
         AiBackendKind.edgeGalleryDelegate => edgeGalleryDescription,
+      };
+
+  /// One glyph per provider, so a row reads at a glance before the label
+  /// does — cloud vs. this device vs. a separate app.
+  IconData iconFor(AiBackendKind kind) => switch (kind) {
+        AiBackendKind.cloudGemini => Icons.cloud_outlined,
+        AiBackendKind.ollama => Icons.dns_outlined,
+        AiBackendKind.systemOnDevice => Icons.phone_iphone_outlined,
+        AiBackendKind.edgeGalleryDelegate => Icons.open_in_new_rounded,
       };
 }

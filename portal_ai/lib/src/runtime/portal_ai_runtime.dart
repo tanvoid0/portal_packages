@@ -4,10 +4,12 @@ import '../clients/ai_completion_client_factory.dart';
 import '../clients/ollama_completion_client.dart';
 import '../clients/server_completion_client.dart';
 import '../models/ai_backend_kind.dart';
+import '../models/ai_sampler_config.dart';
 import '../models/ai_backend_option.dart';
 import '../prefs/ai_backend_store.dart';
 import '../tools/ai_agent.dart';
 import '../tools/ai_tool.dart';
+import '../tools/web_search_tool.dart';
 
 /// Env keys that point the assistant at a local model during development.
 abstract final class AiDevEnvKeys {
@@ -90,10 +92,19 @@ class PortalAiRuntime {
       );
     }
 
+    // Search is offered to every app, or to none: an app does not ask for it,
+    // it is there when a key is configured. Absent key means the model keeps
+    // answering from what it knows, which is the behaviour without this tool.
+    final searchKey = env[AiSearchEnvKeys.tavilyKey]?.trim();
+
     return PortalAiRuntime(
       client: client,
       appDescription: appDescription,
-      tools: tools,
+      tools: [
+        ...tools,
+        if (searchKey != null && searchKey.isNotEmpty)
+          webSearchTool(apiKey: searchKey),
+      ],
       store: store,
       clientFactory: factory,
       serverClient: server,
@@ -163,6 +174,47 @@ class PortalAiRuntime {
   /// Whether the backing model can be reached right now. The server client
   /// answers optimistically; Ollama is probed.
   Future<bool> get isReady => client.isAvailable();
+
+  /// Asks the model for a handful of things worth trying in this app.
+  ///
+  /// The apps ship a fixed list of example prompts, which goes stale the
+  /// moment someone has read it twice. This regenerates them from the same
+  /// app description the agent already runs on, so the chips stay varied
+  /// without every app maintaining its own copy. [seed] is the app's own
+  /// list, passed to the model as the house style to imitate.
+  ///
+  /// Returns an empty list on any failure: suggestions are a nicety, and a
+  /// broken backend must not take the assistant down with it.
+  Future<List<String>> suggestPrompts({
+    List<String> seed = const [],
+    int count = 4,
+  }) async {
+    try {
+      final reply = await client.complete(
+        systemPrompt: 'You suggest things a user could ask an in-app '
+            'assistant. $appDescription. '
+            'Reply with JSON only: {"prompts": ["...", "..."]}. '
+            'Each prompt is a short first-person request, under 8 words, '
+            'phrased as the user would type it. No numbering, no quotes '
+            'inside the strings.',
+        userPrompt: seed.isEmpty
+            ? 'Give $count varied prompts.'
+            : 'Give $count varied prompts in the style of these, but '
+                'different from them: ${seed.join(' | ')}',
+        jsonMode: true,
+        sampler: const AiSamplerConfig(temperature: 1),
+      );
+      final decoded = extractJsonObject(splitThinking(reply).rest);
+      final prompts = decoded?['prompts'];
+      if (prompts is! List) return const [];
+      return [
+        for (final p in prompts)
+          if (p is String && p.trim().isNotEmpty) p.trim(),
+      ].take(count).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
 
   /// Runs [prompt] through the tool loop. See [AiAgent.run] for [confirm].
   Future<AiAgentResult> ask(

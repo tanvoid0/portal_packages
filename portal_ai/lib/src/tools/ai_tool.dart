@@ -9,12 +9,15 @@ class AiTool {
   const AiTool({
     required this.name,
     required this.description,
-    required this.run,
+    this.run,
     this.parameters = const {},
     this.mutates = false,
     this.namespace,
     this.runRich,
-  });
+  }) : assert(
+          run != null || runRich != null,
+          'a tool needs run or runRich',
+        );
 
   final String name;
 
@@ -45,14 +48,22 @@ class AiTool {
   /// Whether running this tool changes user data (asks for confirmation).
   final bool mutates;
 
-  /// Returns a short human-readable result fed back to the model.
-  final Future<String> Function(AiToolCall call) run;
+  /// Returns a short human-readable result fed back to the model. Null when
+  /// [runRich] answers instead.
+  final Future<String> Function(AiToolCall call)? run;
 
-  /// Optional richer form of [run] that also returns blocks to render.
+  /// Richer form of [run] that also returns blocks to render.
   ///
-  /// Separate from [run] so the existing tools keep working untouched; when
-  /// set it takes precedence.
+  /// Separate from [run] so text-only tools stay one-liners; when set it takes
+  /// precedence.
   final Future<AiToolResult> Function(AiToolCall call)? runRich;
+
+  /// Runs whichever of [runRich] or [run] this tool has.
+  Future<AiToolResult> call(AiToolCall call) async {
+    final rich = runRich;
+    if (rich != null) return rich(call);
+    return AiToolResult(forModel: await run!(call));
+  }
 
   /// Single line describing this tool in the system prompt.
   String get spec {
@@ -157,6 +168,43 @@ class AiBlock {
     this.actions = const [],
   });
 
+  /// The one kind the assistant draws itself, so a tool can return something
+  /// visual without every app writing a renderer for it.
+  static const itemsKind = 'items';
+
+  /// Rows of image, title and subtitle: what a list-shaped tool result looks
+  /// like in every app here.
+  ///
+  /// [entity] names what these rows are -- `recipe`, `grocery_item` -- so a
+  /// host handling a tap knows which editor to open. The package never
+  /// interprets it.
+  factory AiBlock.items(
+    List<AiItem> items, {
+    String entity = '',
+    List<AiAction> actions = const [],
+  }) =>
+      AiBlock(
+        kind: itemsKind,
+        data: {
+          'items': [for (final item in items) item.toJson()],
+          if (entity.isNotEmpty) 'entity': entity,
+        },
+        actions: actions,
+      );
+
+  /// What [items] are, for an [AiBlock.items] block. Empty when unset.
+  String get entity => data['entity'] as String? ?? '';
+
+  /// The rows of an [AiBlock.items], empty for any other kind.
+  List<AiItem> get items {
+    final raw = data['items'];
+    if (raw is! List) return const [];
+    return [
+      for (final entry in raw)
+        if (entry is Map) AiItem.fromJson(Map<String, dynamic>.from(entry)),
+    ];
+  }
+
   final String kind;
   final Map<String, dynamic> data;
   final List<AiAction> actions;
@@ -175,6 +223,58 @@ class AiBlock {
         actions: (json['actions'] as List<dynamic>? ?? const [])
             .map((e) => AiAction.fromJson(Map<String, dynamic>.from(e as Map)))
             .toList(),
+      );
+}
+
+/// One row of an [AiBlock.items].
+///
+/// [imageUrl] must be fetchable without an auth header — the renderer uses a
+/// plain network image. Leave it null when the picture lives behind the app's
+/// API and let the row fall back to its icon.
+class AiItem {
+  const AiItem({
+    required this.title,
+    this.id,
+    this.subtitle = '',
+    this.trailing = '',
+    this.imageUrl,
+    this.data = const {},
+  });
+
+  /// The record this row stands for. Null means the assistant is proposing
+  /// something that does not exist yet, so a host opens its create form
+  /// instead of its editor.
+  final String? id;
+
+  final String title;
+  final String subtitle;
+
+  /// Fields a host needs to prefill a create form for a row with no [id].
+  /// Ignored for saved records, which the host loads by [id].
+  final Map<String, dynamic> data;
+
+  /// Right-aligned value: a price, a count, a date.
+  final String trailing;
+  final String? imageUrl;
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        if (id != null) 'id': id,
+        if (subtitle.isNotEmpty) 'subtitle': subtitle,
+        if (trailing.isNotEmpty) 'trailing': trailing,
+        if (imageUrl != null && imageUrl!.isNotEmpty) 'image': imageUrl,
+        if (data.isNotEmpty) 'data': data,
+      };
+
+  factory AiItem.fromJson(Map<String, dynamic> json) => AiItem(
+        title: json['title'] as String? ?? '',
+        id: json['id'] as String?,
+        subtitle: json['subtitle'] as String? ?? '',
+        trailing: json['trailing'] as String? ?? '',
+        imageUrl: json['image'] as String?,
+        data: Map<String, dynamic>.from(
+          json['data'] as Map? ?? const <String, dynamic>{},
+        ),
       );
 }
 

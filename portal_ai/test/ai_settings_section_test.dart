@@ -83,6 +83,22 @@ void main() {
     );
   });
 
+  testWidgets('badges mark the selected provider and the unavailable one',
+      (tester) async {
+    await pump(tester, const [
+      AiBackendOption(kind: AiBackendKind.cloudGemini, available: true),
+      AiBackendOption(
+        kind: AiBackendKind.ollama,
+        available: false,
+        unavailableReason: 'Not running',
+      ),
+    ]);
+
+    // Cloud is first and available, so resolveSelectedKind picks it.
+    expect(find.text(labels.selectedBadge), findsOneWidget);
+    expect(find.text(labels.unavailable), findsOneWidget);
+  });
+
   testWidgets('a device model that only needs downloading offers the download',
       (tester) async {
     await pump(tester, const [

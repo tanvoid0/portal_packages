@@ -1,5 +1,6 @@
 import '../models/ai_sampler_config.dart';
 import 'ai_completion_client.dart';
+import 'ai_completion_stats.dart';
 
 /// Posts a JSON body to the app's API and returns the decoded response.
 ///
@@ -14,8 +15,10 @@ typedef AiPostJson = Future<dynamic> Function(
 /// the model and enforces the per-user AI quota.
 ///
 /// Server route: `POST /ai/complete` -> `{ "text": "..." }`.
-class ServerCompletionClient implements AiCompletionClient {
-  const ServerCompletionClient({
+class ServerCompletionClient
+    with AiCompletionStatsSource
+    implements AiCompletionClient {
+  ServerCompletionClient({
     required this.post,
     this.path = '/ai/complete',
     this.feature = 'assistant',
@@ -48,11 +51,27 @@ class ServerCompletionClient implements AiCompletionClient {
       },
     );
 
+    // The route may or may not report usage; read it when it does rather
+    // than requiring a server change to land first.
+    lastStats = response is Map ? _statsOf(response) : null;
     final text = response is Map ? response['text'] as String? : null;
     if (text == null || text.trim().isEmpty) {
       throw const AiCompletionException('Server returned an empty response');
     }
     return text;
+  }
+
+  static AiCompletionStats? _statsOf(Map<dynamic, dynamic> response) {
+    final usage = response['usage'];
+    final stats = AiCompletionStats(
+      model: response['model'] as String?,
+      promptTokens:
+          usage is Map ? (usage['promptTokens'] ?? usage['prompt_tokens']) as int? : null,
+      replyTokens: usage is Map
+          ? (usage['completionTokens'] ?? usage['completion_tokens']) as int?
+          : null,
+    );
+    return stats.isEmpty ? null : stats;
   }
 
   /// The server route is not streaming; this yields the whole reply at once.

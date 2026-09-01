@@ -20,6 +20,9 @@ class AiChatLabels {
     this.messages = 'messages',
     this.delete = 'Delete',
     this.close = 'Close',
+    this.thinking = 'Thought process',
+    this.retry = 'Retry',
+    this.moreIdeas = 'More ideas',
   });
 
   final String inputHint;
@@ -46,4 +49,13 @@ class AiChatLabels {
 
   final String delete;
   final String close;
+
+  /// Header of the collapsed reasoning block, for models that report any.
+  final String thinking;
+
+  /// Re-sends the last question, after a failure or an edit.
+  final String retry;
+
+  /// Asks the model for a fresh set of suggestion chips.
+  final String moreIdeas;
 }

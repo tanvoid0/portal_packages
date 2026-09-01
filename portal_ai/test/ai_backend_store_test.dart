@@ -46,6 +46,23 @@ void main() {
       expect(kind, AiBackendKind.ollama);
     });
 
+    test('keeps stored backend even when momentarily unavailable', () async {
+      await store.setSelectedKind(AiBackendKind.ollama);
+      final kind = await store.resolveSelectedKind(const [
+        AiBackendOption(
+          kind: AiBackendKind.ollama,
+          available: false,
+          unavailableReason: 'Not reachable',
+        ),
+        AiBackendOption(kind: AiBackendKind.cloudGemini, available: true),
+      ]);
+
+      expect(kind, AiBackendKind.ollama);
+      // The scan must not silently switch the stored choice to whatever
+      // fallback was available during this one scan.
+      expect(store.selectedKind, AiBackendKind.ollama);
+    });
+
     test('keeps stored Edge Gallery delegate when installed', () async {
       await store.setSelectedKind(AiBackendKind.edgeGalleryDelegate);
       final kind = await store.resolveSelectedKind(const [

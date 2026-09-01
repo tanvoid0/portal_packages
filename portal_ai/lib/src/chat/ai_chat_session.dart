@@ -10,12 +10,21 @@ class AiChatTurn {
     required this.content,
     this.summary,
     this.payload,
+    this.at,
+    this.took,
   });
 
   final String role;
   final String content;
   final String? summary;
   final Map<String, dynamic>? payload;
+
+  /// When the turn was written. Null on threads saved before turns were
+  /// stamped -- the UI just shows no time for those.
+  final DateTime? at;
+
+  /// How long the assistant took to produce this turn. Null on user turns.
+  final Duration? took;
 
   bool get isUser => role == 'user';
   bool get isAssistant => role == 'assistant';
@@ -24,12 +33,16 @@ class AiChatTurn {
     String? content,
     String? summary,
     Map<String, dynamic>? payload,
+    DateTime? at,
+    Duration? took,
   }) {
     return AiChatTurn(
       role: role,
       content: content ?? this.content,
       summary: summary ?? this.summary,
       payload: payload ?? this.payload,
+      at: at ?? this.at,
+      took: took ?? this.took,
     );
   }
 }
@@ -125,6 +138,8 @@ extension AiChatTurnJson on AiChatTurn {
         'content': content,
         if (summary != null) 'summary': summary,
         if (payload != null) 'payload': payload,
+        if (at != null) 'at': at!.toIso8601String(),
+        if (took != null) 'took_ms': took!.inMilliseconds,
       };
 }
 
@@ -135,6 +150,10 @@ AiChatTurn aiChatTurnFromJson(Map<String, dynamic> json) => AiChatTurn(
       payload: json['payload'] == null
           ? null
           : Map<String, dynamic>.from(json['payload'] as Map),
+      at: DateTime.tryParse(json['at'] as String? ?? ''),
+      took: json['took_ms'] == null
+          ? null
+          : Duration(milliseconds: json['took_ms'] as int),
     );
 
 extension AiChatSessionJson on AiChatSession {

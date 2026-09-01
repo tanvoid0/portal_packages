@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 
@@ -8,15 +8,18 @@ import '../runtime/portal_ai_runtime.dart';
 import '../tools/ai_tool.dart';
 import 'ai_chat_history_list.dart';
 import 'ai_chat_labels.dart';
+import 'ai_item_list.dart';
+import 'ai_markdown.dart';
+import 'ai_thinking_tile.dart';
 
 /// Drop-in assistant UI: prompt box, live step log and a confirmation prompt
 /// before any tool that changes data.
 ///
 /// ```dart
-/// AiAssistantSheet.show(context, runtime: Get.find<PortalAiRuntime>());
+/// AiAssistantPage.show(context, runtime: Get.find<PortalAiRuntime>());
 /// ```
-class AiAssistantSheet extends StatefulWidget {
-  const AiAssistantSheet({
+class AiAssistantPage extends StatefulWidget {
+  const AiAssistantPage({
     super.key,
     this.runtime,
     this.title = 'Assistant',
@@ -31,13 +34,15 @@ class AiAssistantSheet extends StatefulWidget {
     this.turns = const [],
     this.onSend,
     this.busy = false,
+    this.onRewind,
     this.onCancel,
     this.labels = const AiChatLabels(),
     this.fill = false,
     this.store,
+    this.onItemTap,
   }) : assert(
           runtime != null || onSend != null,
-          'give the sheet a runtime to drive the agent, or an onSend that '
+          'give the page a runtime to drive the agent, or an onSend that '
           'generates the reply itself',
         );
 
@@ -53,19 +58,20 @@ class AiAssistantSheet extends StatefulWidget {
   /// on the server, so there is nothing to configure here by default.
   final VoidCallback? onSettings;
 
-  /// Overrides [PortalAiRuntime.tools] for this sheet, for tools that have to
+  /// Overrides [PortalAiRuntime.tools] for this page, for tools that have to
   /// be built per call site (e.g. closed over a Riverpod ref).
   final List<AiTool>? tools;
 
   /// Builders for [AiBlock.kind], so each app draws its own data.
   ///
-  /// A kind with no builder falls back to text: threads persist, so an old one
-  /// can hold blocks whose renderer was since renamed or removed, and a reload
-  /// must survive that rather than throw.
+  /// [AiBlock.itemsKind] is drawn by the assistant itself unless overridden
+  /// here. Any other kind with no builder falls back to text: threads persist,
+  /// so an old one can hold blocks whose renderer was since renamed or
+  /// removed, and a reload must survive that rather than throw.
   final Map<String, Widget Function(AiBlock block)> renderers;
 
   /// Suggestions to add, edit or throw away, shown as cards with an "Add all"
-  /// bar. Host-supplied: the sheet never invents one.
+  /// bar. Host-supplied: the page never invents one.
   final List<AiProposal> proposals;
 
   /// Called once per proposal accepted, by its card or by "Add all". The card
@@ -80,8 +86,8 @@ class AiAssistantSheet extends StatefulWidget {
 
   /// The conversation so far, rendered as bubbles above the run log.
   ///
-  /// Host-owned: an app with sessions rebuilds the sheet with the turns it has
-  /// persisted, so history and reload cost the sheet nothing.
+  /// Host-owned: an app with sessions rebuilds the page with the turns it has
+  /// persisted, so history and reload cost the page nothing.
   final List<AiChatTurn> turns;
 
   /// Takes over sending. Set by apps that generate their own reply (portal_task
@@ -89,8 +95,16 @@ class AiAssistantSheet extends StatefulWidget {
   /// [turns] and [proposals], instead of running the tool agent.
   final Future<void> Function(String prompt)? onSend;
 
-  /// Host-driven busy flag, ORed with the sheet's own.
+  /// Host-driven busy flag, ORed with the page's own.
   final bool busy;
+
+  /// Drops [turns] from `index` onwards, for a host that owns the transcript.
+  ///
+  /// The page puts the question back in the composer itself; all the host has
+  /// to do is forget the turns it is about to be asked again. Without this,
+  /// [onSend] hosts get no edit and no retry -- the page cannot rewrite a list
+  /// it does not own.
+  final Future<void> Function(int index)? onRewind;
 
   /// Shows a stop button while busy when set.
   final VoidCallback? onCancel;
@@ -99,17 +113,24 @@ class AiAssistantSheet extends StatefulWidget {
 
   /// Where to keep this app's threads, if it wants history.
   ///
-  /// With a store the sheet records the conversation, restores it from the
+  /// With a store the page records the conversation, restores it from the
   /// history button and feeds the earlier turns back to the agent, so a
   /// follow-up can say "make it shorter". Without one it stays a one-shot.
   /// Ignored when [onSend] is set: that host owns its own sessions.
   final AiChatStore? store;
 
   /// Take all the height offered instead of hugging the content, so the
-  /// composer sits at the bottom. For hosts that embed this full-screen; a
-  /// modal sheet wants the opposite.
+  /// composer sits at the bottom. Set by [show]; an embedded card wants the
+  /// opposite.
   final bool fill;
 
+  /// Opens a result row. Called with the block's [AiBlock.entity] and the row
+  /// tapped; an [AiItem] with no id is one the assistant proposed but has not
+  /// saved, so the host opens its create form rather than its editor. Rows are
+  /// inert without this -- only the app knows what a recipe looks like.
+  final void Function(String entity, AiItem item)? onItemTap;
+
+  /// Opens the assistant as its own route.
   static Future<void> show(
     BuildContext context, {
     required PortalAiRuntime runtime,
@@ -124,34 +145,39 @@ class AiAssistantSheet extends StatefulWidget {
     ValueChanged<AiProposal>? onDiscardProposal,
     AiChatLabels labels = const AiChatLabels(),
     AiChatStore? store,
+    void Function(String entity, AiItem item)? onItemTap,
   }) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (_) => AiAssistantSheet(
-        runtime: runtime,
-        title: title,
-        suggestions: suggestions,
-        onSettings: onSettings,
-        tools: tools,
-        renderers: renderers,
-        proposals: proposals,
-        onAcceptProposal: onAcceptProposal,
-        onEditProposal: onEditProposal,
-        onDiscardProposal: onDiscardProposal,
-        labels: labels,
-        store: store,
+    return Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          body: SafeArea(
+            child: AiAssistantPage(
+              runtime: runtime,
+              title: title,
+              suggestions: suggestions,
+              onSettings: onSettings,
+              tools: tools,
+              renderers: renderers,
+              proposals: proposals,
+              onAcceptProposal: onAcceptProposal,
+              onEditProposal: onEditProposal,
+              onDiscardProposal: onDiscardProposal,
+              labels: labels,
+              store: store,
+              onItemTap: onItemTap,
+              fill: true,
+            ),
+          ),
+        ),
       ),
     );
   }
 
   @override
-  State<AiAssistantSheet> createState() => _AiAssistantSheetState();
+  State<AiAssistantPage> createState() => _AiAssistantPageState();
 }
 
-class _AiAssistantSheetState extends State<AiAssistantSheet> {
+class _AiAssistantPageState extends State<AiAssistantPage> {
   final _input = TextEditingController();
   final _scroll = ScrollController();
 
@@ -161,18 +187,45 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
   final _steps = <AiAgentStep>[];
   bool _running = false;
   String? _reply;
+
+  /// Reasoning behind [_reply]; only used in one-shot mode, since a kept turn
+  /// carries its own in the payload.
+  String? _replyThinking;
   String? _error;
 
   /// Accepting or discarding removes a card here and now; the host is told, but
-  /// the sheet does not wait for it to hand back a new list.
+  /// the page does not wait for it to hand back a new list.
   late List<AiProposal> _proposals = List.of(widget.proposals);
   String? _expandedProposal;
 
-  /// Only used in store mode; when the host passes [AiAssistantSheet.onSend] it
+  /// Only used in store mode; when the host passes [AiAssistantPage.onSend] it
   /// owns the transcript and these stay empty.
   final _turns = <AiChatTurn>[];
   final _sessions = <AiChatSessionSummary>[];
   String? _sessionId;
+
+  /// What the chips show now. Starts as a shuffle of the app's own list, so
+  /// two visits do not open on the same four prompts, and is replaced when
+  /// the user asks the model for fresh ones.
+  late List<String> _suggestions = _shuffled(widget.suggestions);
+  bool _loadingIdeas = false;
+
+  static List<String> _shuffled(List<String> from) =>
+      (List.of(from)..shuffle(Random())).take(4).toList();
+
+  Future<void> _freshIdeas() async {
+    final runtime = widget.runtime;
+    if (runtime == null || _loadingIdeas) return;
+    setState(() => _loadingIdeas = true);
+    final ideas = await runtime.suggestPrompts(seed: widget.suggestions);
+    if (!mounted) return;
+    setState(() {
+      _loadingIdeas = false;
+      // An empty list means the backend could not answer; keep what is on
+      // screen rather than blanking the empty state.
+      if (ideas.isNotEmpty) _suggestions = ideas;
+    });
+  }
 
   List<AiChatTurn> get _visibleTurns =>
       widget.onSend != null ? widget.turns : _turns;
@@ -252,7 +305,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
       context: context,
       builder: (dialogContext) => Dialog(
         // Deleting keeps the dialog open, so it rebuilds from the store rather
-        // than from the list this sheet captured when it opened.
+        // than from the list this page captured when it opened.
         child: StatefulBuilder(
           builder: (dialogContext, setDialogState) => SizedBox(
             height: 420,
@@ -290,7 +343,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
   }
 
   @override
-  void didUpdateWidget(AiAssistantSheet oldWidget) {
+  void didUpdateWidget(AiAssistantPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.proposals, widget.proposals)) {
       _proposals = List.of(widget.proposals);
@@ -346,6 +399,39 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
 
   bool get _busy => _running || widget.busy;
 
+  /// The last thing the user asked, so a failure or an edit has something to
+  /// re-send. Null in host-driven mode: that host owns its transcript.
+  AiChatTurn? get _lastUserTurn {
+    if (widget.onSend != null && widget.onRewind == null) return null;
+    for (final turn in _visibleTurns.reversed) {
+      if (turn.isUser) return turn;
+    }
+    return null;
+  }
+
+  /// Drops everything from the last question onwards and puts it back where
+  /// it came from. Re-sending is one call, not two: rewinding is the whole
+  /// job, whether the answer failed or the user wants to reword it.
+  Future<void> _rewindToLastQuestion() async {
+    final turns = _visibleTurns;
+    final index = turns.lastIndexWhere((t) => t.isUser);
+    if (index < 0) return;
+    setState(() {
+      _input.text = turns[index].content;
+      _input.selection = TextSelection.collapsed(offset: _input.text.length);
+      _error = null;
+      _steps.clear();
+      if (widget.onSend == null) _turns.removeRange(index, _turns.length);
+    });
+    if (widget.onSend != null) await widget.onRewind?.call(index);
+  }
+
+  Future<void> _retry() async {
+    await _rewindToLastQuestion();
+    if (!mounted || _input.text.trim().isEmpty) return;
+    await _send();
+  }
+
   Future<void> _send() async {
     final prompt = _input.text.trim();
     if (prompt.isEmpty || _busy) return;
@@ -369,6 +455,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
     }
     final keeping = widget.store != null;
     final history = List.of(_turns);
+    final clock = Stopwatch()..start();
     setState(() {
       _running = true;
       _cancelled = false;
@@ -377,7 +464,9 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
       _steps.clear();
       if (keeping) {
         _input.clear();
-        _turns.add(AiChatTurn(role: 'user', content: prompt));
+        _turns.add(
+          AiChatTurn(role: 'user', content: prompt, at: DateTime.now()),
+        );
       }
     });
     try {
@@ -394,7 +483,10 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
       );
       if (!mounted || _cancelled) return;
       if (!keeping) {
-        setState(() => _reply = result.message);
+        setState(() {
+          _reply = result.message;
+          _replyThinking = result.thinking;
+        });
         return;
       }
       setState(() {
@@ -402,11 +494,19 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
           AiChatTurn(
             role: 'assistant',
             content: result.message,
+            at: DateTime.now(),
+            took: clock.elapsed,
             payload: {
               'blocks': [
                 for (final step in _steps)
                   for (final block in step.blocks) block.toJson(),
               ],
+              if (result.thinking != null) 'thinking': result.thinking,
+              if (_steps.isNotEmpty) 'step_count': _steps.length,
+              if (result.stats case final stats?) ...{
+                'model': ?stats.model,
+                'tokens': ?stats.totalTokens,
+              },
             },
           ),
         );
@@ -443,21 +543,16 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
 
     setState(() => _running = true);
     try {
-      final rich = tool.runRich;
-      final step = rich != null
-          ? () async {
-              final r = await rich(call);
-              return AiAgentStep(
+      final result = await tool.call(call);
+      if (mounted) {
+        setState(() => _steps.add(
+              AiAgentStep(
                 call: call,
-                result: r.forModel,
-                blocks: r.blocks,
-              );
-            }()
-          : tool.run(call).then(
-              (r) => AiAgentStep(call: call, result: r),
-            );
-      final resolved = await step;
-      if (mounted) setState(() => _steps.add(resolved));
+                result: result.forModel,
+                blocks: result.blocks,
+              ),
+            ));
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _steps.add(
@@ -467,6 +562,13 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
     } finally {
       if (mounted) setState(() => _running = false);
     }
+  }
+
+  /// Reasoning a turn carries, if the backend reported any.
+  String? _thinkingOf(AiChatTurn turn) {
+    if (turn.isUser) return null;
+    final raw = turn.payload?['thinking'];
+    return raw is String && raw.trim().isNotEmpty ? raw : null;
   }
 
   /// Blocks a restored turn carries. An unreadable payload renders nothing
@@ -480,11 +582,27 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
     ];
   }
 
+  Widget _blockBody(AiBlock block, ThemeData theme) {
+    final custom = widget.renderers[block.kind];
+    if (custom != null) return custom(block);
+    if (block.kind == AiBlock.itemsKind) {
+      final open = widget.onItemTap;
+      // A block with no entity is rows the host cannot open -- an aggregate,
+      // a computed total. Those stay inert rather than offering a chevron
+      // that goes nowhere.
+      final openable = open != null && block.entity.isNotEmpty;
+      return AiItemList(
+        items: block.items,
+        onTap: openable ? (item) => open(block.entity, item) : null,
+      );
+    }
+    return Text(block.kind, style: theme.textTheme.bodySmall);
+  }
+
   Widget _blockView(AiBlock block, ThemeData theme) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          widget.renderers[block.kind]?.call(block) ??
-              Text(block.kind, style: theme.textTheme.bodySmall),
+          _blockBody(block, theme),
           if (block.actions.isNotEmpty)
             Wrap(
               spacing: 8,
@@ -499,25 +617,47 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
         ],
       );
 
+  /// One completed tool call: what ran, plus whatever it had to show. The raw
+  /// result text is a fallback for a tool with no blocks of its own.
+  Widget _stepView(AiAgentStep step, ThemeData theme) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              step.failed ? Icons.error_outline : Icons.check_circle_outline,
+              color: step.failed ? theme.colorScheme.error : null,
+              size: 20,
+            ),
+            title: Text(step.call.name.replaceAll('_', ' ')),
+            subtitle: step.blocks.isEmpty ? Text(step.result) : null,
+          ),
+          for (final block in step.blocks)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _blockView(block, theme),
+            ),
+        ],
+      );
+
   Future<bool> _confirm(AiTool tool, AiToolCall call) async {
     if (!mounted) return false;
     final approved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(tool.name.replaceAll('_', ' ')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(tool.description),
-            if (call.args.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                const JsonEncoder.withIndent('  ').convert(call.args),
-                style: Theme.of(dialogContext).textTheme.bodySmall,
-              ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(tool.description),
+              if (call.args.isNotEmpty) const SizedBox(height: 12),
+              for (final arg in call.args.entries)
+                _ArgRow(name: arg.key, value: arg.value),
             ],
-          ],
+          ),
         ),
         actions: [
           TextButton(
@@ -541,6 +681,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
       padding: EdgeInsets.only(
         left: 16,
         right: 16,
+        top: widget.fill ? 8 : 0,
         bottom: MediaQuery.of(context).viewInsets.bottom + 16,
       ),
       child: Column(
@@ -552,6 +693,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
               widget.store != null) ...[
             Row(
               children: [
+                if (widget.fill && Navigator.canPop(context)) const BackButton(),
                 Expanded(
                   child: Text(widget.title, style: theme.textTheme.titleMedium),
                 ),
@@ -599,17 +741,40 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                         ),
                       ),
                     _Suggestions(
-                      suggestions: widget.suggestions,
+                      suggestions: _suggestions,
                       onTap: (text) {
                         _input.text = text;
                         _send();
                       },
+                      // Only offered when there is a model to ask and a
+                      // house style to imitate.
+                      onRefresh: widget.runtime == null ? null : _freshIdeas,
+                      refreshing: _loadingIdeas,
+                      refreshLabel: widget.labels.moreIdeas,
                     ),
                   ],
                   for (final turn in _visibleTurns) ...[
+                    if (_thinkingOf(turn) case final thinking?)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: AiThinkingTile(
+                          thinking: thinking,
+                          label: widget.labels.thinking,
+                        ),
+                      ),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: _TurnBubble(turn: turn),
+                      child: _TurnBubble(
+                        turn: turn,
+                        // Only the newest question is editable: rewriting an
+                        // older one would mean throwing away every answer
+                        // after it, which is a bigger promise than "let me
+                        // fix that typo".
+                        onEdit: !_busy && identical(turn, _lastUserTurn)
+                            ? () => _rewindToLastQuestion()
+                            : null,
+                        editLabel: widget.labels.edit,
+                      ),
                     ),
                     for (final block in _blocksOf(turn))
                       Padding(
@@ -617,28 +782,16 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                         child: _blockView(block, theme),
                       ),
                   ],
-                  for (final step in _steps)
-                    ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        step.failed ? Icons.error_outline : Icons.check_circle_outline,
-                        color: step.failed ? theme.colorScheme.error : null,
-                        size: 20,
-                      ),
-                      title: Text(step.call.name.replaceAll('_', ' ')),
-                      subtitle: Text(step.result),
+                  for (final step in _steps) _stepView(step, theme),
+                  if (_replyThinking case final thinking?)
+                    AiThinkingTile(
+                      thinking: thinking,
+                      label: widget.labels.thinking,
                     ),
-                  for (final step in _steps)
-                    for (final block in step.blocks)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: _blockView(block, theme),
-                      ),
                   if (_reply != null)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text(_reply!, style: theme.textTheme.bodyMedium),
+                      child: AiMarkdown(text: _reply!),
                     ),
                   for (final proposal in _proposals)
                     Padding(
@@ -673,40 +826,28 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                   if (_error != null)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text(
-                        _error!,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: theme.colorScheme.error),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _error!,
+                              style: theme.textTheme.bodySmall
+                                  ?.copyWith(color: theme.colorScheme.error),
+                            ),
+                          ),
+                          if (_lastUserTurn != null && !_busy)
+                            TextButton.icon(
+                              onPressed: _retry,
+                              icon: const Icon(Icons.refresh, size: 18),
+                              label: Text(widget.labels.retry),
+                            ),
+                        ],
                       ),
                     ),
                 ],
               ),
             ),
           ),
-          if (_busy)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Row(
-                children: [
-                  const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      widget.labels.working,
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _stop,
-                    child: Text(widget.labels.stop),
-                  ),
-                ],
-              ),
-            ),
           if (_proposals.isNotEmpty && widget.onAcceptProposal != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -727,15 +868,24 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
             textInputAction: TextInputAction.send,
             onSubmitted: (_) => _send(),
             decoration: InputDecoration(
-              hintText: widget.labels.inputHint,
+              hintText: _busy ? widget.labels.working : widget.labels.inputHint,
               border: const OutlineInputBorder(),
+              // One spinner, and it is also the stop button: the ring shows
+              // the run is live, tapping it cancels.
               suffixIcon: _busy
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(
+                  ? IconButton(
+                      tooltip: widget.labels.stop,
+                      onPressed: _stop,
+                      icon: const SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            CircularProgressIndicator(strokeWidth: 2),
+                            Icon(Icons.stop_rounded, size: 12),
+                          ],
+                        ),
                       ),
                     )
                   : IconButton(
@@ -750,21 +900,93 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
   }
 }
 
+/// One argument of a pending tool call, as a label and a readable value.
+///
+/// The user is being asked to approve a change to their own data, so the
+/// arguments have to be legible -- a JSON dump is not an answer to "allow
+/// this?".
+class _ArgRow extends StatelessWidget {
+  const _ArgRow({required this.name, required this.value});
+
+  final String name;
+  final Object? value;
+
+  static String describe(Object? value) => switch (value) {
+        null => '-',
+        final List list => list.map(describe).join(', '),
+        final Map map => map.values.map(describe).join(' '),
+        _ => '$value',
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 92,
+            child: Text(
+              name.replaceAll('_', ' '),
+              style: theme.textTheme.labelMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(describe(value), style: theme.textTheme.bodySmall),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _Suggestions extends StatelessWidget {
-  const _Suggestions({required this.suggestions, required this.onTap});
+  const _Suggestions({
+    required this.suggestions,
+    required this.onTap,
+    this.onRefresh,
+    this.refreshing = false,
+    this.refreshLabel = 'More ideas',
+  });
 
   final List<String> suggestions;
   final ValueChanged<String> onTap;
 
+  /// Asks the model for a different set. Null when nothing can be asked.
+  final Future<void> Function()? onRefresh;
+  final bool refreshing;
+  final String refreshLabel;
+
   @override
   Widget build(BuildContext context) {
-    if (suggestions.isEmpty) return const SizedBox.shrink();
+    if (suggestions.isEmpty && onRefresh == null) {
+      return const SizedBox.shrink();
+    }
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
         for (final suggestion in suggestions)
-          ActionChip(label: Text(suggestion), onPressed: () => onTap(suggestion)),
+          ActionChip(
+            label: Text(suggestion),
+            onPressed: () => onTap(suggestion),
+          ),
+        if (onRefresh case final refresh?)
+          ActionChip(
+            avatar: refreshing
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.autorenew, size: 16),
+            label: Text(refreshLabel),
+            onPressed: refreshing ? null : refresh,
+          ),
       ],
     );
   }
@@ -868,35 +1090,114 @@ class _ProposalCard extends StatelessWidget {
 
 /// One side of the conversation.
 class _TurnBubble extends StatelessWidget {
-  const _TurnBubble({required this.turn});
+  const _TurnBubble({required this.turn, this.onEdit, this.editLabel = 'Edit'});
 
   final AiChatTurn turn;
+
+  /// Puts this turn back in the composer. Null for anything not editable.
+  final VoidCallback? onEdit;
+  final String editLabel;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isUser = turn.isUser;
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.85,
-        ),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: isUser
-              ? theme.colorScheme.primary.withValues(alpha: 0.15)
-              : theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(14),
-            topRight: const Radius.circular(14),
-            bottomLeft: Radius.circular(isUser ? 14 : 4),
-            bottomRight: Radius.circular(isUser ? 4 : 14),
+    final meta = _meta(context);
+    // Only the user gets a bubble. The assistant's reply is the page's own
+    // content -- boxing it just fights the app's background for contrast.
+    if (!isUser) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AiMarkdown(text: turn.content),
+          if (meta != null) _metaText(theme, meta),
+        ],
+      );
+    }
+    final scheme = theme.colorScheme;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        if (onEdit != null)
+          IconButton(
+            tooltip: editLabel,
+            onPressed: onEdit,
+            visualDensity: VisualDensity.compact,
+            iconSize: 18,
+            color: scheme.onSurfaceVariant,
+            icon: const Icon(Icons.edit_outlined),
+          ),
+        Flexible(
+          child: Container(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.sizeOf(context).width * 0.85,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(4),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  turn.content,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    height: 1.45,
+                    color: scheme.onPrimaryContainer,
+                  ),
+                ),
+                if (meta != null)
+                  _metaText(theme, meta, color: scheme.onPrimaryContainer),
+              ],
+            ),
           ),
         ),
-        child: Text(
-          turn.content,
-          style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+      ],
+    );
+  }
+
+  /// `09:14 - 4.2s - 3 steps`, skipping whatever this turn does not know.
+  /// Threads saved before turns carried a time show nothing at all.
+  String? _meta(BuildContext context) {
+    final parts = [
+      if (turn.at case final at?)
+        MaterialLocalizations.of(context).formatTimeOfDay(
+          TimeOfDay.fromDateTime(at),
+        ),
+      if (turn.took case final took?) _formatTook(took),
+      if (turn.payload?['step_count'] case final int steps when steps > 0)
+        '$steps ${steps == 1 ? 'step' : 'steps'}',
+      if (turn.payload?['tokens'] case final int tokens when tokens > 0)
+        '$tokens tokens',
+      if (turn.payload?['model'] case final String model when model.isNotEmpty)
+        model,
+    ];
+    return parts.isEmpty ? null : parts.join('  ·  ');
+  }
+
+  static String _formatTook(Duration took) {
+    if (took.inSeconds < 60) {
+      return '${(took.inMilliseconds / 1000).toStringAsFixed(1)}s';
+    }
+    return '${took.inMinutes}m ${took.inSeconds % 60}s';
+  }
+
+  Widget _metaText(ThemeData theme, String meta, {Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Text(
+        meta,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: (color ?? theme.colorScheme.onSurfaceVariant)
+              .withValues(alpha: 0.7),
         ),
       ),
     );

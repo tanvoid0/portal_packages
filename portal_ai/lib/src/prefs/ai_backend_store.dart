@@ -74,21 +74,19 @@ class AiBackendStore {
     await setModelFor(option.kind, option.models.first);
   }
 
-  /// Picks the stored backend when still available, otherwise the first
-  /// available inference backend, otherwise cloud.
+  /// Picks the stored backend when there is one, otherwise defaults to the
+  /// first available inference backend, otherwise cloud.
+  ///
+  /// A stored choice is never overwritten by a fallback: Ollama being
+  /// unreachable for one scan (daemon not started, LAN hiccup) must not
+  /// silently switch the user to another provider and persist that switch —
+  /// the row still shows disabled with a reason, same as any other
+  /// momentarily-unavailable option.
   Future<AiBackendKind> resolveSelectedKind(
     List<AiBackendOption> discovered,
   ) async {
     final stored = selectedKind;
-    if (stored != null) {
-      final match = _firstWhereOrNull(discovered, (o) => o.kind == stored);
-      if (match != null && match.available) {
-        if (match.supportsInAppInference ||
-            match.kind == AiBackendKind.edgeGalleryDelegate) {
-          return stored;
-        }
-      }
-    }
+    if (stored != null) return stored;
 
     for (final option in discovered) {
       if (option.available && option.supportsInAppInference) {
@@ -100,14 +98,4 @@ class AiBackendStore {
     await setSelectedKind(AiBackendKind.cloudGemini);
     return AiBackendKind.cloudGemini;
   }
-}
-
-AiBackendOption? _firstWhereOrNull(
-  Iterable<AiBackendOption> items,
-  bool Function(AiBackendOption item) test,
-) {
-  for (final item in items) {
-    if (test(item)) return item;
-  }
-  return null;
 }

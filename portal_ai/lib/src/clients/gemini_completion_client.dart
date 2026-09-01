@@ -3,9 +3,12 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import '../config/gemini_model_catalog.dart';
 import '../models/ai_sampler_config.dart';
 import 'ai_completion_client.dart';
+import 'ai_completion_stats.dart';
 
 /// Direct Gemini completions using an API key from app environment.
-class GeminiCompletionClient implements AiCompletionClient {
+class GeminiCompletionClient
+    with AiCompletionStatsSource
+    implements AiCompletionClient {
   GeminiCompletionClient({
     required GeminiModelCatalog catalog,
     required String model,
@@ -45,6 +48,12 @@ class GeminiCompletionClient implements AiCompletionClient {
 
     try {
       final response = await model.generateContent([Content.text(userPrompt)]);
+      final usage = response.usageMetadata;
+      lastStats = AiCompletionStats(
+        model: _modelName,
+        promptTokens: usage?.promptTokenCount,
+        replyTokens: usage?.candidatesTokenCount,
+      );
       final text = response.text?.trim();
       if (text == null || text.isEmpty) {
         throw const AiCompletionException('Gemini returned an empty response');

@@ -88,4 +88,29 @@ void main() {
 
     expect(find.text('APPEARANCE'), findsNothing);
   });
+
+  testWidgets('assistant opens on its own page, not inline', (tester) async {
+    await pump(
+      tester,
+      const PortalSettingsPage(
+        include: [PortalSettingsGroup.assistant],
+        aiSection: Text('provider list'),
+      ),
+    );
+
+    // Not inlined into the settings list.
+    expect(find.text('provider list'), findsNothing);
+    expect(find.text('Assistant'), findsOneWidget);
+
+    await tester.tap(find.text('Assistant'));
+    await tester.pumpAndSettle();
+
+    // Now on its own page, with a back button to return.
+    expect(find.text('provider list'), findsOneWidget);
+    expect(find.byType(BackButton), findsOneWidget);
+
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(find.text('provider list'), findsNothing);
+  });
 }

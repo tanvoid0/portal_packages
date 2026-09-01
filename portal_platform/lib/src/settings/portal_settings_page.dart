@@ -8,7 +8,7 @@ import '../update/portal_update_service.dart';
 import '../update/portal_update_tile.dart';
 import '../widgets/portal_app_version.dart';
 import 'portal_apps_section.dart';
-import 'portal_avatar.dart';
+import 'portal_profile_tile.dart';
 import 'portal_settings_labels.dart';
 import 'portal_status_tile.dart';
 import 'portal_theme_controller.dart';
@@ -103,7 +103,7 @@ class PortalSettingsPage extends StatelessWidget {
       switch (group) {
         case PortalSettingsGroup.profile:
           if (Get.isRegistered<SessionController>()) {
-            children.add(_ProfileCard(labels: labels));
+            children.add(PortalProfileTile(labels: labels));
           }
 
         case PortalSettingsGroup.appearance:
@@ -124,7 +124,9 @@ class PortalSettingsPage extends StatelessWidget {
           final ai = aiSection;
           if (ai == null) break;
           children.add(
-            build(labels.assistant, [Padding(padding: _padding, child: ai)]),
+            build(labels.assistant, [
+              _AssistantNavTile(labels: labels, section: ai),
+            ]),
           );
 
         case PortalSettingsGroup.status:
@@ -201,6 +203,55 @@ class _Section extends StatelessWidget {
   }
 }
 
+/// The row that opens the AI backend picker on its own page, rather than
+/// cramming the provider list, model dropdown and Ollama host field into the
+/// middle of the general settings list.
+class _AssistantNavTile extends StatelessWidget {
+  const _AssistantNavTile({required this.labels, required this.section});
+
+  final PortalSettingsLabels labels;
+
+  /// The app's `AiSettingsSection` (or equivalent), unchanged — this only
+  /// changes where it is shown, not what it is.
+  final Widget section;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: PortalSettingsPage._padding,
+      leading: const Icon(Icons.smart_toy_outlined),
+      title: Text(labels.assistant),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) =>
+              _AssistantSettingsPage(title: labels.assistant, child: section),
+        ),
+      ),
+    );
+  }
+}
+
+class _AssistantSettingsPage extends StatelessWidget {
+  const _AssistantSettingsPage({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+          children: [child],
+        ),
+      ),
+    );
+  }
+}
+
 class _SignOutTile extends StatelessWidget {
   const _SignOutTile({required this.labels});
 
@@ -244,72 +295,6 @@ class _SignOutTile extends StatelessWidget {
 }
 
 /// Name, email and initials for the one profile every Portal app shares.
-class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({required this.labels});
-
-  final PortalSettingsLabels labels;
-
-  Future<void> _rename(BuildContext context, String current) async {
-    final field = TextEditingController(text: current);
-    final name = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(labels.nameDialogTitle),
-        content: TextField(
-          controller: field,
-          autofocus: true,
-          textCapitalization: TextCapitalization.words,
-          decoration: InputDecoration(helperText: labels.nameDialogHelper),
-          onSubmitted: (v) => Navigator.of(context).pop(v),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(labels.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(field.text),
-            child: Text(labels.save),
-          ),
-        ],
-      ),
-    );
-    field.dispose();
-
-    final trimmed = name?.trim() ?? '';
-    if (trimmed.isEmpty || trimmed == current) return;
-    try {
-      await Get.find<SessionController>().updateName(trimmed);
-    } catch (_) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(labels.nameSaveFailed)),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final session = Get.find<SessionController>();
-
-    return Obx(() {
-      final user = session.user.value;
-      if (user == null) return const SizedBox.shrink();
-      final name = (user['name'] as String?)?.trim() ?? '';
-      final email = (user['email'] as String?)?.trim() ?? '';
-
-      return ListTile(
-        contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        leading: PortalAvatar(user: user, radius: 24),
-        title: Text(name.isEmpty ? labels.profileFallbackTitle : name),
-        subtitle: Text(email, maxLines: 1, overflow: TextOverflow.ellipsis),
-        trailing: const Icon(Icons.edit_outlined),
-        onTap: () => _rename(context, name),
-      );
-    });
-  }
-}
-
 class _ThemeModePicker extends StatelessWidget {
   const _ThemeModePicker({required this.controller});
 
