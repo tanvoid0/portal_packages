@@ -14,7 +14,12 @@ class AiModelCatalog {
   final GeminiModelCatalog _gemini;
   final AiBackendDiscovery _discovery;
 
-  /// Gemini model ids from app `.env` ([GeminiEnvKeys.models] / [GeminiEnvKeys.model]).
+  /// Gemini model ids for the app's *own* Gemini calls, from `.env`.
+  ///
+  /// Not the model the Portal server uses. `POST /api/task/ai/plan` carries no
+  /// model field -- the server picks, from its own key and config -- so this
+  /// list is meaningless while the app is signed in. There is no endpoint
+  /// exposing the server's model yet; wire one in here when there is.
   List<String> get geminiModels => _gemini.availableModels;
 
   GeminiModelCatalog get gemini => _gemini;

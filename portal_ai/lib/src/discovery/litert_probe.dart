@@ -1,8 +1,25 @@
 import 'package:flutter/foundation.dart';
 
 /// Checks whether on-device LiteRT-LM inference could run on this device.
+///
+/// There is no LiteRT runtime wired up yet — [OnDeviceLiteRtCompletionClient]
+/// throws on every call. Reporting the platform as capable made the backend
+/// selectable as soon as a model path was set, and generation then died with
+/// "On-device AI is not configured yet". Report it unavailable until a real
+/// runtime lands; the per-platform capability checks below stay for then.
 class LiteRtProbe {
+  /// Flip to true when an actual LiteRT runtime is wired into the factory.
+  static const runtimeImplemented = false;
+
   Future<LiteRtProbeResult> probe({String? modelPath}) async {
+    if (!runtimeImplemented) {
+      return const LiteRtProbeResult(
+        isCapable: false,
+        isConfigured: false,
+        reason: 'On-device inference is not available in this build yet',
+      );
+    }
+
     if (kIsWeb) {
       return const LiteRtProbeResult(
         isCapable: false,

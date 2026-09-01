@@ -60,7 +60,7 @@ class PortalAiRuntime {
         client: OllamaCompletionClient(
           baseUrl: env[AiDevEnvKeys.ollamaHost]?.trim().isNotEmpty ?? false
               ? env[AiDevEnvKeys.ollamaHost]!.trim()
-              : kDefaultOllamaBaseUrl,
+              : defaultOllamaBaseUrl,
           model: ollamaModel,
         ),
         usesLocalModel: true,

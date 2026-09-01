@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// Supported AI inference backends.
 enum AiBackendKind {
   /// Portal cloud pipeline (e.g. server-side Gemini).
@@ -35,3 +37,18 @@ const kEdgeGalleryPackageName = 'com.google.ai.edge.gallery';
 
 /// Default Ollama HTTP base URL on desktop.
 const kDefaultOllamaBaseUrl = 'http://127.0.0.1:11434';
+
+/// Where to look for Ollama when the user has not set a host.
+///
+/// On Android `127.0.0.1` is the phone itself, so the desktop default can
+/// never find a daemon. `10.0.2.2` is the emulator's alias for the host
+/// machine; on a physical device the user still has to enter their LAN
+/// address in AI settings, but the emulator then works out of the box.
+const kAndroidEmulatorOllamaBaseUrl = 'http://10.0.2.2:11434';
+
+String get defaultOllamaBaseUrl {
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    return kAndroidEmulatorOllamaBaseUrl;
+  }
+  return kDefaultOllamaBaseUrl;
+}

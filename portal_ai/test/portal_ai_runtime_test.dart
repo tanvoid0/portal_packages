@@ -18,7 +18,7 @@ void main() {
     expect(runtime.usesLocalModel, isTrue);
     final client = runtime.client as OllamaCompletionClient;
     expect(client.model, 'gemma4');
-    expect(client.baseUrl, kDefaultOllamaBaseUrl);
+    expect(client.baseUrl, defaultOllamaBaseUrl);
   });
 
   test('AI_OLLAMA_HOST overrides the default host', () {

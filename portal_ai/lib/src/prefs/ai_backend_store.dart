@@ -25,7 +25,7 @@ class AiBackendStore {
   String? get selectedBackendId => _prefs.getString(_selectedBackendKey);
 
   String get ollamaHost =>
-      _prefs.getString(_ollamaHostKey) ?? kDefaultOllamaBaseUrl;
+      _prefs.getString(_ollamaHostKey) ?? defaultOllamaBaseUrl;
 
   String? get ollamaModel => _prefs.getString(_ollamaModelKey);
 
