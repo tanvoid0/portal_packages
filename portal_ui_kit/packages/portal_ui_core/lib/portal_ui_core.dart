@@ -45,6 +45,8 @@ export 'src/components/portal_section_header.dart';
 export 'src/components/portal_segmented_tabs.dart';
 export 'src/components/portal_skeleton.dart';
 export 'src/components/portal_stat_card.dart';
+export 'src/components/portal_startup_gate.dart';
+export 'src/components/portal_startup_splash.dart';
 export 'src/motion/portal_page_transitions.dart';
 export 'src/motion/portal_shimmer.dart';
 export 'src/motion/portal_stagger.dart';
