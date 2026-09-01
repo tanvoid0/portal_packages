@@ -402,7 +402,6 @@ IconData portalAppIconFor(String slug) => switch (slug) {
       'portal-gym' => Icons.fitness_center,
       'portal-shopping' => Icons.shopping_bag_outlined,
       'portal-lifestyle' => Icons.spa_outlined,
-      'portal-productivity' => Icons.check_circle_outline,
       'portal-finance' => Icons.account_balance_outlined,
       'portal-task' => Icons.task_alt,
       _ => Icons.apps_outlined,
