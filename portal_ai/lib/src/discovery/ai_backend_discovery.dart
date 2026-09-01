@@ -4,32 +4,29 @@ import '../config/gemini_model_catalog.dart';
 import '../models/ai_backend_kind.dart';
 import '../models/ai_backend_option.dart';
 import 'edge_gallery_probe.dart';
-import 'litert_probe.dart';
 import 'ollama_probe.dart';
+import 'system_ai_probe.dart';
 
 /// Discovers AI backends available on the current platform.
 class AiBackendDiscovery {
   AiBackendDiscovery({
     OllamaProbe? ollamaProbe,
     EdgeGalleryProbe? edgeGalleryProbe,
-    LiteRtProbe? liteRtProbe,
+    SystemAiProbe? systemAiProbe,
     this._geminiCatalog,
-    this._onDeviceModels = const [],
   })  : _ollamaProbe = ollamaProbe ?? OllamaProbe(),
         _edgeGalleryProbe = edgeGalleryProbe ?? EdgeGalleryProbe(),
-        _liteRtProbe = liteRtProbe ?? LiteRtProbe();
+        _systemAiProbe = systemAiProbe ?? SystemAiProbe();
 
   final OllamaProbe _ollamaProbe;
   final EdgeGalleryProbe _edgeGalleryProbe;
-  final LiteRtProbe _liteRtProbe;
+  final SystemAiProbe _systemAiProbe;
   final GeminiModelCatalog? _geminiCatalog;
-  final List<String> _onDeviceModels;
 
   Future<List<AiBackendOption>> discover({
     bool includeCloud = true,
     bool cloudEligible = true,
     String ollamaHost = kDefaultOllamaBaseUrl,
-    String? onDeviceModelPath,
     bool includeEdgeGalleryDelegate = true,
   }) async {
     final options = <AiBackendOption>[];
@@ -49,19 +46,19 @@ class AiBackendDiscovery {
       ),
     );
 
-    final liteRtResult = await _liteRtProbe.probe(modelPath: onDeviceModelPath);
-    final onDeviceModels = _onDeviceModels;
+    final system = await _systemAiProbe.probe();
     options.add(
       AiBackendOption(
-        kind: AiBackendKind.onDeviceLiteRt,
-        available: liteRtResult.isAvailable,
-        unavailableReason:
-            liteRtResult.isAvailable ? null : liteRtResult.reason,
-        models: liteRtResult.isAvailable ? onDeviceModels : onDeviceModels,
+        kind: AiBackendKind.systemOnDevice,
+        available: system.isAvailable,
+        unavailableReason: system.isAvailable ? null : system.reason,
+        models: system.models,
         metadata: {
-          'capable': liteRtResult.isCapable,
-          'configured': liteRtResult.isConfigured,
-          'modelPath': ?onDeviceModelPath,
+          'status': system.status.name,
+          // The settings UI offers a Download button off this, so a model the
+          // device could run but has not fetched is one tap away rather than
+          // a dead row.
+          'downloadable': system.isDownloadable,
         },
       ),
     );
@@ -72,8 +69,7 @@ class AiBackendDiscovery {
         AiBackendOption(
           kind: AiBackendKind.edgeGalleryDelegate,
           available: edgeResult.isInstalled,
-          unavailableReason:
-              edgeResult.isInstalled ? null : edgeResult.reason,
+          unavailableReason: edgeResult.isInstalled ? null : edgeResult.reason,
           metadata: {'package': kEdgeGalleryPackageName},
         ),
       );
@@ -121,7 +117,8 @@ class AiBackendDiscovery {
           defaultTargetPlatform == TargetPlatform.iOS) {
         return OllamaProbeResult.unavailable(
           host: host,
-          reason: 'Enter a LAN Ollama host in advanced settings',
+          reason: 'Not reachable from this device. Tap Find on my network, '
+              "or enter your computer's address.",
         );
       }
     }
@@ -130,8 +127,7 @@ class AiBackendDiscovery {
 
   static bool _isLocalHost(String host) {
     final normalized = host.toLowerCase();
-    return normalized.contains('127.0.0.1') ||
-        normalized.contains('localhost');
+    return normalized.contains('127.0.0.1') || normalized.contains('localhost');
   }
 
   static List<AiBackendOption> _sortOptions(List<AiBackendOption> options) {

@@ -166,34 +166,3 @@ class CloudGeminiCompletionClient implements AiCompletionClient {
     );
   }
 }
-
-/// Placeholder until LiteRT-LM is wired in.
-class OnDeviceLiteRtCompletionClient implements AiCompletionClient {
-  const OnDeviceLiteRtCompletionClient();
-
-  @override
-  Future<bool> isAvailable() async => false;
-
-  @override
-  Future<String> complete({
-    required String systemPrompt,
-    required String userPrompt,
-    AiSamplerConfig sampler = const AiSamplerConfig(),
-    bool jsonMode = false,
-  }) {
-    throw const AiCompletionException(
-      'On-device LiteRT-LM is not configured yet.',
-    );
-  }
-
-  @override
-  Stream<String> completeStream({
-    required String systemPrompt,
-    required String userPrompt,
-    AiSamplerConfig sampler = const AiSamplerConfig(),
-  }) {
-    throw const AiCompletionException(
-      'On-device LiteRT-LM is not configured yet.',
-    );
-  }
-}

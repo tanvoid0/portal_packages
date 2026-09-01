@@ -3,5 +3,7 @@
     <!-- Required on API 30+ for isPackageInstalled(Edge Gallery). -->
     <queries>
         <package android:name="com.google.ai.edge.gallery" />
+        <!-- AICore hosts the on-device model ML Kit GenAI talks to. -->
+        <package android:name="com.google.android.aicore" />
     </queries>
 </manifest>

@@ -12,9 +12,33 @@ class AiTool {
     required this.run,
     this.parameters = const {},
     this.mutates = false,
+    this.namespace,
+    this.runRich,
   });
 
   final String name;
+
+  /// Owning app, e.g. `shopping`. Null for app-local tools.
+  ///
+  /// Bare names collide across apps -- `shopping.add_item` and
+  /// `lifestyle.add_item` are different actions -- so anything that puts two
+  /// apps' tools in front of one agent must qualify them.
+  final String? namespace;
+
+  /// [name] qualified by [namespace]: `shopping.add_item`.
+  String get qualifiedName =>
+      namespace == null ? name : '$namespace.$name';
+
+  /// A copy of this tool owned by [ns].
+  AiTool withNamespace(String ns) => AiTool(
+        name: name,
+        description: description,
+        run: run,
+        parameters: parameters,
+        mutates: mutates,
+        namespace: ns,
+        runRich: runRich,
+      );
   final String description;
   final Map<String, String> parameters;
 
@@ -24,12 +48,18 @@ class AiTool {
   /// Returns a short human-readable result fed back to the model.
   final Future<String> Function(AiToolCall call) run;
 
+  /// Optional richer form of [run] that also returns blocks to render.
+  ///
+  /// Separate from [run] so the existing tools keep working untouched; when
+  /// set it takes precedence.
+  final Future<AiToolResult> Function(AiToolCall call)? runRich;
+
   /// Single line describing this tool in the system prompt.
   String get spec {
     final args = parameters.entries
         .map((e) => '${e.key}: ${e.value}')
         .join('; ');
-    return '- $name(${args.isEmpty ? '' : args})'
+    return '- $qualifiedName(${args.isEmpty ? '' : args})'
         '${mutates ? ' [changes data]' : ''}: $description';
   }
 }
@@ -85,10 +115,116 @@ class AiToolCall {
 }
 
 /// One completed step of an agent run.
+
+/// A button on an [AiBlock].
+///
+/// [tool] is a namespaced name; tapping re-enters the agent at the tool-call
+/// step, so a mutating tool still asks for confirmation exactly as it does
+/// when the model calls it.
+class AiAction {
+  const AiAction({
+    required this.label,
+    required this.tool,
+    this.args = const {},
+  });
+
+  final String label;
+  final String tool;
+  final Map<String, dynamic> args;
+
+  Map<String, dynamic> toJson() =>
+      {'label': label, 'tool': tool, 'args': args};
+
+  factory AiAction.fromJson(Map<String, dynamic> json) => AiAction(
+        label: json['label'] as String? ?? '',
+        tool: json['tool'] as String? ?? '',
+        args: Map<String, dynamic>.from(
+          json['args'] as Map? ?? const <String, dynamic>{},
+        ),
+      );
+}
+
+/// Something the assistant shows the user, rendered by the host app.
+///
+/// JSON only: blocks are persisted inside a chat turn and must survive a
+/// reload, so they hold data and not widgets. The host maps [kind] to a
+/// builder; an unknown kind falls back to text rather than throwing, because
+/// old threads outlive renderer renames.
+class AiBlock {
+  const AiBlock({
+    required this.kind,
+    this.data = const {},
+    this.actions = const [],
+  });
+
+  final String kind;
+  final Map<String, dynamic> data;
+  final List<AiAction> actions;
+
+  Map<String, dynamic> toJson() => {
+        'kind': kind,
+        'data': data,
+        'actions': actions.map((a) => a.toJson()).toList(),
+      };
+
+  factory AiBlock.fromJson(Map<String, dynamic> json) => AiBlock(
+        kind: json['kind'] as String? ?? '',
+        data: Map<String, dynamic>.from(
+          json['data'] as Map? ?? const <String, dynamic>{},
+        ),
+        actions: (json['actions'] as List<dynamic>? ?? const [])
+            .map((e) => AiAction.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList(),
+      );
+}
+
+/// What a tool hands back when it has something to show.
+///
+/// [forModel] is the short text fed into the next turn; [blocks] are for the
+/// user. Blocks come from here and never from model output -- rendering
+/// model-authored blocks would let injected text draw buttons wired to
+/// mutating tools.
+class AiToolResult {
+  const AiToolResult({required this.forModel, this.blocks = const []});
+
+  final String forModel;
+  final List<AiBlock> blocks;
+}
+
 class AiAgentStep {
-  const AiAgentStep({required this.call, required this.result, this.failed = false});
+  const AiAgentStep({
+    required this.call,
+    required this.result,
+    this.failed = false,
+    this.blocks = const [],
+  });
 
   final AiToolCall call;
   final String result;
   final bool failed;
+
+  /// What the host should render for this step, if anything.
+  final List<AiBlock> blocks;
+}
+
+
+/// Qualifies every tool in [tools] with [namespace].
+///
+/// Use at the point tools are handed to a runtime, so each app keeps writing
+/// plain names and only the assembled set carries app ownership.
+List<AiTool> namespacedTools(String namespace, List<AiTool> tools) =>
+    tools.map((t) => t.withNamespace(namespace)).toList();
+
+/// Resolves [name] against [tools].
+///
+/// Qualified names win. A bare name resolves only when exactly one tool has
+/// it -- an ambiguous bare name returns null rather than a coin flip, because
+/// shopping.add_item and lifestyle.add_item are different actions. Shared by
+/// the agent and by action buttons so the two cannot drift apart.
+AiTool? resolveTool(List<AiTool> tools, String name) {
+  for (final tool in tools) {
+    if (tool.qualifiedName == name) return tool;
+  }
+  final bare = tools.where((t) => t.name == name).toList();
+  return bare.length == 1 ? bare.first : null;
 }

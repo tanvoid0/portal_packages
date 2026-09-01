@@ -17,7 +17,6 @@ class _FixedDiscovery extends AiBackendDiscovery {
     bool includeCloud = true,
     bool cloudEligible = true,
     String ollamaHost = kDefaultOllamaBaseUrl,
-    String? onDeviceModelPath,
     bool includeEdgeGalleryDelegate = true,
   }) async => options;
 }

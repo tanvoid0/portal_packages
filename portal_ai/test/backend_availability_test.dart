@@ -1,21 +1,18 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
-import 'package:portal_ai/src/discovery/litert_probe.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('LiteRT is never offered while no runtime is wired up', () async {
-    final result = await LiteRtProbe().probe(modelPath: '/tmp/model.task');
+  test('the device model is not offered when the platform has none', () async {
+    // No platform channel handler is registered in a unit test, so the
+    // MissingPluginException path is exactly what a device without AICore
+    // hits. A selectable backend there throws on every generate.
+    final result = await SystemAiProbe().probe();
 
-    expect(LiteRtProbe.runtimeImplemented, isFalse);
-    expect(
-      result.isAvailable,
-      isFalse,
-      reason: 'a selectable LiteRT backend throws on every generate',
-    );
+    expect(result.isAvailable, isFalse);
     expect(result.reason, isNotNull);
   });
 

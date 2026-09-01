@@ -8,8 +8,9 @@ enum AiBackendKind {
   /// Local [Ollama](https://ollama.com) daemon.
   ollama,
 
-  /// On-device LiteRT-LM (same stack as Google AI Edge Gallery).
-  onDeviceLiteRt,
+  /// The device's own built-in model, reached through the platform channel
+  /// (Android: ML Kit GenAI / AICore, i.e. Gemini Nano).
+  systemOnDevice,
 
   /// Opens Google AI Edge Gallery when installed (delegation, not in-app).
   edgeGalleryDelegate,
@@ -19,7 +20,7 @@ extension AiBackendKindIds on AiBackendKind {
   String get id => switch (this) {
         AiBackendKind.cloudGemini => 'cloud_gemini',
         AiBackendKind.ollama => 'ollama',
-        AiBackendKind.onDeviceLiteRt => 'on_device_litert',
+        AiBackendKind.systemOnDevice => 'system_on_device',
         AiBackendKind.edgeGalleryDelegate => 'edge_gallery',
       };
 

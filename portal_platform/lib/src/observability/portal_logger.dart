@@ -80,6 +80,11 @@ class PortalLogger {
         : null;
     _minLevel = logLevel ?? envLevel ?? _minLevel;
 
+    // Web has no filesystem: getApplicationDocumentsDirectory() throws
+    // MissingPluginException and takes the whole bootstrap down with it. Do
+    // this after the env parsing above so LOG_TO_FILE=true cannot re-enable it.
+    if (kIsWeb) _logToFile = false;
+
     if (_logToFile) {
       final dir = await getApplicationDocumentsDirectory();
       final logsDir = Directory('${dir.path}/logs');

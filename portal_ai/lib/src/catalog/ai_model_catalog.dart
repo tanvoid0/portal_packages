@@ -33,19 +33,17 @@ class AiModelCatalog {
     List<AiBackendOption>? cachedOptions,
     bool cloudEligible = true,
     String ollamaHost = kDefaultOllamaBaseUrl,
-    String? onDeviceModelPath,
   }) async {
     switch (kind) {
       case AiBackendKind.cloudGemini:
         return _gemini.availableModels;
       case AiBackendKind.ollama:
-      case AiBackendKind.onDeviceLiteRt:
+      case AiBackendKind.systemOnDevice:
       case AiBackendKind.edgeGalleryDelegate:
         final options = cachedOptions ??
             await _discovery.discover(
               cloudEligible: cloudEligible,
               ollamaHost: ollamaHost,
-              onDeviceModelPath: onDeviceModelPath,
             );
         return _modelsFromOptions(options, kind);
     }
@@ -56,12 +54,10 @@ class AiModelCatalog {
     AiBackendKind kind, {
     bool cloudEligible = true,
     String ollamaHost = kDefaultOllamaBaseUrl,
-    String? onDeviceModelPath,
   }) async {
     final options = await _discovery.discover(
       cloudEligible: cloudEligible,
       ollamaHost: ollamaHost,
-      onDeviceModelPath: onDeviceModelPath,
     );
     return _firstWhereOrNull(options, (o) => o.kind == kind);
   }

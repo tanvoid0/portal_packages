@@ -5,6 +5,7 @@ import '../prefs/ai_backend_store.dart';
 import 'ai_completion_client.dart';
 import 'gemini_completion_client.dart';
 import 'ollama_completion_client.dart';
+import 'system_ai_completion_client.dart';
 
 /// Builds an [AiCompletionClient] for the selected backend.
 class AiCompletionClientFactory {
@@ -24,13 +25,13 @@ class AiCompletionClientFactory {
           return const CloudGeminiCompletionClient();
         }
         final model = catalog.resolveModel(
-          store.geminiModel ??
+          store.modelFor(AiBackendKind.cloudGemini) ??
               (option?.models.isNotEmpty == true ? option!.models.first : null),
         );
         return GeminiCompletionClient(catalog: catalog, model: model);
       case AiBackendKind.ollama:
         final host = store.ollamaHost;
-        final model = store.ollamaModel ??
+        final model = store.modelFor(AiBackendKind.ollama) ??
             (option?.models.isNotEmpty == true ? option!.models.first : null);
         if (model == null || model.isEmpty) {
           throw const AiCompletionException(
@@ -38,8 +39,8 @@ class AiCompletionClientFactory {
           );
         }
         return OllamaCompletionClient(baseUrl: host, model: model);
-      case AiBackendKind.onDeviceLiteRt:
-        return const OnDeviceLiteRtCompletionClient();
+      case AiBackendKind.systemOnDevice:
+        return const SystemAiCompletionClient();
       case AiBackendKind.edgeGalleryDelegate:
         throw const AiCompletionException(
           'Edge Gallery is an external app, not an in-app backend.',

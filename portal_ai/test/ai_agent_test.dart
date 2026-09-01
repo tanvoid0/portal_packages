@@ -47,6 +47,12 @@ void main() {
         },
       );
 
+  AiTool listItems() => AiTool(
+        name: 'list_items',
+        description: 'List the items.',
+        run: (_) async => added.isEmpty ? 'empty' : added.join(', '),
+      );
+
   setUp(added.clear);
 
   test('extracts JSON from fenced or chatty replies', () {
@@ -70,13 +76,42 @@ void main() {
       '{"tool":"add_item","args":{"name":"Milk","quantity":"2"}}',
       '{"final":"Added milk."}',
     ]);
-    final result = await AiAgent(client: client, tools: [addItem()]).run('buy milk');
+    final result = await AiAgent(client: client, tools: [addItem()])
+        .run('buy milk', confirm: (_, _) async => true);
 
     expect(added, ['Milk x2']);
     expect(result.message, 'Added milk.');
     expect(result.steps.single.failed, isFalse);
     // Second turn must carry the tool result back to the model.
     expect(client.prompts[1], contains('added Milk'));
+  });
+
+  test('a mutating tool is refused when there is nobody to approve it',
+      () async {
+    final client = _ScriptedClient([
+      '{"tool":"add_item","args":{"name":"Milk"}}',
+      '{"final":"Could not add it."}',
+    ]);
+    // No confirm callback: a caller with no UI must not write user data.
+    final result = await AiAgent(client: client, tools: [addItem()])
+        .run('buy milk');
+
+    expect(added, isEmpty);
+    expect(result.steps.single.failed, isTrue);
+    expect(client.prompts[1], contains('refused'));
+  });
+
+  test('tool results reach the model fenced as data, not instructions',
+      () async {
+    final client = _ScriptedClient([
+      '{"tool":"list_items","args":{}}',
+      '{"final":"done"}',
+    ]);
+    await AiAgent(client: client, tools: [addItem(), listItems()])
+        .run('what is on my list');
+
+    expect(client.prompts[1], contains('BEGIN TOOL RESULTS'));
+    expect(client.prompts[1], contains('END TOOL RESULTS'));
   });
 
   test('declining a mutating tool skips it and tells the model', () async {

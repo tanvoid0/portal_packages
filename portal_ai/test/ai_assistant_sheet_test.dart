@@ -41,7 +41,7 @@ void main() {
 
   PortalAiRuntime runtimeWith(List<String> replies) => PortalAiRuntime(
         client: _ScriptedClient(replies),
-        usesLocalModel: false,
+
         appDescription: 'A shopping list.',
         tools: [
           AiTool(

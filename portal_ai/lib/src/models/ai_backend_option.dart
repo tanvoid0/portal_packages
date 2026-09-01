@@ -27,7 +27,7 @@ class AiBackendOption {
   bool get supportsInAppInference =>
       kind == AiBackendKind.cloudGemini ||
       kind == AiBackendKind.ollama ||
-      kind == AiBackendKind.onDeviceLiteRt;
+      kind == AiBackendKind.systemOnDevice;
 
   AiBackendOption copyWith({
     bool? available,

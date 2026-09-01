@@ -15,9 +15,14 @@ class AiBackendStore {
 
   String get _selectedBackendKey => '${keyPrefix}_selected_backend_id';
   String get _ollamaHostKey => '${keyPrefix}_ollama_host';
-  String get _ollamaModelKey => '${keyPrefix}_ollama_model';
-  String get _geminiModelKey => '${keyPrefix}_gemini_model';
-  String get _onDeviceModelPathKey => '${keyPrefix}_on_device_model_path';
+
+  /// Gemini and Ollama keep their original key names so an existing install
+  /// does not silently forget the model the user picked.
+  String _modelKey(AiBackendKind kind) => switch (kind) {
+        AiBackendKind.ollama => '${keyPrefix}_ollama_model',
+        AiBackendKind.cloudGemini => '${keyPrefix}_gemini_model',
+        _ => '${keyPrefix}_model_${kind.id}',
+      };
 
   AiBackendKind? get selectedKind =>
       AiBackendKindIds.fromId(_prefs.getString(_selectedBackendKey));
@@ -27,11 +32,13 @@ class AiBackendStore {
   String get ollamaHost =>
       _prefs.getString(_ollamaHostKey) ?? defaultOllamaBaseUrl;
 
-  String? get ollamaModel => _prefs.getString(_ollamaModelKey);
+  /// The model chosen for [kind], if any. Providers report their own model
+  /// lists; nothing here assumes what those contain.
+  String? modelFor(AiBackendKind kind) => _prefs.getString(_modelKey(kind));
 
-  String? get geminiModel => _prefs.getString(_geminiModelKey);
+  String? get ollamaModel => modelFor(AiBackendKind.ollama);
 
-  String? get onDeviceModelPath => _prefs.getString(_onDeviceModelPathKey);
+  String? get geminiModel => modelFor(AiBackendKind.cloudGemini);
 
   Future<void> setSelectedKind(AiBackendKind kind) =>
       _prefs.setString(_selectedBackendKey, kind.id);
@@ -47,18 +54,24 @@ class AiBackendStore {
   Future<void> setOllamaHost(String host) =>
       _prefs.setString(_ollamaHostKey, host.trim());
 
+  Future<void> setModelFor(AiBackendKind kind, String model) =>
+      _prefs.setString(_modelKey(kind), model.trim());
+
   Future<void> setOllamaModel(String model) =>
-      _prefs.setString(_ollamaModelKey, model.trim());
+      setModelFor(AiBackendKind.ollama, model);
 
   Future<void> setGeminiModel(String model) =>
-      _prefs.setString(_geminiModelKey, model.trim());
+      setModelFor(AiBackendKind.cloudGemini, model);
 
-  Future<void> setOnDeviceModelPath(String? path) async {
-    if (path == null || path.isEmpty) {
-      await _prefs.remove(_onDeviceModelPathKey);
-      return;
-    }
-    await _prefs.setString(_onDeviceModelPathKey, path);
+  /// Makes sure the model stored for [option]'s provider is one that provider
+  /// actually offers, defaulting to its first. A provider that reports no
+  /// models (Edge Gallery, or a device model the platform does not name) keeps
+  /// whatever is stored.
+  Future<void> ensureModelFor(AiBackendOption option) async {
+    if (option.models.isEmpty) return;
+    final current = modelFor(option.kind);
+    if (current != null && option.models.contains(current)) return;
+    await setModelFor(option.kind, option.models.first);
   }
 
   /// Picks the stored backend when still available, otherwise the first

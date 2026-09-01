@@ -34,7 +34,8 @@ android {
     }
 
     defaultConfig {
-        minSdk = 21
+        // ML Kit GenAI (AICore) needs 26; every Portal app is already there.
+        minSdk = 26
     }
 }
 
@@ -46,4 +47,8 @@ kotlin {
 
 dependencies {
     implementation("androidx.annotation:annotation:1.9.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    // The device's own model. Resolves against Google Play services at
+    // runtime, so a device without it fails on first call, not at install.
+    implementation("com.google.mlkit:genai-prompt:1.0.0-beta2")
 }
