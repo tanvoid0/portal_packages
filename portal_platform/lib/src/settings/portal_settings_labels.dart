@@ -35,6 +35,21 @@ class PortalSettingsLabels {
     this.assistantUnknown = 'Could not read assistant status',
     this.checking = 'Checking…',
     this.checkAgain = 'Check again',
+    this.serverLocalDetail = 'Local',
+    this.serverCloud = 'Cloud',
+    this.serverLocal = 'Local',
+    this.serverLocalHost = 'Host and port',
+    this.serverLocalHint =
+        '10.0.2.2 reaches your machine from an Android emulator; '
+            'use your computer\'s LAN IP from a physical device.',
+    this.serverCheck = 'Check',
+    this.serverSwitch = 'Switch and sign out',
+    this.serverSwitchConfirmTitle = 'Switch server?',
+    this.serverSwitchConfirmMessage =
+        'You will be signed out. Sign back in against the new server.',
+    this.serverInvalidHost =
+        'Only a local-network address is allowed here (e.g. 10.0.2.2, '
+            '192.168.x.x, localhost).',
     this.loading = 'Loading…',
     this.tryAgain = 'Try again',
     this.install = 'Install',
@@ -78,6 +93,16 @@ class PortalSettingsLabels {
   final String assistantUnknown;
   final String checking;
   final String checkAgain;
+  final String serverLocalDetail;
+  final String serverCloud;
+  final String serverLocal;
+  final String serverLocalHost;
+  final String serverLocalHint;
+  final String serverCheck;
+  final String serverSwitch;
+  final String serverSwitchConfirmTitle;
+  final String serverSwitchConfirmMessage;
+  final String serverInvalidHost;
 
   // App list.
   final String loading;

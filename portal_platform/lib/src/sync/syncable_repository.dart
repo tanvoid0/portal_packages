@@ -109,6 +109,15 @@ abstract class SyncableRepository<T> implements Syncable {
   /// Return the unique, stable identifier of [entity].
   String getId(T entity);
 
+  /// JSON body sent to the server for a create/update request.
+  ///
+  /// Defaults to [toJson]. Override when the wire DTO is narrower than the
+  /// cached representation — e.g. server-managed fields like `createdAt`
+  /// that a strict/whitelisting validator on the server rejects if present,
+  /// or fields only valid on one of create/update.
+  Map<String, dynamic> toWireJson(T entity, {required bool isCreate}) =>
+      toJson(entity);
+
   /// Query parameters applied to every **collection** read (`getAll` and the
   /// pull half of [sync]), for repositories that own only a slice of a shared
   /// endpoint — e.g. `{'source': 'recipe'}` on a shared shopping list.
@@ -141,11 +150,15 @@ abstract class SyncableRepository<T> implements Syncable {
     if (connectivity.isOnline) {
       try {
         final data = await api.get(apiBasePath, queryParams: listQueryParams);
-        final list = (data as List)
+        final serverList = (data as List)
             .map((e) => fromJson(Map<String, dynamic>.from(e)))
             .toList();
-        await writeCache(list);
-        return list;
+        final pendingOps = await syncQueue.getByEntityType(entityType);
+        final merged = pendingOps.isEmpty
+            ? serverList
+            : _mergeWithPending(serverList, await readCache(), pendingOps);
+        await writeCache(merged);
+        return merged;
       } catch (e) {
         debugPrint('[$entityType] API fetch failed, using cache: $e');
       }
@@ -202,11 +215,11 @@ abstract class SyncableRepository<T> implements Syncable {
     if (connectivity.isOnline) {
       try {
         if (isCreate) {
-          await api.post(apiBasePath, body: toJson(entity));
+          await api.post(apiBasePath, body: toWireJson(entity, isCreate: true));
         } else {
           await api.put(
             '$apiBasePath/${getId(entity)}',
-            body: toJson(entity),
+            body: toWireJson(entity, isCreate: false),
           );
         }
         return;
@@ -219,7 +232,7 @@ abstract class SyncableRepository<T> implements Syncable {
       entityType: entityType,
       entityId: getId(entity),
       type: opType,
-      data: toJson(entity),
+      data: toWireJson(entity, isCreate: isCreate),
     ));
   }
 
@@ -332,38 +345,50 @@ abstract class SyncableRepository<T> implements Syncable {
           .toList();
 
       final pendingOps = await syncQueue.getByEntityType(entityType);
-      final pendingIds = pendingOps.map((o) => o.entityId).toSet();
-
-      if (pendingIds.isEmpty) {
+      if (pendingOps.isEmpty) {
         await writeCache(serverList);
         return;
       }
 
-      final localCache = await readCache();
-      final merged = <T>[];
-      final serverMap = {for (final e in serverList) getId(e): e};
-
-      for (final entry in serverMap.entries) {
-        if (pendingIds.contains(entry.key)) {
-          final local = localCache.where((e) => getId(e) == entry.key);
-          merged.add(local.isNotEmpty ? local.first : entry.value);
-        } else {
-          merged.add(entry.value);
-        }
-      }
-
-      for (final op in pendingOps) {
-        if (op.type == SyncOperationType.create &&
-            !serverMap.containsKey(op.entityId)) {
-          final local = localCache.where((e) => getId(e) == op.entityId);
-          if (local.isNotEmpty) merged.add(local.first);
-        }
-      }
-
-      await writeCache(merged);
+      await writeCache(
+        _mergeWithPending(serverList, await readCache(), pendingOps),
+      );
     } catch (e) {
       debugPrint('[$entityType] Pull from server failed: $e');
     }
+  }
+
+  /// Merge a freshly-fetched [serverList] with [localCache], keeping the
+  /// local version of any entity with a pending [SyncOperation] — used by
+  /// both [getAll] and [_pullFromServer] so a server refresh can never
+  /// clobber a write that hasn't synced yet.
+  List<T> _mergeWithPending(
+    List<T> serverList,
+    List<T> localCache,
+    List<SyncOperation> pendingOps,
+  ) {
+    final pendingIds = pendingOps.map((o) => o.entityId).toSet();
+    final serverMap = {for (final e in serverList) getId(e): e};
+    final merged = <T>[];
+
+    for (final entry in serverMap.entries) {
+      if (pendingIds.contains(entry.key)) {
+        final local = localCache.where((e) => getId(e) == entry.key);
+        merged.add(local.isNotEmpty ? local.first : entry.value);
+      } else {
+        merged.add(entry.value);
+      }
+    }
+
+    for (final op in pendingOps) {
+      if (op.type == SyncOperationType.create &&
+          !serverMap.containsKey(op.entityId)) {
+        final local = localCache.where((e) => getId(e) == op.entityId);
+        if (local.isNotEmpty) merged.add(local.first);
+      }
+    }
+
+    return merged;
   }
 
   // ─── Cache helpers ─────────────────────────────────────────────────

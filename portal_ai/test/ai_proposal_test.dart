@@ -156,7 +156,9 @@ void _hostRewindTests() {
       ),
     );
 
-    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.longPress(find.text('plan my week'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit'));
     await tester.pumpAndSettle();
 
     expect(rewound, [0]);
@@ -179,6 +181,11 @@ void _hostRewindTests() {
       ),
     );
 
-    expect(find.byIcon(Icons.edit_outlined), findsNothing);
+    // No onRewind means no action to offer at all -- long-pressing the
+    // bubble opens nothing.
+    await tester.longPress(find.text('plan my week'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit'), findsNothing);
+    expect(find.text('Delete'), findsNothing);
   });
 }

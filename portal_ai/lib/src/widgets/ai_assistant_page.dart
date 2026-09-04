@@ -1,9 +1,12 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../chat/ai_chat_export.dart';
 import '../chat/ai_chat_session.dart';
 import '../chat/ai_proposal.dart';
+import '../clients/ai_completion_client.dart';
 import '../runtime/portal_ai_runtime.dart';
 import '../tools/ai_tool.dart';
 import 'ai_chat_history_list.dart';
@@ -298,6 +301,40 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     });
   }
 
+  /// Puts the whole conversation on the clipboard as JSON.
+  ///
+  /// The transcript is only half of what tuning the assistant needs, so the
+  /// system prompt and tool specs go with it. The clipboard is the export:
+  /// pasting into a chat or an issue is what people actually do with this, and
+  /// it costs no plugin and no file permission.
+  Future<void> _exportChat() async {
+    final runtime = widget.runtime;
+    String? prompt;
+    var specs = const <String>[];
+    if (runtime != null) {
+      final tools = widget.tools ?? runtime.tools;
+      specs = [for (final tool in tools) tool.spec];
+      try {
+        prompt = runtime.systemPromptFor(widget.tools);
+      } on AiCompletionException {
+        // No usable backend configured: the turns are still worth exporting.
+      }
+    }
+    final json = aiChatExportJson(
+      app: widget.title,
+      title: _sessionId == null ? null : widget.store?.load(_sessionId!)?.title,
+      turns: _visibleTurns,
+      at: DateTime.now(),
+      systemPrompt: prompt,
+      toolSpecs: specs,
+    );
+    await Clipboard.setData(ClipboardData(text: json));
+    if (!mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      const SnackBar(content: Text('Conversation copied as JSON')),
+    );
+  }
+
   Future<void> _showHistory() async {
     final store = widget.store;
     if (store == null) return;
@@ -409,22 +446,29 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     return null;
   }
 
-  /// Drops everything from the last question onwards and puts it back where
-  /// it came from. Re-sending is one call, not two: rewinding is the whole
-  /// job, whether the answer failed or the user wants to reword it.
-  Future<void> _rewindToLastQuestion() async {
+  /// Drops everything from the last question onwards. Re-sending is one
+  /// call, not two: rewinding is the whole job, whether the answer failed or
+  /// the user wants to reword it.
+  ///
+  /// [refill] puts the question's own text back in the composer — that's
+  /// "edit". A plain delete (`refill: false`) just removes it.
+  Future<void> _rewindToLastQuestion({bool refill = true}) async {
     final turns = _visibleTurns;
     final index = turns.lastIndexWhere((t) => t.isUser);
     if (index < 0) return;
     setState(() {
-      _input.text = turns[index].content;
-      _input.selection = TextSelection.collapsed(offset: _input.text.length);
+      if (refill) {
+        _input.text = turns[index].content;
+        _input.selection = TextSelection.collapsed(offset: _input.text.length);
+      }
       _error = null;
       _steps.clear();
       if (widget.onSend == null) _turns.removeRange(index, _turns.length);
     });
     if (widget.onSend != null) await widget.onRewind?.call(index);
   }
+
+  Future<void> _deleteLastQuestion() => _rewindToLastQuestion(refill: false);
 
   Future<void> _retry() async {
     await _rewindToLastQuestion();
@@ -690,13 +734,20 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         children: [
           if (widget.title.isNotEmpty ||
               widget.onSettings != null ||
-              widget.store != null) ...[
+              widget.store != null ||
+              _visibleTurns.isNotEmpty) ...[
             Row(
               children: [
                 if (widget.fill && Navigator.canPop(context)) const BackButton(),
                 Expanded(
                   child: Text(widget.title, style: theme.textTheme.titleMedium),
                 ),
+                if (_visibleTurns.isNotEmpty)
+                  IconButton(
+                    tooltip: 'Copy conversation as JSON',
+                    icon: const Icon(Icons.data_object),
+                    onPressed: _exportChat,
+                  ),
                 if (widget.store != null) ...[
                   IconButton(
                     tooltip: widget.labels.historyTitle,
@@ -766,14 +817,18 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _TurnBubble(
                         turn: turn,
-                        // Only the newest question is editable: rewriting an
-                        // older one would mean throwing away every answer
-                        // after it, which is a bigger promise than "let me
-                        // fix that typo".
+                        // Only the newest question can be acted on:
+                        // rewriting or dropping an older one would mean
+                        // throwing away every answer after it, which is a
+                        // bigger promise than "let me fix that typo".
                         onEdit: !_busy && identical(turn, _lastUserTurn)
                             ? () => _rewindToLastQuestion()
                             : null,
+                        onDelete: !_busy && identical(turn, _lastUserTurn)
+                            ? _deleteLastQuestion
+                            : null,
                         editLabel: widget.labels.edit,
+                        deleteLabel: widget.labels.delete,
                       ),
                     ),
                     for (final block in _blocksOf(turn))
@@ -1090,13 +1145,24 @@ class _ProposalCard extends StatelessWidget {
 
 /// One side of the conversation.
 class _TurnBubble extends StatelessWidget {
-  const _TurnBubble({required this.turn, this.onEdit, this.editLabel = 'Edit'});
+  const _TurnBubble({
+    required this.turn,
+    this.onEdit,
+    this.onDelete,
+    this.editLabel = 'Edit',
+    this.deleteLabel = 'Delete',
+  });
 
   final AiChatTurn turn;
 
   /// Puts this turn back in the composer. Null for anything not editable.
   final VoidCallback? onEdit;
+
+  /// Drops this turn (and everything after it) with no re-typing. Null for
+  /// anything not deletable.
+  final VoidCallback? onDelete;
   final String editLabel;
+  final String deleteLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -1115,53 +1181,96 @@ class _TurnBubble extends StatelessWidget {
       );
     }
     final scheme = theme.colorScheme;
+    final canAct = onEdit != null || onDelete != null;
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        if (onEdit != null)
-          IconButton(
-            tooltip: editLabel,
-            onPressed: onEdit,
-            visualDensity: VisualDensity.compact,
-            iconSize: 18,
-            color: scheme.onSurfaceVariant,
-            icon: const Icon(Icons.edit_outlined),
-          ),
         Flexible(
-          child: Container(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.sizeOf(context).width * 0.85,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: scheme.primaryContainer,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(4),
+          child: GestureDetector(
+            // Long-press for actions, like every other chat bubble on the
+            // platform -- a pencil icon sitting next to the bubble at all
+            // times was one more thing to explain for an action people only
+            // ever take right after sending.
+            onLongPressStart: canAct
+                ? (details) =>
+                    _showActions(context, details.globalPosition, scheme)
+                : null,
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width * 0.85,
               ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  turn.content,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    height: 1.45,
-                    color: scheme.onPrimaryContainer,
-                  ),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: scheme.primaryContainer,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(4),
                 ),
-                if (meta != null)
-                  _metaText(theme, meta, color: scheme.onPrimaryContainer),
-              ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    turn.content,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      height: 1.45,
+                      color: scheme.onPrimaryContainer,
+                    ),
+                  ),
+                  if (meta != null)
+                    _metaText(theme, meta, color: scheme.onPrimaryContainer),
+                ],
+              ),
             ),
           ),
         ),
       ],
     );
+  }
+
+  Future<void> _showActions(
+    BuildContext context,
+    Offset position,
+    ColorScheme scheme,
+  ) async {
+    HapticFeedback.selectionClick();
+    final overlay =
+        Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final action = await showMenu<VoidCallback>(
+      context: context,
+      position: RelativeRect.fromRect(
+        position & const Size(1, 1),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        if (onEdit != null)
+          PopupMenuItem(
+            value: onEdit,
+            child: ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: Text(editLabel),
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+            ),
+          ),
+        if (onDelete != null)
+          PopupMenuItem(
+            value: onDelete,
+            child: ListTile(
+              leading: Icon(Icons.delete_outline, color: scheme.error),
+              title: Text(deleteLabel, style: TextStyle(color: scheme.error)),
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+            ),
+          ),
+      ],
+    );
+    action?.call();
   }
 
   /// `09:14 - 4.2s - 3 steps`, skipping whatever this turn does not know.

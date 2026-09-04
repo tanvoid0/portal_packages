@@ -93,12 +93,13 @@ void main() {
     await pump(
       tester,
       const PortalSettingsPage(
-        include: [PortalSettingsGroup.assistant],
+        include: [PortalSettingsGroup.status],
         aiSection: Text('provider list'),
       ),
     );
 
-    // Not inlined into the settings list.
+    // Not inlined into the settings list -- it's the status row's tap
+    // target now, not a separate section.
     expect(find.text('provider list'), findsNothing);
     expect(find.text('Assistant'), findsOneWidget);
 

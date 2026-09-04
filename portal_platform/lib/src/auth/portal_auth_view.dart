@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 
+import '../services/api_client.dart';
 import 'portal_auth_config.dart';
 import 'portal_auth_controller.dart';
 import 'portal_password_reset_view.dart';
@@ -96,6 +97,16 @@ class PortalAuthView extends GetView<PortalAuthController> {
             color: cs.onSurfaceVariant,
           ),
         ).animate().fadeIn(delay: 400.ms),
+        // A visible tell at the moment credentials are typed: a dev/QA
+        // server override should never be silently mistaken for Cloud.
+        if (Get.isRegistered<ApiClient>() && Get.find<ApiClient>().isOverridden)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Local server · ${Get.find<ApiClient>().baseUrl}',
+              style: theme.textTheme.bodySmall?.copyWith(color: cs.error),
+            ),
+          ),
       ],
     );
   }

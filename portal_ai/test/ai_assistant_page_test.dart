@@ -365,7 +365,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Sure.'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.edit_outlined));
+    // Actions live behind a long-press on the bubble, not a standing button.
+    await tester.longPress(find.text('plan dinners'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit'));
     await tester.pumpAndSettle();
 
     expect(
@@ -374,6 +377,40 @@ void main() {
     );
     // The turn and its answer are gone, not duplicated below the edit.
     expect(find.text('Sure.'), findsNothing);
+  });
+
+  testWidgets('deleting the last question drops it without touching the composer',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AiAssistantPage(
+            runtime: PortalAiRuntime(
+              client: _ScriptedClient(['{"final":"Sure."}']),
+            ),
+            store: _MemoryStore(),
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), 'plan dinners');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pumpAndSettle();
+    expect(find.text('Sure.'), findsOneWidget);
+
+    await tester.longPress(find.text('plan dinners'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
+    // Gone, and the composer was never touched.
+    expect(find.text('plan dinners'), findsNothing);
+    expect(find.text('Sure.'), findsNothing);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller?.text,
+      '',
+    );
   });
 
   testWidgets('fresh ideas replace the chips, and a failure keeps the old ones',

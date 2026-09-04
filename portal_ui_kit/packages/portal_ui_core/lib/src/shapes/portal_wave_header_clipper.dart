@@ -14,7 +14,12 @@ class PortalWaveHeaderClipper extends CustomClipper<Path> {
 
   @override
   Path getClip(Size size) {
-    final path = Path()..lineTo(0, size.height - amplitude);
+    // moveTo, not a bare lineTo: an empty path implies a start at (0, 0), and
+    // the contour below has to close back to that corner for the header's own
+    // content to be inside the clip.
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(0, size.height - amplitude);
 
     final waveLength = size.width / waves;
     for (var i = 0; i < waves; i++) {
@@ -30,9 +35,13 @@ class PortalWaveHeaderClipper extends CustomClipper<Path> {
       );
     }
 
+    // Up the right edge and closed along the top: the wave is the *bottom*
+    // edge, so everything above it is kept. Running along `size.height`
+    // instead enclosed only the wave band itself, clipping the header's
+    // content away -- and `RenderClipPath` hit-tests against the clip, so the
+    // back button was both invisible and untappable.
     path
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
+      ..lineTo(size.width, 0)
       ..close();
     return path;
   }

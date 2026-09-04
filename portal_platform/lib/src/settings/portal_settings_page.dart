@@ -121,17 +121,28 @@ class PortalSettingsPage extends StatelessWidget {
           }
 
         case PortalSettingsGroup.assistant:
-          final ai = aiSection;
-          if (ai == null) break;
-          children.add(
-            build(labels.assistant, [
-              _AssistantNavTile(labels: labels, section: ai),
-            ]),
-          );
+          // Folded into the status row below: one "Assistant" entry, showing
+          // live health and opening the same picker, instead of two separate
+          // rows that can drift out of sync with each other.
+          break;
 
         case PortalSettingsGroup.status:
+          final ai = aiSection;
           children.add(build(labels.status, [
-            PortalStatusSection(contentPadding: _padding, labels: labels),
+            PortalStatusSection(
+              contentPadding: _padding,
+              labels: labels,
+              onAssistantTap: ai == null
+                  ? null
+                  : () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => _AssistantSettingsPage(
+                            title: labels.assistant,
+                            child: ai,
+                          ),
+                        ),
+                      ),
+            ),
           ]));
 
         case PortalSettingsGroup.apps:
@@ -203,35 +214,9 @@ class _Section extends StatelessWidget {
   }
 }
 
-/// The row that opens the AI backend picker on its own page, rather than
-/// cramming the provider list, model dropdown and Ollama host field into the
-/// middle of the general settings list.
-class _AssistantNavTile extends StatelessWidget {
-  const _AssistantNavTile({required this.labels, required this.section});
-
-  final PortalSettingsLabels labels;
-
-  /// The app's `AiSettingsSection` (or equivalent), unchanged — this only
-  /// changes where it is shown, not what it is.
-  final Widget section;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: PortalSettingsPage._padding,
-      leading: const Icon(Icons.smart_toy_outlined),
-      title: Text(labels.assistant),
-      trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) =>
-              _AssistantSettingsPage(title: labels.assistant, child: section),
-        ),
-      ),
-    );
-  }
-}
-
+/// The page the status row's "Assistant" tile opens: the app's backend
+/// picker (provider list, model dropdown, Ollama host field) on its own
+/// screen, rather than cramming it into the middle of the general list.
 class _AssistantSettingsPage extends StatelessWidget {
   const _AssistantSettingsPage({required this.title, required this.child});
 

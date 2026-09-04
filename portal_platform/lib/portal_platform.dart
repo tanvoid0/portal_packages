@@ -121,6 +121,7 @@ export 'src/auth/device_security/portal_device_security_strings.dart';
 export 'src/bootstrap/portal_bootstrap.dart';
 export 'src/config/app_config.dart';
 export 'src/config/data_storage_mode.dart';
+export 'src/config/portal_server_prefs.dart';
 export 'src/observability/portal_sentry.dart';
 export 'src/observability/portal_logger.dart';
 export 'src/observability/portal_log_severity.dart';
@@ -139,6 +140,7 @@ export 'src/update/portal_update_tile.dart';
 
 // The settings page every app shares: profile, theme, backend status, the
 // other Portal apps, and this app's own version.
+export 'src/settings/portal_server_page.dart';
 export 'src/settings/portal_settings_page.dart';
 export 'src/settings/portal_settings_labels.dart';
 export 'src/settings/portal_status_tile.dart';
@@ -147,6 +149,14 @@ export 'src/settings/portal_account_menu_button.dart';
 export 'src/settings/portal_avatar.dart';
 export 'src/settings/portal_profile_tile.dart';
 export 'src/settings/portal_theme_controller.dart';
+
+// ─── Media ─────────────────────────────────────────────────────────
+// The shared image picker: search the photo library or paste a link, in one
+// sheet, behind one form field.
+export 'src/media/portal_image_field.dart';
+export 'src/media/portal_image_picker_sheet.dart';
+export 'src/media/portal_image_search_service.dart';
+export 'src/media/portal_media_service.dart';
 
 // ─── Routing ───────────────────────────────────────────────────────
 export 'portal_deep_link.dart';

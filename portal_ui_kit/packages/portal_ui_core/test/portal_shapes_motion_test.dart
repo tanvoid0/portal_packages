@@ -38,6 +38,17 @@ void main() {
       expect(path.getBounds().height, greaterThanOrEqualTo(70));
     });
 
+    test('keeps the header content, notches only the bottom edge', () {
+      // The wave is decoration on the bottom edge; RenderClipPath hit-tests
+      // against this path, so anything the header draws -- the back button
+      // most of all -- has to be inside it.
+      const clipper = PortalWaveHeaderClipper(amplitude: 14, waves: 2);
+      final path = clipper.getClip(const Size(400, 100));
+      expect(path.contains(const Offset(28, 20)), isTrue);
+      expect(path.contains(const Offset(200, 50)), isTrue);
+      expect(path.contains(const Offset(200, 99)), isFalse);
+    });
+
     test('shouldReclip when amplitude changes', () {
       const a = PortalWaveHeaderClipper(amplitude: 10);
       const b = PortalWaveHeaderClipper(amplitude: 12);

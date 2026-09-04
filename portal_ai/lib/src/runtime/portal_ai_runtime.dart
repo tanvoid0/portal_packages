@@ -216,6 +216,13 @@ class PortalAiRuntime {
     }
   }
 
+  /// The instructions the agent runs on, for a transcript export.
+  String systemPromptFor([List<AiTool>? tools]) => AiAgent(
+        client: client,
+        tools: tools ?? this.tools,
+        appDescription: appDescription,
+      ).systemPrompt;
+
   /// Runs [prompt] through the tool loop. See [AiAgent.run] for [confirm].
   Future<AiAgentResult> ask(
     String prompt, {

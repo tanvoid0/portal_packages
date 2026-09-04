@@ -118,7 +118,7 @@ class AiAgent {
 
     for (var i = 0; i < maxSteps; i++) {
       final answer = await client.complete(
-        systemPrompt: _systemPrompt,
+        systemPrompt: systemPrompt,
         userPrompt: _userPrompt(prompt, transcript, history),
         jsonMode: true,
         sampler: const AiSamplerConfig(temperature: 0.2),
@@ -203,7 +203,9 @@ class AiAgent {
     );
   }
 
-  String get _systemPrompt => '''
+  /// The instructions the loop runs on. Public so a transcript export can
+  /// show what the model was actually told.
+  String get systemPrompt => '''
 You are the in-app assistant. $appDescription
 You act by calling tools. Reply with ONE JSON object and nothing else, either:
 {"tool": "<name>", "args": {...}}

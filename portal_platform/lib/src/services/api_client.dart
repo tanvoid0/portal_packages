@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 
 import '../config/app_config.dart';
+import '../config/portal_server_prefs.dart';
 import '../extensions/uri_extensions.dart';
 import '../observability/portal_logger.dart';
 import '../routing/deep_link_service.dart';
@@ -35,9 +36,19 @@ bool get _apiVerboseRequests =>
 /// API Client for backend communication.
 /// Base URL is provided at init from [AppConfig.apiBaseUrl].
 class ApiClient extends GetxService {
-  /// Base URL set in [init].
+  /// Base URL currently in effect — the build default, or a dev/QA override
+  /// from [switchServer]/[PortalServerPrefs].
   String get baseUrl => _baseUrl;
   late String _baseUrl;
+
+  /// The build's own server, ignoring any override. Shown as "Cloud" in the
+  /// server-switch UI.
+  String get defaultBaseUrl => _defaultBaseUrl;
+  late String _defaultBaseUrl;
+
+  /// True when [baseUrl] differs from [defaultBaseUrl] — a dev/QA override
+  /// is active.
+  bool get isOverridden => _baseUrl != _defaultBaseUrl;
 
   final TokenStorage _tokenStorage = TokenStorage();
   final Uuid _uuid = const Uuid();
@@ -76,14 +87,33 @@ class ApiClient extends GetxService {
     String appName = '',
   }) async {
     _appSlug = slugifyAppName(appName.trim());
-    _baseUrl = baseUrl.trim();
-    if (_baseUrl.isEmpty) {
+    _defaultBaseUrl = baseUrl.trim();
+    if (_defaultBaseUrl.isEmpty) {
       throw StateError(
         'API base URL must not be empty. Set API_BASE_URL in .env (see .env.example).',
       );
     }
+    _baseUrl = await PortalServerPrefs.read() ?? _defaultBaseUrl;
     await _tokenStorage.init();
     return this;
+  }
+
+  /// Points this app install at a different Portal server, or back at the
+  /// build default when [url] is null.
+  ///
+  /// Clears the current session's tokens **before** moving [_baseUrl] and
+  /// persisting the override, so a crash mid-switch leaves the app signed
+  /// out on the old server rather than signed in against the wrong one — the
+  /// alternative risks a Cloud bearer token reaching a Local server on the
+  /// next request. Callers still own signing the user fully out
+  /// (`SessionController.signOut()`) since a server switch means a different
+  /// user database, not just a different host.
+  Future<void> switchServer(String? url) async {
+    await _tokenStorage.clearTokens();
+    _handlingSessionExpiry = false;
+    _refreshInFlight = null;
+    _baseUrl = url ?? _defaultBaseUrl;
+    await PortalServerPrefs.write(url);
   }
 
   String _newTraceId() {
@@ -749,8 +779,9 @@ class ApiClient extends GetxService {
   /// GET /api/health/ready — HTTP server up and MongoDB accepts ping.
   Future<BackendReadinessResult> checkBackendReadiness({
     Duration timeout = const Duration(seconds: 12),
+    String? baseUrl,
   }) async {
-    final url = '$baseUrl/health/ready';
+    final url = '${baseUrl ?? this.baseUrl}/health/ready';
     try {
       final response = await http
           .get(

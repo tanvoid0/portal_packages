@@ -153,6 +153,20 @@ void main() {
     expect(find.byType(PortalSkeleton), findsNWidgets(3));
   });
 
+  testWidgets('search field shows hint text and reports changes', (t) async {
+    String? changed;
+    await t.pumpWidget(_host(PortalSearchField(
+      hintText: 'Search recipes',
+      onChanged: (value) => changed = value,
+    )));
+
+    expect(find.text('Search recipes'), findsOneWidget);
+    expect(find.byIcon(Icons.search), findsOneWidget);
+
+    await t.enterText(find.byType(TextField), 'pasta');
+    expect(changed, 'pasta');
+  });
+
   testWidgets('empty state paints a well behind the glyph when asked',
       (t) async {
     await t.pumpWidget(_host(const PortalEmptyState(

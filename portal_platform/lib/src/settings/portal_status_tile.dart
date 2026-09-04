@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../config/portal_server_prefs.dart';
 import '../services/api_client.dart';
+import 'portal_server_page.dart';
 import 'portal_settings_labels.dart';
 
 /// What one dependency looked like the last time it was asked.
@@ -21,10 +24,15 @@ class PortalStatusSection extends StatefulWidget {
     super.key,
     this.contentPadding,
     this.labels = const PortalSettingsLabels(),
+    this.onAssistantTap,
   });
 
   final EdgeInsetsGeometry? contentPadding;
   final PortalSettingsLabels labels;
+
+  /// Opens the backend picker (provider, model, Ollama host). Null hides the
+  /// tap affordance -- an app with no AI backend to pick has nothing to open.
+  final VoidCallback? onAssistantTap;
 
   @override
   State<PortalStatusSection> createState() => _PortalStatusSectionState();
@@ -37,10 +45,36 @@ class _PortalStatusSectionState extends State<PortalStatusSection> {
   PortalStatusState _ai = PortalStatusState.checking;
   String? _aiDetail;
 
+  // Server-switch reveal: 7 taps on the Server row (Android's own
+  // dev-options gesture), or a debug build. The gesture is only a
+  // discoverability gate -- PortalServerPrefs.localUrlFrom's private-host
+  // check is what actually stops this reaching a real server.
+  bool _devToolsUnlocked = kDebugMode;
+  int _serverTaps = 0;
+
   @override
   void initState() {
     super.initState();
     _refresh();
+    if (!_devToolsUnlocked) {
+      PortalServerPrefs.devToolsUnlocked().then((unlocked) {
+        if (unlocked && mounted) setState(() => _devToolsUnlocked = true);
+      });
+    }
+  }
+
+  void _onServerTap(BuildContext context) {
+    if (_devToolsUnlocked) {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => PortalServerPage(labels: widget.labels),
+      ));
+      return;
+    }
+    _serverTaps++;
+    if (_serverTaps >= 7) {
+      PortalServerPrefs.unlockDevTools();
+      setState(() => _devToolsUnlocked = true);
+    }
   }
 
   Future<void> _refresh() async {
@@ -71,9 +105,11 @@ class _PortalStatusSectionState extends State<PortalStatusSection> {
     setState(() {
       _server =
           readiness.isReady ? PortalStatusState.ok : PortalStatusState.down;
-      _serverDetail = readiness.isReady
-          ? labels.serverOnline
-          : (readiness.errorMessage ?? labels.serverUnreachable);
+      _serverDetail = !readiness.isReady
+          ? (readiness.errorMessage ?? labels.serverUnreachable)
+          : api.isOverridden
+              ? '${labels.serverLocalDetail} · ${api.baseUrl}'
+              : labels.serverOnline;
     });
 
     // An unreachable server tells us nothing about the assistant, and asking
@@ -126,11 +162,18 @@ class _PortalStatusSectionState extends State<PortalStatusSection> {
           detail: _serverDetail,
           checkingLabel: labels.checking,
           contentPadding: widget.contentPadding,
-          trailing: IconButton(
-            tooltip: labels.checkAgain,
-            onPressed: busy ? null : _refresh,
-            icon: const Icon(Icons.refresh_rounded),
-            visualDensity: VisualDensity.compact,
+          onTap: () => _onServerTap(context),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: labels.checkAgain,
+                onPressed: busy ? null : _refresh,
+                icon: const Icon(Icons.refresh_rounded),
+                visualDensity: VisualDensity.compact,
+              ),
+              if (_devToolsUnlocked) const Icon(Icons.chevron_right_rounded),
+            ],
           ),
         ),
         PortalStatusTile(
@@ -140,6 +183,20 @@ class _PortalStatusSectionState extends State<PortalStatusSection> {
           detail: _aiDetail,
           checkingLabel: labels.checking,
           contentPadding: widget.contentPadding,
+          onTap: widget.onAssistantTap,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: labels.checkAgain,
+                onPressed: busy ? null : _refresh,
+                icon: const Icon(Icons.refresh_rounded),
+                visualDensity: VisualDensity.compact,
+              ),
+              if (widget.onAssistantTap != null)
+                const Icon(Icons.chevron_right_rounded),
+            ],
+          ),
         ),
       ],
     );
@@ -160,6 +217,7 @@ class PortalStatusTile extends StatelessWidget {
     this.trailing,
     this.contentPadding,
     this.checkingLabel = 'Checking…',
+    this.onTap,
   });
 
   final IconData icon;
@@ -169,6 +227,7 @@ class PortalStatusTile extends StatelessWidget {
   final Widget? trailing;
   final EdgeInsetsGeometry? contentPadding;
   final String checkingLabel;
+  final VoidCallback? onTap;
 
   /// Green / amber / red, resolved against the theme where one fits.
   ///
@@ -191,6 +250,7 @@ class PortalStatusTile extends StatelessWidget {
 
     return ListTile(
       contentPadding: contentPadding,
+      onTap: onTap,
       leading: Icon(icon, color: cs.onSurfaceVariant),
       title: Text(title),
       subtitle: Text(

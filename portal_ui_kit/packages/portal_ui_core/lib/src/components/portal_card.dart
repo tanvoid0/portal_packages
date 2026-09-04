@@ -87,7 +87,14 @@ class PortalCard extends StatelessWidget {
               border: borderSide,
               shadows: shadows,
               gradient: gradient,
-              child: _maybeInk(content, onTap, radius),
+              // Ink hosts (ListTile, InkWell, ...) need a real Material
+              // ancestor above the BackdropFilter, or splashes paint at a
+              // desynced offset on scroll/rebuild -- matches the Material
+              // wrap every other variant already has.
+              child: Material(
+                type: MaterialType.transparency,
+                child: _maybeInk(content, onTap, radius),
+              ),
             ),
           ),
         );
