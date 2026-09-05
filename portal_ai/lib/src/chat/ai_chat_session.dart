@@ -97,6 +97,7 @@ class AiChatSessionSummary {
     required this.updatedAt,
     required this.turnCount,
     this.itemCount = 0,
+    this.preview = '',
     this.payload = const {},
   });
 
@@ -107,6 +108,11 @@ class AiChatSessionSummary {
 
   /// Host-defined count shown beside the title (proposals, items, ...).
   final int itemCount;
+
+  /// The last thing said in the thread, for the list's second line. Empty
+  /// falls back to the turn count, which is what a store written before this
+  /// existed will keep reporting.
+  final String preview;
 
   final Map<String, dynamic> payload;
 }
@@ -134,50 +140,50 @@ abstract interface class AiChatStore {
 /// what lets a host keep its own data in a thread portal_ai persists.
 extension AiChatTurnJson on AiChatTurn {
   Map<String, dynamic> toJson() => {
-        'role': role,
-        'content': content,
-        if (summary != null) 'summary': summary,
-        if (payload != null) 'payload': payload,
-        if (at != null) 'at': at!.toIso8601String(),
-        if (took != null) 'took_ms': took!.inMilliseconds,
-      };
+    'role': role,
+    'content': content,
+    if (summary != null) 'summary': summary,
+    if (payload != null) 'payload': payload,
+    if (at != null) 'at': at!.toIso8601String(),
+    if (took != null) 'took_ms': took!.inMilliseconds,
+  };
 }
 
 AiChatTurn aiChatTurnFromJson(Map<String, dynamic> json) => AiChatTurn(
-      role: json['role'] as String? ?? 'assistant',
-      content: json['content'] as String? ?? '',
-      summary: json['summary'] as String?,
-      payload: json['payload'] == null
-          ? null
-          : Map<String, dynamic>.from(json['payload'] as Map),
-      at: DateTime.tryParse(json['at'] as String? ?? ''),
-      took: json['took_ms'] == null
-          ? null
-          : Duration(milliseconds: json['took_ms'] as int),
-    );
+  role: json['role'] as String? ?? 'assistant',
+  content: json['content'] as String? ?? '',
+  summary: json['summary'] as String?,
+  payload: json['payload'] == null
+      ? null
+      : Map<String, dynamic>.from(json['payload'] as Map),
+  at: DateTime.tryParse(json['at'] as String? ?? ''),
+  took: json['took_ms'] == null
+      ? null
+      : Duration(milliseconds: json['took_ms'] as int),
+);
 
 extension AiChatSessionJson on AiChatSession {
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'created_at': createdAt.toIso8601String(),
-        'updated_at': updatedAt.toIso8601String(),
-        'summary': summary,
-        'payload': payload,
-        'turns': turns.map((t) => t.toJson()).toList(),
-      };
+    'id': id,
+    'title': title,
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt.toIso8601String(),
+    'summary': summary,
+    'payload': payload,
+    'turns': turns.map((t) => t.toJson()).toList(),
+  };
 }
 
 AiChatSession aiChatSessionFromJson(Map<String, dynamic> json) => AiChatSession(
-      id: json['id'] as String,
-      title: json['title'] as String? ?? '',
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
-      summary: json['summary'] as String? ?? '',
-      payload: Map<String, dynamic>.from(
-        json['payload'] as Map? ?? const <String, dynamic>{},
-      ),
-      turns: (json['turns'] as List<dynamic>? ?? const [])
-          .map((e) => aiChatTurnFromJson(Map<String, dynamic>.from(e as Map)))
-          .toList(),
-    );
+  id: json['id'] as String,
+  title: json['title'] as String? ?? '',
+  createdAt: DateTime.parse(json['created_at'] as String),
+  updatedAt: DateTime.parse(json['updated_at'] as String),
+  summary: json['summary'] as String? ?? '',
+  payload: Map<String, dynamic>.from(
+    json['payload'] as Map? ?? const <String, dynamic>{},
+  ),
+  turns: (json['turns'] as List<dynamic>? ?? const [])
+      .map((e) => aiChatTurnFromJson(Map<String, dynamic>.from(e as Map)))
+      .toList(),
+);

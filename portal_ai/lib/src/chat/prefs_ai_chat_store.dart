@@ -13,7 +13,6 @@ import 'ai_chat_session.dart';
 class PrefsAiChatStore implements AiChatStore {
   PrefsAiChatStore({required this.prefs, required this.keyPrefix});
 
-
   static Future<PrefsAiChatStore> open(String keyPrefix) async =>
       PrefsAiChatStore(
         prefs: await SharedPreferences.getInstance(),
@@ -32,8 +31,9 @@ class PrefsAiChatStore implements AiChatStore {
     if (raw == null || raw.isEmpty) return [];
     try {
       return (jsonDecode(raw) as List<dynamic>)
-          .map((e) =>
-              aiChatSessionFromJson(Map<String, dynamic>.from(e as Map)))
+          .map(
+            (e) => aiChatSessionFromJson(Map<String, dynamic>.from(e as Map)),
+          )
           .toList();
     } catch (_) {
       // A thread written by an older shape is not worth crashing the sheet for.
@@ -42,23 +42,24 @@ class PrefsAiChatStore implements AiChatStore {
   }
 
   Future<void> _write(List<AiChatSession> sessions) => prefs.setString(
-        _key,
-        jsonEncode(sessions.map((s) => s.toJson()).toList()),
-      );
+    _key,
+    jsonEncode(sessions.map((s) => s.toJson()).toList()),
+  );
 
   @override
-  List<AiChatSessionSummary> listSummaries() => (_all()
-        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt)))
-      .map(
-        (s) => AiChatSessionSummary(
-          id: s.id,
-          title: s.title,
-          updatedAt: s.updatedAt,
-          turnCount: s.turns.length,
-          payload: s.payload,
-        ),
-      )
-      .toList();
+  List<AiChatSessionSummary> listSummaries() =>
+      (_all()..sort((a, b) => b.updatedAt.compareTo(a.updatedAt)))
+          .map(
+            (s) => AiChatSessionSummary(
+              id: s.id,
+              title: s.title,
+              updatedAt: s.updatedAt,
+              turnCount: s.turns.length,
+              preview: s.turns.isEmpty ? '' : s.turns.last.content.trim(),
+              payload: s.payload,
+            ),
+          )
+          .toList();
 
   @override
   AiChatSession? load(String id) {

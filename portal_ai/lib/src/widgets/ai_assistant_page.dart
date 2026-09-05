@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,13 +6,17 @@ import 'package:flutter/services.dart';
 import '../chat/ai_chat_export.dart';
 import '../chat/ai_chat_session.dart';
 import '../chat/ai_proposal.dart';
+import '../chat/ai_suggestion.dart';
 import '../clients/ai_completion_client.dart';
 import '../runtime/portal_ai_runtime.dart';
 import '../tools/ai_tool.dart';
 import 'ai_chat_history_list.dart';
 import 'ai_chat_labels.dart';
+import 'ai_consent.dart';
+import 'ai_suggestion_cards.dart';
 import 'ai_item_list.dart';
 import 'ai_markdown.dart';
+import 'ai_prompt_composer.dart';
 import 'ai_thinking_tile.dart';
 
 /// Drop-in assistant UI: prompt box, live step log and a confirmation prompt
@@ -46,19 +49,26 @@ class AiAssistantPage extends StatefulWidget {
     this.onItemTap,
     this.initialPrompt,
     this.autoSend = false,
+    this.consent,
+    this.onAttach,
+    this.maxPromptLength,
   }) : assert(
-          runtime != null || onSend != null,
-          'give the page a runtime to drive the agent, or an onSend that '
-          'generates the reply itself',
-        );
+         runtime != null || onSend != null,
+         'give the page a runtime to drive the agent, or an onSend that '
+         'generates the reply itself',
+       );
 
   /// Drives the agent loop. Null when [onSend] answers instead.
   final PortalAiRuntime? runtime;
 
   final String title;
 
-  /// Example prompts shown as tappable chips before the first run.
-  final List<String> suggestions;
+  /// Prompts offered as cards before the first run.
+  ///
+  /// A plain list of sentences still works -- `AiSuggestion.prompts([...])`
+  /// wraps them -- but a suggestion that carries a subtitle, an icon and a
+  /// time-of-day bias gets a fuller card and a better slot in the rotation.
+  final List<AiSuggestion> suggestions;
 
   /// Opens the app's own AI settings, when it has any. The model and key live
   /// on the server, so there is nothing to configure here by default.
@@ -141,6 +151,18 @@ class AiAssistantPage extends StatefulWidget {
   /// carrying one.
   final String? initialPrompt;
 
+  /// Gates the page behind a "what gets sent" card until accepted.
+  ///
+  /// Null for an app that needs no gate. While it is unaccepted the deck is
+  /// inert and the composer is disabled, so there is one way past it.
+  final AiConsent? consent;
+
+  /// Adds an attachment button beside the counter. Null draws none.
+  final VoidCallback? onAttach;
+
+  /// Caps the composer and shows a counter. Null means neither.
+  final int? maxPromptLength;
+
   /// Asks [initialPrompt] without waiting for the user to press send.
   ///
   /// Off by default, and deliberately: the prompt can come from outside the
@@ -155,7 +177,7 @@ class AiAssistantPage extends StatefulWidget {
     BuildContext context, {
     required PortalAiRuntime runtime,
     String title = 'Assistant',
-    List<String> suggestions = const [],
+    List<AiSuggestion> suggestions = const [],
     VoidCallback? onSettings,
     List<AiTool>? tools,
     Map<String, Widget Function(AiBlock block)> renderers = const {},
@@ -166,6 +188,9 @@ class AiAssistantPage extends StatefulWidget {
     AiChatLabels labels = const AiChatLabels(),
     AiChatStore? store,
     void Function(String entity, AiItem item)? onItemTap,
+    AiConsent? consent,
+    VoidCallback? onAttach,
+    int? maxPromptLength,
   }) {
     return Navigator.of(context).push<void>(
       MaterialPageRoute(
@@ -185,6 +210,9 @@ class AiAssistantPage extends StatefulWidget {
               labels: labels,
               store: store,
               onItemTap: onItemTap,
+              consent: consent,
+              onAttach: onAttach,
+              maxPromptLength: maxPromptLength,
               fill: true,
             ),
           ),
@@ -224,26 +252,58 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   final _sessions = <AiChatSessionSummary>[];
   String? _sessionId;
 
-  /// What the chips show now. Starts as a shuffle of the app's own list, so
-  /// two visits do not open on the same four prompts, and is replaced when
-  /// the user asks the model for fresh ones.
-  late List<String> _suggestions = _shuffled(widget.suggestions);
+  /// Which prompts the deck shows, and what swaps them. Seeded from the app's
+  /// own list so two visits do not open on the same three cards, topped up
+  /// with whatever the model suggests.
+  late final _rotator = AiSuggestionRotator(pool: widget.suggestions)
+    ..refresh();
+
+  /// Swaps one card every so often while the deck is the only thing on screen.
+  /// Cancelled the moment a conversation starts -- nothing should move under a
+  /// reply someone is reading.
+  Timer? _rotation;
+
   bool _loadingIdeas = false;
 
-  static List<String> _shuffled(List<String> from) =>
-      (List.of(from)..shuffle(Random())).take(4).toList();
+  /// True while the deck is what the user is looking at.
+  bool get _showingDeck =>
+      _steps.isEmpty &&
+      _proposals.isEmpty &&
+      _visibleTurns.isEmpty &&
+      _reply == null &&
+      _error == null;
+
+  bool get _gated => widget.consent?.accepted == false;
+
+  void _syncRotation() {
+    final wanted = _showingDeck && !_gated && _rotator.canRotate;
+    if (wanted == (_rotation != null)) return;
+    _rotation?.cancel();
+    _rotation = wanted
+        ? Timer.periodic(const Duration(seconds: 14), (_) {
+            if (!mounted) return;
+            setState(_rotator.rotateOne);
+          })
+        : null;
+  }
 
   Future<void> _freshIdeas() async {
     final runtime = widget.runtime;
     if (runtime == null || _loadingIdeas) return;
     setState(() => _loadingIdeas = true);
-    final ideas = await runtime.suggestPrompts(seed: widget.suggestions);
+    final ideas = await runtime.suggestPrompts(
+      seed: [for (final s in widget.suggestions) s.prompt],
+    );
     if (!mounted) return;
     setState(() {
       _loadingIdeas = false;
       // An empty list means the backend could not answer; keep what is on
-      // screen rather than blanking the empty state.
-      if (ideas.isNotEmpty) _suggestions = ideas;
+      // screen rather than blanking the deck. What does come back joins the
+      // pool instead of replacing it, so the app's curated cards survive.
+      if (ideas.isEmpty) return;
+      _rotator
+        ..mergePool(AiSuggestion.prompts(ideas))
+        ..refresh();
     });
   }
 
@@ -254,6 +314,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   void initState() {
     super.initState();
     _reloadSessions();
+    _syncRotation();
     final initial = widget.initialPrompt?.trim();
     if (initial == null || initial.isEmpty) return;
     _input.text = initial;
@@ -283,7 +344,8 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     await store.save(
       AiChatSession(
         id: id,
-        title: existing?.title ??
+        title:
+            existing?.title ??
             (first.length <= 48 ? first : '${first.substring(0, 45)}...'),
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
@@ -377,8 +439,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
               selectedId: _sessionId,
               labels: widget.labels,
               width: 320,
-              subtitleFor: (s) =>
-                  '${s.turnCount} ${widget.labels.messages}',
+              subtitleFor: (s) => '${s.turnCount} ${widget.labels.messages}',
               onClose: () => Navigator.of(dialogContext).pop(),
               onSelect: (id) => Navigator.of(dialogContext).pop(id),
               onNewChat: () => Navigator.of(dialogContext).pop(''),
@@ -411,6 +472,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     if (!identical(oldWidget.proposals, widget.proposals)) {
       _proposals = List.of(widget.proposals);
     }
+    _syncRotation();
   }
 
   void _resolveProposal(AiProposal proposal, ValueChanged<AiProposal>? then) {
@@ -434,6 +496,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
 
   @override
   void dispose() {
+    _rotation?.cancel();
     _input.dispose();
     _scroll.dispose();
     super.dispose();
@@ -615,19 +678,23 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     try {
       final result = await tool.call(call);
       if (mounted) {
-        setState(() => _steps.add(
-              AiAgentStep(
-                call: call,
-                result: result.forModel,
-                blocks: result.blocks,
-              ),
-            ));
+        setState(
+          () => _steps.add(
+            AiAgentStep(
+              call: call,
+              result: result.forModel,
+              blocks: result.blocks,
+            ),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _steps.add(
-              AiAgentStep(call: call, result: e.toString(), failed: true),
-            ));
+        setState(
+          () => _steps.add(
+            AiAgentStep(call: call, result: e.toString(), failed: true),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _running = false);
@@ -670,46 +737,46 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   }
 
   Widget _blockView(AiBlock block, ThemeData theme) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _blockBody(block, theme),
-          if (block.actions.isNotEmpty)
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final action in block.actions)
-                  OutlinedButton(
-                    onPressed: _busy ? null : () => _runAction(action),
-                    child: Text(action.label),
-                  ),
-              ],
-            ),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _blockBody(block, theme),
+      if (block.actions.isNotEmpty)
+        Wrap(
+          spacing: 8,
+          children: [
+            for (final action in block.actions)
+              OutlinedButton(
+                onPressed: _busy ? null : () => _runAction(action),
+                child: Text(action.label),
+              ),
+          ],
+        ),
+    ],
+  );
 
   /// One completed tool call: what ran, plus whatever it had to show. The raw
   /// result text is a fallback for a tool with no blocks of its own.
   Widget _stepView(AiAgentStep step, ThemeData theme) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(
-              step.failed ? Icons.error_outline : Icons.check_circle_outline,
-              color: step.failed ? theme.colorScheme.error : null,
-              size: 20,
-            ),
-            title: Text(step.call.name.replaceAll('_', ' ')),
-            subtitle: step.blocks.isEmpty ? Text(step.result) : null,
-          ),
-          for (final block in step.blocks)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _blockView(block, theme),
-            ),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      ListTile(
+        dense: true,
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(
+          step.failed ? Icons.error_outline : Icons.check_circle_outline,
+          color: step.failed ? theme.colorScheme.error : null,
+          size: 20,
+        ),
+        title: Text(step.call.name.replaceAll('_', ' ')),
+        subtitle: step.blocks.isEmpty ? Text(step.result) : null,
+      ),
+      for (final block in step.blocks)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _blockView(block, theme),
+        ),
+    ],
+  );
 
   Future<bool> _confirm(AiTool tool, AiToolCall call) async {
     if (!mounted) return false;
@@ -764,7 +831,8 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
               _visibleTurns.isNotEmpty) ...[
             Row(
               children: [
-                if (widget.fill && Navigator.canPop(context)) const BackButton(),
+                if (widget.fill && Navigator.canPop(context))
+                  const BackButton(),
                 Expanded(
                   child: Text(widget.title, style: theme.textTheme.titleMedium),
                 ),
@@ -803,12 +871,14 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (_steps.isEmpty &&
-                      _proposals.isEmpty &&
-                      _visibleTurns.isEmpty &&
-                      _reply == null &&
-                      _error == null) ...[
-                    if (widget.labels.empty.isNotEmpty)
+                  if (_showingDeck) ...[
+                    if (widget.consent case final consent?
+                        when !consent.accepted)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: AiConsentCard(consent: consent),
+                      )
+                    else if (widget.labels.empty.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 24),
                         child: Text(
@@ -817,16 +887,22 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                           style: theme.textTheme.bodyMedium,
                         ),
                       ),
-                    _Suggestions(
-                      suggestions: _suggestions,
-                      onTap: (text) {
-                        _input.text = text;
+                    const SizedBox(height: 8),
+                    AiSuggestionCards(
+                      suggestions: _rotator.visible,
+                      enabled: !_gated,
+                      onTap: (suggestion) {
+                        _input.text = suggestion.prompt;
                         _send();
                       },
+                      onShuffle: _rotator.canRotate
+                          ? () => setState(_rotator.refresh)
+                          : null,
                       // Only offered when there is a model to ask and a
                       // house style to imitate.
                       onRefresh: widget.runtime == null ? null : _freshIdeas,
                       refreshing: _loadingIdeas,
+                      shuffleLabel: widget.labels.shuffle,
                       refreshLabel: widget.labels.moreIdeas,
                     ),
                   ],
@@ -883,15 +959,15 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                         onTap: () => setState(
                           () => _expandedProposal =
                               _expandedProposal == proposal.id
-                                  ? null
-                                  : proposal.id,
+                              ? null
+                              : proposal.id,
                         ),
                         onAccept: widget.onAcceptProposal == null
                             ? null
                             : () => _resolveProposal(
-                                  proposal,
-                                  widget.onAcceptProposal,
-                                ),
+                                proposal,
+                                widget.onAcceptProposal,
+                              ),
                         labels: widget.labels,
                         onEdit: widget.onEditProposal == null
                             ? null
@@ -899,9 +975,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                         onDiscard: widget.onDiscardProposal == null
                             ? null
                             : () => _resolveProposal(
-                                  proposal,
-                                  widget.onDiscardProposal,
-                                ),
+                                proposal,
+                                widget.onDiscardProposal,
+                              ),
                       ),
                     ),
                   if (_error != null)
@@ -912,8 +988,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                           Expanded(
                             child: Text(
                               _error!,
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(color: theme.colorScheme.error),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.error,
+                              ),
                             ),
                           ),
                           if (_lastUserTurn != null && !_busy)
@@ -935,45 +1012,25 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
               child: FilledButton.icon(
                 onPressed: _acceptAll,
                 icon: const Icon(Icons.playlist_add),
-                label: Text(
-                  '${widget.labels.addAll} (${_proposals.length})',
-                ),
+                label: Text('${widget.labels.addAll} (${_proposals.length})'),
               ),
             ),
           const SizedBox(height: 8),
-          TextField(
+          AiPromptComposer(
             controller: _input,
-            enabled: !_busy,
-            minLines: 1,
-            maxLines: 4,
-            textInputAction: TextInputAction.send,
-            onSubmitted: (_) => _send(),
-            decoration: InputDecoration(
-              hintText: _busy ? widget.labels.working : widget.labels.inputHint,
-              border: const OutlineInputBorder(),
-              // One spinner, and it is also the stop button: the ring shows
-              // the run is live, tapping it cancels.
-              suffixIcon: _busy
-                  ? IconButton(
-                      tooltip: widget.labels.stop,
-                      onPressed: _stop,
-                      icon: const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            CircularProgressIndicator(strokeWidth: 2),
-                            Icon(Icons.stop_rounded, size: 12),
-                          ],
-                        ),
-                      ),
-                    )
-                  : IconButton(
-                      icon: const Icon(Icons.arrow_upward),
-                      onPressed: _send,
-                    ),
-            ),
+            enabled: !_gated,
+            busy: _busy,
+            onStop: _stop,
+            onSubmit: _send,
+            onAttach: widget.onAttach,
+            maxLength: widget.maxPromptLength,
+            stopLabel: widget.labels.stop,
+            attachLabel: widget.labels.attach,
+            hintText: _gated
+                ? widget.labels.consentBlocked
+                : _busy
+                    ? widget.labels.working
+                    : widget.labels.inputHint,
           ),
         ],
       ),
@@ -993,11 +1050,11 @@ class _ArgRow extends StatelessWidget {
   final Object? value;
 
   static String describe(Object? value) => switch (value) {
-        null => '-',
-        final List list => list.map(describe).join(', '),
-        final Map map => map.values.map(describe).join(' '),
-        _ => '$value',
-      };
+    null => '-',
+    final List list => list.map(describe).join(', '),
+    final Map map => map.values.map(describe).join(' '),
+    _ => '$value',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -1011,8 +1068,9 @@ class _ArgRow extends StatelessWidget {
             width: 92,
             child: Text(
               name.replaceAll('_', ' '),
-              style: theme.textTheme.labelMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -1021,54 +1079,6 @@ class _ArgRow extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _Suggestions extends StatelessWidget {
-  const _Suggestions({
-    required this.suggestions,
-    required this.onTap,
-    this.onRefresh,
-    this.refreshing = false,
-    this.refreshLabel = 'More ideas',
-  });
-
-  final List<String> suggestions;
-  final ValueChanged<String> onTap;
-
-  /// Asks the model for a different set. Null when nothing can be asked.
-  final Future<void> Function()? onRefresh;
-  final bool refreshing;
-  final String refreshLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    if (suggestions.isEmpty && onRefresh == null) {
-      return const SizedBox.shrink();
-    }
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (final suggestion in suggestions)
-          ActionChip(
-            label: Text(suggestion),
-            onPressed: () => onTap(suggestion),
-          ),
-        if (onRefresh case final refresh?)
-          ActionChip(
-            avatar: refreshing
-                ? const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.autorenew, size: 16),
-            label: Text(refreshLabel),
-            onPressed: refreshing ? null : refresh,
-          ),
-      ],
     );
   }
 }
@@ -1122,8 +1132,9 @@ class _ProposalCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       proposal.title,
-                      style: theme.textTheme.titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w600),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                   if (proposal.badge.isNotEmpty)
@@ -1220,14 +1231,13 @@ class _TurnBubble extends StatelessWidget {
             // ever take right after sending.
             onLongPressStart: canAct
                 ? (details) =>
-                    _showActions(context, details.globalPosition, scheme)
+                      _showActions(context, details.globalPosition, scheme)
                 : null,
             child: Container(
               constraints: BoxConstraints(
                 maxWidth: MediaQuery.sizeOf(context).width * 0.85,
               ),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: scheme.primaryContainer,
                 borderRadius: const BorderRadius.only(
@@ -1304,9 +1314,9 @@ class _TurnBubble extends StatelessWidget {
   String? _meta(BuildContext context) {
     final parts = [
       if (turn.at case final at?)
-        MaterialLocalizations.of(context).formatTimeOfDay(
-          TimeOfDay.fromDateTime(at),
-        ),
+        MaterialLocalizations.of(
+          context,
+        ).formatTimeOfDay(TimeOfDay.fromDateTime(at)),
       if (turn.took case final took?) _formatTook(took),
       if (turn.payload?['step_count'] case final int steps when steps > 0)
         '$steps ${steps == 1 ? 'step' : 'steps'}',
@@ -1331,8 +1341,9 @@ class _TurnBubble extends StatelessWidget {
       child: Text(
         meta,
         style: theme.textTheme.labelSmall?.copyWith(
-          color: (color ?? theme.colorScheme.onSurfaceVariant)
-              .withValues(alpha: 0.7),
+          color: (color ?? theme.colorScheme.onSurfaceVariant).withValues(
+            alpha: 0.7,
+          ),
         ),
       ),
     );

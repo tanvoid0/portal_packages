@@ -40,56 +40,52 @@ void main() {
   late List<String> basket;
 
   PortalAiRuntime runtimeWith(List<String> replies) => PortalAiRuntime(
-        client: _ScriptedClient(replies),
+    client: _ScriptedClient(replies),
 
-        appDescription: 'A shopping list.',
-        tools: [
-          AiTool(
-            name: 'add_item',
-            description: 'Add an item to the list.',
-            parameters: const {'name': 'item name'},
-            mutates: true,
-            run: (call) async {
-              basket.add(call.argString('name')!);
-              return 'added ${call.argString('name')}';
-            },
-          ),
-          AiTool(
-            name: 'list_items',
-            description: 'List the items.',
-            run: (_) async => basket.isEmpty ? 'empty' : basket.join(', '),
-          ),
-          AiTool(
-            name: 'show_items',
-            description: 'List the items with pictures.',
-            runRich: (_) async => AiToolResult(
-              forModel: basket.join(', '),
-              blocks: [
-                AiBlock.items(entity: 'basket_item', [
-                  for (final item in basket)
-                    AiItem(
-                      id: 'id-$item',
-                      title: item,
-                      subtitle: 'in the basket',
-                    ),
-                ]),
-              ],
-            ),
-          ),
-          AiTool(
-            name: 'show_totals',
-            description: 'Totals, which are not records.',
-            runRich: (_) async => AiToolResult(
-              forModel: '${basket.length} items',
-              blocks: [
-                AiBlock.items([
-                  AiItem(title: 'Total', trailing: '${basket.length}'),
-                ]),
-              ],
-            ),
-          ),
-        ],
-      );
+    appDescription: 'A shopping list.',
+    tools: [
+      AiTool(
+        name: 'add_item',
+        description: 'Add an item to the list.',
+        parameters: const {'name': 'item name'},
+        mutates: true,
+        run: (call) async {
+          basket.add(call.argString('name')!);
+          return 'added ${call.argString('name')}';
+        },
+      ),
+      AiTool(
+        name: 'list_items',
+        description: 'List the items.',
+        run: (_) async => basket.isEmpty ? 'empty' : basket.join(', '),
+      ),
+      AiTool(
+        name: 'show_items',
+        description: 'List the items with pictures.',
+        runRich: (_) async => AiToolResult(
+          forModel: basket.join(', '),
+          blocks: [
+            AiBlock.items(entity: 'basket_item', [
+              for (final item in basket)
+                AiItem(id: 'id-$item', title: item, subtitle: 'in the basket'),
+            ]),
+          ],
+        ),
+      ),
+      AiTool(
+        name: 'show_totals',
+        description: 'Totals, which are not records.',
+        runRich: (_) async => AiToolResult(
+          forModel: '${basket.length} items',
+          blocks: [
+            AiBlock.items([
+              AiItem(title: 'Total', trailing: '${basket.length}'),
+            ]),
+          ],
+        ),
+      ),
+    ],
+  );
 
   Future<void> pumpSheet(WidgetTester tester, PortalAiRuntime runtime) async {
     await tester.pumpWidget(
@@ -97,7 +93,7 @@ void main() {
         home: Scaffold(
           body: AiAssistantPage(
             runtime: runtime,
-            suggestions: const ['Add milk'],
+            suggestions: AiSuggestion.prompts(const ['Add milk']),
           ),
         ),
       ),
@@ -106,15 +102,16 @@ void main() {
 
   setUp(() => basket = <String>[]);
 
-  testWidgets('suggestion chips show before the first run', (tester) async {
+  testWidgets('suggestion cards show before the first run', (tester) async {
     await pumpSheet(tester, runtimeWith(const ['{"final":"done"}']));
 
     expect(find.text('Assistant'), findsOneWidget);
-    expect(find.widgetWithText(ActionChip, 'Add milk'), findsOneWidget);
+    expect(find.widgetWithText(AiSuggestionCards, 'Add milk'), findsOneWidget);
   });
 
-  testWidgets('allowing a mutating tool runs it and logs the step',
-      (tester) async {
+  testWidgets('allowing a mutating tool runs it and logs the step', (
+    tester,
+  ) async {
     await pumpSheet(
       tester,
       runtimeWith(const [
@@ -140,8 +137,9 @@ void main() {
     expect(find.text('Added milk to your list.'), findsOneWidget);
   });
 
-  testWidgets('skipping a mutating tool leaves state untouched',
-      (tester) async {
+  testWidgets('skipping a mutating tool leaves state untouched', (
+    tester,
+  ) async {
     await pumpSheet(
       tester,
       runtimeWith(const [
@@ -181,8 +179,9 @@ void main() {
     expect(find.text('You have bread.'), findsOneWidget);
   });
 
-  testWidgets('a rich result renders as rows, not as its raw text',
-      (tester) async {
+  testWidgets('a rich result renders as rows, not as its raw text', (
+    tester,
+  ) async {
     basket.add('Bread');
     await pumpSheet(
       tester,
@@ -202,8 +201,9 @@ void main() {
     expect(find.text('Bread'), findsOneWidget);
   });
 
-  testWidgets('a confirmation shows the arguments in words, not as JSON',
-      (tester) async {
+  testWidgets('a confirmation shows the arguments in words, not as JSON', (
+    tester,
+  ) async {
     await pumpSheet(
       tester,
       runtimeWith(const [
@@ -221,8 +221,9 @@ void main() {
     expect(find.textContaining('{'), findsNothing);
   });
 
-  testWidgets('tapping a row hands the host the entity and the record',
-      (tester) async {
+  testWidgets('tapping a row hands the host the entity and the record', (
+    tester,
+  ) async {
     basket.add('Bread');
     final tapped = <String>[];
     await tester.pumpWidget(
@@ -249,8 +250,9 @@ void main() {
     expect(tapped, ['basket_item/id-Bread']);
   });
 
-  testWidgets('rows with no entity stay inert even with a handler',
-      (tester) async {
+  testWidgets('rows with no entity stay inert even with a handler', (
+    tester,
+  ) async {
     basket.add('Bread');
     final tapped = <String>[];
     await tester.pumpWidget(
@@ -279,8 +281,9 @@ void main() {
     expect(tapped, isEmpty);
   });
 
-  testWidgets('reasoning is folded away, not shown as the answer',
-      (tester) async {
+  testWidgets('reasoning is folded away, not shown as the answer', (
+    tester,
+  ) async {
     await pumpSheet(
       tester,
       runtimeWith(const [
@@ -315,38 +318,41 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 
-  testWidgets('a failed question can be retried, and succeeds the second time',
-      (tester) async {
-    // The first attempt has nothing to reply with; the retry does.
-    final client = _ScriptedClient(const []);
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: AiAssistantPage(
-            runtime: PortalAiRuntime(client: client),
-            store: _MemoryStore(),
+  testWidgets(
+    'a failed question can be retried, and succeeds the second time',
+    (tester) async {
+      // The first attempt has nothing to reply with; the retry does.
+      final client = _ScriptedClient(const []);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AiAssistantPage(
+              runtime: PortalAiRuntime(client: client),
+              store: _MemoryStore(),
+            ),
           ),
         ),
-      ),
-    );
+      );
 
-    await tester.enterText(find.byType(TextField), 'plan dinners');
-    await tester.testTextInput.receiveAction(TextInputAction.send);
-    await tester.pumpAndSettle();
-    expect(find.textContaining('script exhausted'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'plan dinners');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('script exhausted'), findsOneWidget);
 
-    client.replies.add('{"final":"Here is a plan."}');
-    await tester.tap(find.text('Retry'));
-    await tester.pumpAndSettle();
+      client.replies.add('{"final":"Here is a plan."}');
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Here is a plan.'), findsOneWidget);
-    expect(find.textContaining('script exhausted'), findsNothing);
-    // The question is asked once, not left behind twice.
-    expect(find.text('plan dinners'), findsOneWidget);
-  });
+      expect(find.text('Here is a plan.'), findsOneWidget);
+      expect(find.textContaining('script exhausted'), findsNothing);
+      // The question is asked once, not left behind twice.
+      expect(find.text('plan dinners'), findsOneWidget);
+    },
+  );
 
-  testWidgets('editing the last question puts it back in the composer',
-      (tester) async {
+  testWidgets('editing the last question puts it back in the composer', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -379,42 +385,45 @@ void main() {
     expect(find.text('Sure.'), findsNothing);
   });
 
-  testWidgets('deleting the last question drops it without touching the composer',
-      (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: AiAssistantPage(
-            runtime: PortalAiRuntime(
-              client: _ScriptedClient(['{"final":"Sure."}']),
+  testWidgets(
+    'deleting the last question drops it without touching the composer',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AiAssistantPage(
+              runtime: PortalAiRuntime(
+                client: _ScriptedClient(['{"final":"Sure."}']),
+              ),
+              store: _MemoryStore(),
             ),
-            store: _MemoryStore(),
           ),
         ),
-      ),
-    );
+      );
 
-    await tester.enterText(find.byType(TextField), 'plan dinners');
-    await tester.testTextInput.receiveAction(TextInputAction.send);
-    await tester.pumpAndSettle();
-    expect(find.text('Sure.'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'plan dinners');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      expect(find.text('Sure.'), findsOneWidget);
 
-    await tester.longPress(find.text('plan dinners'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Delete'));
-    await tester.pumpAndSettle();
+      await tester.longPress(find.text('plan dinners'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
 
-    // Gone, and the composer was never touched.
-    expect(find.text('plan dinners'), findsNothing);
-    expect(find.text('Sure.'), findsNothing);
-    expect(
-      tester.widget<TextField>(find.byType(TextField)).controller?.text,
-      '',
-    );
-  });
+      // Gone, and the composer was never touched.
+      expect(find.text('plan dinners'), findsNothing);
+      expect(find.text('Sure.'), findsNothing);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller?.text,
+        '',
+      );
+    },
+  );
 
-  testWidgets('fresh ideas replace the chips, and a failure keeps the old ones',
-      (tester) async {
+  testWidgets('fresh ideas join the deck, and a failure keeps the old ones', (
+    tester,
+  ) async {
     final client = _ScriptedClient(const [
       '{"prompts":["Plan a roast","Use up leftovers"]}',
     ]);
@@ -423,22 +432,53 @@ void main() {
         home: Scaffold(
           body: AiAssistantPage(
             runtime: PortalAiRuntime(client: client),
-            suggestions: const ['Add milk'],
+            suggestions: AiSuggestion.prompts(const ['Add milk']),
           ),
         ),
       ),
     );
 
-    await tester.tap(find.widgetWithText(ActionChip, 'More ideas'));
+    await tester.tap(find.text('More ideas'));
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(ActionChip, 'Plan a roast'), findsOneWidget);
-    expect(find.widgetWithText(ActionChip, 'Add milk'), findsNothing);
+    expect(find.text('Plan a roast'), findsOneWidget);
+    // Merged, not swapped: the app's own prompt is curated copy and the model
+    // has no way to know it was worth keeping.
+    expect(find.text('Add milk'), findsOneWidget);
 
-    // Script exhausted: the chips already on screen survive.
-    await tester.tap(find.widgetWithText(ActionChip, 'More ideas'));
+    // Script exhausted: what is on screen survives.
+    await tester.tap(find.text('More ideas'));
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(ActionChip, 'Plan a roast'), findsOneWidget);
+    expect(find.text('Plan a roast'), findsOneWidget);
+  });
+
+  testWidgets('an unaccepted consent card gates the composer', (tester) async {
+    var accepted = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) => AiAssistantPage(
+              runtime: PortalAiRuntime(client: _ScriptedClient(const [])),
+              suggestions: AiSuggestion.prompts(const ['Add milk']),
+              consent: AiConsent(
+                accepted: accepted,
+                onAccept: () => setState(() => accepted = true),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(AiConsentCard), findsOneWidget);
+    expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
+
+    await tester.tap(find.text('Accept and continue'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AiConsentCard), findsNothing);
+    expect(tester.widget<TextField>(find.byType(TextField)).enabled, isTrue);
   });
 }
 
@@ -449,14 +489,14 @@ class _MemoryStore implements AiChatStore {
 
   @override
   List<AiChatSessionSummary> listSummaries() => [
-        for (final s in _sessions.values)
-          AiChatSessionSummary(
-            id: s.id,
-            title: s.title,
-            updatedAt: s.updatedAt,
-            turnCount: s.turns.length,
-          ),
-      ];
+    for (final s in _sessions.values)
+      AiChatSessionSummary(
+        id: s.id,
+        title: s.title,
+        updatedAt: s.updatedAt,
+        turnCount: s.turns.length,
+      ),
+  ];
 
   @override
   AiChatSession? load(String id) => _sessions[id];

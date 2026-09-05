@@ -23,6 +23,14 @@ class AiChatLabels {
     this.thinking = 'Thought process',
     this.retry = 'Retry',
     this.moreIdeas = 'More ideas',
+    this.shuffle = 'Shuffle',
+    this.attach = 'Attach a photo',
+    this.consentBlocked = 'Accept the notice above to start',
+    this.searchHint = 'Search chats',
+    this.today = 'Today',
+    this.yesterday = 'Yesterday',
+    this.earlier = 'Earlier',
+    this.noMatches = 'No chats match that.',
   });
 
   final String inputHint;
@@ -56,6 +64,24 @@ class AiChatLabels {
   /// Re-sends the last question, after a failure or an edit.
   final String retry;
 
-  /// Asks the model for a fresh set of suggestion chips.
+  /// Asks the model for a fresh set of suggestion cards.
   final String moreIdeas;
+
+  /// Re-picks the deck from the prompts already loaded.
+  final String shuffle;
+
+  final String attach;
+
+  /// Composer hint while the consent card is still unanswered.
+  final String consentBlocked;
+
+  final String searchHint;
+
+  /// Date group headers in the thread list.
+  final String today;
+  final String yesterday;
+  final String earlier;
+
+  /// Shown when a search matches no thread.
+  final String noMatches;
 }
