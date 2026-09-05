@@ -135,6 +135,7 @@ export 'src/widgets/portal_app_version.dart';
 // Sideload updates. Portal ships outside the Play Store while the apps are
 // finished, so nothing tells an installed build that a newer one exists.
 export 'src/update/portal_release.dart';
+export 'src/update/portal_installed_apps.dart';
 export 'src/update/portal_update_service.dart';
 export 'src/update/portal_update_tile.dart';
 

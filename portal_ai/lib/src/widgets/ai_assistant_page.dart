@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -43,6 +44,8 @@ class AiAssistantPage extends StatefulWidget {
     this.fill = false,
     this.store,
     this.onItemTap,
+    this.initialPrompt,
+    this.autoSend = false,
   }) : assert(
           runtime != null || onSend != null,
           'give the page a runtime to drive the agent, or an onSend that '
@@ -132,6 +135,20 @@ class AiAssistantPage extends StatefulWidget {
   /// saved, so the host opens its create form rather than its editor. Rows are
   /// inert without this -- only the app knows what a recipe looks like.
   final void Function(String entity, AiItem item)? onItemTap;
+
+  /// Put in the composer on first mount, for a caller that already has the
+  /// question -- a voice launch that has finished transcribing, or a deep link
+  /// carrying one.
+  final String? initialPrompt;
+
+  /// Asks [initialPrompt] without waiting for the user to press send.
+  ///
+  /// Off by default, and deliberately: the prompt can come from outside the
+  /// app, and sending it runs tools against the user's data. Turn it on only
+  /// where the text is known to be either the user's own speech or a sentence
+  /// this app composed itself. Only the first mount sends, so a rebuild does
+  /// not ask twice.
+  final bool autoSend;
 
   /// Opens the assistant as its own route.
   static Future<void> show(
@@ -237,6 +254,15 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   void initState() {
     super.initState();
     _reloadSessions();
+    final initial = widget.initialPrompt?.trim();
+    if (initial == null || initial.isEmpty) return;
+    _input.text = initial;
+    if (!widget.autoSend) return;
+    // After the first frame: _send() calls setState, and the confirm dialog
+    // for a mutating tool needs a mounted route to sit on.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_send());
+    });
   }
 
   void _reloadSessions() {

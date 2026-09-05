@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 
 import '../services/api_client.dart';
@@ -9,10 +8,16 @@ import 'portal_password_reset_view.dart';
 
 /// Shared authentication view for all Portal apps using email/password auth.
 ///
-/// Styling is driven entirely by the host app's [ThemeData] — the widget reads
-/// [Theme.of(context)] so it automatically matches whatever theme the app sets
-/// at its root [MaterialApp]. Pass a [PortalAuthConfig] to customise branding
-/// (icon, title, subtitle) and feature flags.
+/// Shape is the host app's, not this file's: fields, buttons and corner radii
+/// come from the app's `inputDecorationTheme`, `filledButtonTheme` and
+/// `outlinedButtonTheme`, so an app restyles its login by restyling its theme
+/// and nothing here has to know. Pass a [PortalAuthConfig] for branding and
+/// feature flags.
+///
+/// The layout is a single column on a flat surface: title, subtitle, fields,
+/// then one primary action pinned to the foot of the screen where a thumb
+/// already is. No wash, no card, no badge — a sign-in screen is a form, and
+/// decoration around it only pushes the action further from the thumb.
 class PortalAuthView extends GetView<PortalAuthController> {
   const PortalAuthView({super.key, required this.config});
 
@@ -24,84 +29,81 @@ class PortalAuthView extends GetView<PortalAuthController> {
     final cs = theme.colorScheme;
 
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              cs.primary.withValues(alpha: 0.1),
-              cs.secondary.withValues(alpha: 0.05),
-              cs.surface,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildHeader(theme, cs),
-                    const SizedBox(height: 48),
-                    _buildFormCard(context, theme, cs),
-                  ],
+      backgroundColor: cs.surface,
+      body: SafeArea(
+        child: Obx(
+          () => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 460),
+                    child: Form(
+                      key: controller.formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _header(context, theme, cs),
+                          const SizedBox(height: 28),
+                          ..._fields(context, cs),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              _footer(context, theme, cs),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(ThemeData theme, ColorScheme cs) {
+  Widget _header(BuildContext context, ThemeData theme, ColorScheme cs) {
+    final signingIn = controller.isLogin.value;
+    // Reached by a push from a gate screen in some apps and as the root route
+    // in others; only the first can go back, and an arrow that does nothing is
+    // worse than no arrow.
+    final canGoBack = Navigator.of(context).canPop();
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: cs.primaryContainer,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: cs.primary.withValues(alpha: 0.3),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: config.appIconImage != null
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.asset(config.appIconImage!, width: 48, height: 48),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 20),
+          child: canGoBack
+              ? IconButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  icon: const Icon(Icons.arrow_back),
+                  padding: EdgeInsets.zero,
+                  alignment: Alignment.centerLeft,
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
                 )
-              : Icon(config.appIcon, size: 40, color: cs.onPrimaryContainer),
-        ).animate().scale(duration: 500.ms, curve: Curves.elasticOut),
-        const SizedBox(height: 24),
+              : config.appIconImage != null
+                  ? Image.asset(config.appIconImage!, width: 40, height: 40)
+                  : Icon(config.appIcon, size: 32, color: cs.onSurface),
+        ),
         Text(
-          config.appTitle,
+          signingIn ? 'Sign in' : 'Create account',
           style: theme.textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w700,
             color: cs.onSurface,
           ),
-        ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.3, end: 0),
+        ),
         const SizedBox(height: 8),
         Text(
-          config.appSubtitle,
+          signingIn ? config.appSubtitle : 'Set up your ${config.appTitle}.',
           style: theme.textTheme.bodyLarge?.copyWith(
             color: cs.onSurfaceVariant,
           ),
-        ).animate().fadeIn(delay: 400.ms),
-        // A visible tell at the moment credentials are typed: a dev/QA
-        // server override should never be silently mistaken for Cloud.
+        ),
+        // A visible tell at the moment credentials are typed: a dev/QA server
+        // override should never be silently mistaken for Cloud.
         if (Get.isRegistered<ApiClient>() && Get.find<ApiClient>().isOverridden)
           Padding(
-            padding: const EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.only(top: 6),
             child: Text(
               'Local server · ${Get.find<ApiClient>().baseUrl}',
               style: theme.textTheme.bodySmall?.copyWith(color: cs.error),
@@ -111,290 +113,191 @@ class PortalAuthView extends GetView<PortalAuthController> {
     );
   }
 
-  Widget _buildFormCard(BuildContext context, ThemeData theme, ColorScheme cs) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+  List<Widget> _fields(BuildContext context, ColorScheme cs) {
+    final signingIn = controller.isLogin.value;
+    return [
+      if (controller.errorMessage.value.isNotEmpty) ...[
+        _errorBanner(cs),
+        const SizedBox(height: 16),
+      ],
+      if (!signingIn) ...[
+        TextFormField(
+          controller: controller.nameController,
+          validator: controller.validateName,
+          textInputAction: TextInputAction.next,
+          decoration: const InputDecoration(hintText: 'Name'),
+        ),
+        const SizedBox(height: 12),
+      ],
+      TextFormField(
+        controller: controller.emailController,
+        validator: controller.validateEmail,
+        keyboardType: TextInputType.emailAddress,
+        textInputAction: TextInputAction.next,
+        decoration: const InputDecoration(hintText: 'Email'),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: controller.formKey,
-          child: Obx(
-            () => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  controller.isLogin.value ? 'Welcome back' : 'Create account',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  controller.isLogin.value
-                      ? 'Sign in to continue'
-                      : 'Sign up to get started',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                if (controller.errorMessage.value.isNotEmpty) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: cs.errorContainer,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.error_outline,
-                            color: cs.onErrorContainer, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            controller.errorMessage.value,
-                            style: TextStyle(color: cs.onErrorContainer),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                if (!controller.isLogin.value) ...[
-                  TextFormField(
-                    controller: controller.nameController,
-                    validator: controller.validateName,
-                    textInputAction: TextInputAction.next,
-                    decoration: InputDecoration(
-                      labelText: 'Name',
-                      prefixIcon: const Icon(Icons.person_outline),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                TextFormField(
-                  controller: controller.emailController,
-                  validator: controller.validateEmail,
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.next,
-                  decoration: InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: const Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: controller.passwordController,
-                  validator: controller.validatePassword,
-                  obscureText: controller.obscurePassword.value,
-                  textInputAction: controller.isLogin.value
-                      ? TextInputAction.done
-                      : TextInputAction.next,
-                  // The keyboard's done key is the last field's submit: without
-                  // this it only dismisses the keyboard and the form sits there.
-                  onFieldSubmitted: (_) {
-                    if (controller.isLogin.value && !controller.isLoading.value) {
-                      controller.submit();
-                    }
-                  },
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        controller.obscurePassword.value
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                      ),
-                      onPressed: controller.togglePasswordVisibility,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                if (controller.isLogin.value) ...[
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: controller.isLoading.value
-                          ? null
-                          : config.onForgotPassword ??
-                                () => showPortalPasswordReset(
-                                  context,
-                                  email: controller.emailController.text,
-                                ),
-                      child: const Text('Forgot password?'),
-                    ),
-                  ),
-                ],
-                if (!controller.isLogin.value) ...[
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: controller.confirmPasswordController,
-                    validator: controller.validateConfirmPassword,
-                    obscureText: controller.obscureConfirmPassword.value,
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) {
-                      if (!controller.isLoading.value) controller.submit();
-                    },
-                    decoration: InputDecoration(
-                      labelText: 'Confirm Password',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          controller.obscureConfirmPassword.value
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                        ),
-                        onPressed: controller.toggleConfirmPasswordVisibility,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed:
-                      controller.isLoading.value ? null : controller.submit,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: controller.isLoading.value
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(
-                          controller.isLogin.value
-                              ? 'Sign In'
-                              : 'Create Account',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                ),
-                if (controller.canUseGoogleSignIn) ...[
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(child: Divider(color: cs.outlineVariant)),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          'or',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      Expanded(child: Divider(color: cs.outlineVariant)),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  OutlinedButton.icon(
-                    onPressed: controller.isLoading.value
-                        ? null
-                        : controller.signInWithGoogle,
-                    icon: const Icon(Icons.g_mobiledata_rounded, size: 22),
-                    label: const Text('Continue with Google'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ],
-                if (controller.canUseDemoLogin) ...[
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: controller.isLoading.value
-                        ? null
-                        : controller.loginWithDemo,
-                    icon: const Icon(Icons.smart_toy_outlined),
-                    label: const Text('Demo Login'),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      controller.isLogin.value
-                          ? "Don't have an account?"
-                          : 'Already have an account?',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: controller.toggleMode,
-                      child: Text(
-                        controller.isLogin.value ? 'Sign Up' : 'Sign In',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
-                ),
-                if (config.showTestServer) ...[
-                  const SizedBox(height: 16),
-                  Obx(
-                    () => TextButton.icon(
-                      onPressed: controller.isTestingServer.value
-                          ? null
-                          : controller.testServerStatus,
-                      icon: controller.isTestingServer.value
-                          ? SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: cs.primary,
-                              ),
-                            )
-                          : Icon(
-                              Icons.health_and_safety_outlined,
-                              size: 18,
-                              color: cs.outline,
-                            ),
-                      label: Text(
-                        controller.isTestingServer.value
-                            ? 'Testing…'
-                            : 'Test server',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: cs.outline,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: controller.passwordController,
+        validator: controller.validatePassword,
+        obscureText: controller.obscurePassword.value,
+        textInputAction:
+            signingIn ? TextInputAction.done : TextInputAction.next,
+        // The keyboard's done key is the last field's submit: without this it
+        // only dismisses the keyboard and the form sits there.
+        onFieldSubmitted: (_) {
+          if (signingIn && !controller.isLoading.value) controller.submit();
+        },
+        decoration: InputDecoration(
+          hintText: 'Password',
+          suffixIcon: IconButton(
+            icon: Icon(
+              controller.obscurePassword.value
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
             ),
+            onPressed: controller.togglePasswordVisibility,
           ),
         ),
       ),
-    ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2, end: 0);
+      if (!signingIn) ...[
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: controller.confirmPasswordController,
+          validator: controller.validateConfirmPassword,
+          obscureText: controller.obscureConfirmPassword.value,
+          textInputAction: TextInputAction.done,
+          onFieldSubmitted: (_) {
+            if (!controller.isLoading.value) controller.submit();
+          },
+          decoration: InputDecoration(
+            hintText: 'Confirm password',
+            suffixIcon: IconButton(
+              icon: Icon(
+                controller.obscureConfirmPassword.value
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+              ),
+              onPressed: controller.toggleConfirmPasswordVisibility,
+            ),
+          ),
+        ),
+      ],
+      if (signingIn)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            onPressed: controller.isLoading.value
+                ? null
+                : config.onForgotPassword ??
+                    () => showPortalPasswordReset(
+                          context,
+                          email: controller.emailController.text,
+                        ),
+            child: const Text('Forgot password?'),
+          ),
+        ),
+    ];
+  }
+
+  Widget _errorBanner(ColorScheme cs) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cs.errorContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, color: cs.onErrorContainer, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              controller.errorMessage.value,
+              style: TextStyle(color: cs.onErrorContainer),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Everything that acts, pinned to the foot. The primary action is the last
+  /// thing above the gesture bar in every state, so it does not move as the
+  /// form grows between sign-in and sign-up.
+  Widget _footer(BuildContext context, ThemeData theme, ColorScheme cs) {
+    final signingIn = controller.isLogin.value;
+    final busy = controller.isLoading.value;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (controller.canUseGoogleSignIn) ...[
+            OutlinedButton.icon(
+              onPressed: busy ? null : controller.signInWithGoogle,
+              icon: const Icon(Icons.g_mobiledata_rounded, size: 22),
+              label: const Text('Continue with Google'),
+            ),
+            const SizedBox(height: 10),
+          ],
+          if (controller.canUseDemoLogin) ...[
+            OutlinedButton.icon(
+              onPressed: busy ? null : controller.loginWithDemo,
+              icon: const Icon(Icons.smart_toy_outlined),
+              label: const Text('Demo login'),
+            ),
+            const SizedBox(height: 10),
+          ],
+          FilledButton(
+            onPressed: busy ? null : controller.submit,
+            child: busy
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text(signingIn ? 'Sign in' : 'Create account'),
+          ),
+          if (config.allowRegistration)
+            TextButton(
+              onPressed: busy ? null : controller.toggleMode,
+              child: Text(
+                signingIn
+                    ? 'Don\'t have an account? Sign up'
+                    : 'Already have an account? Sign in',
+              ),
+            ),
+          if (config.showTestServer)
+            TextButton.icon(
+              onPressed: controller.isTestingServer.value
+                  ? null
+                  : controller.testServerStatus,
+              icon: controller.isTestingServer.value
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: cs.primary,
+                      ),
+                    )
+                  : Icon(
+                      Icons.health_and_safety_outlined,
+                      size: 18,
+                      color: cs.outline,
+                    ),
+              label: Text(
+                controller.isTestingServer.value ? 'Testing…' : 'Test server',
+                style: theme.textTheme.bodySmall?.copyWith(color: cs.outline),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }

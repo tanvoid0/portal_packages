@@ -59,6 +59,11 @@ class PortalSettingsLabels {
     this.loading = 'Loading…',
     this.tryAgain = 'Try again',
     this.install = 'Install',
+    this.update = 'Update',
+    this.uninstall = 'Uninstall',
+    this.uninstallConfirmMessage =
+        'Android will ask you to confirm. Anything this app stored on the '
+            'device goes with it; what is on the server does not.',
     this.open = 'Open',
     this.installAll = 'Install all',
     this.downloading = 'Downloading',
@@ -118,6 +123,9 @@ class PortalSettingsLabels {
   final String loading;
   final String tryAgain;
   final String install;
+  final String update;
+  final String uninstall;
+  final String uninstallConfirmMessage;
   final String open;
   final String installAll;
   final String downloading;

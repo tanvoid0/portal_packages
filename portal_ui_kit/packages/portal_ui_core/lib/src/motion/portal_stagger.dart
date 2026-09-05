@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
 import '../theme/portal_ui_theme.dart';
 
@@ -36,10 +35,32 @@ class PortalStaggeredChild extends StatelessWidget {
     final delay = baseDelay ?? motion.staggerStep;
     final reveal = duration ?? motion.listRevealDuration;
 
-    return child
-        .animate()
-        .fadeIn(duration: reveal, delay: delay * index)
-        .slideY(begin: slideBegin, duration: reveal, delay: delay * index);
+    // The stagger is an Interval inside one animation rather than a real delay
+    // because the tween's target never moves: a reorder changes this widget's
+    // index, and therefore its duration and curve, but not its `end`, so
+    // TweenAnimationBuilder carries on instead of restarting. flutter_animate
+    // folded the delay into its own duration and replayed whenever that
+    // duration changed — which meant ticking one row off re-revealed every row
+    // beneath it.
+    final step = delay * index;
+    final total = reveal + step;
+    final startFraction = total.inMicroseconds == 0
+        ? 0.0
+        : step.inMicroseconds / total.inMicroseconds;
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: total,
+      curve: Interval(startFraction, 1, curve: motion.standard),
+      builder: (context, t, child) => Opacity(
+        opacity: t,
+        child: Transform.translate(
+          offset: Offset(0, (1 - t) * slideBegin * 100),
+          child: child,
+        ),
+      ),
+      child: child,
+    );
   }
 }
 

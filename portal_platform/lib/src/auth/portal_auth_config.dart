@@ -13,7 +13,13 @@ class PortalAuthConfig {
     this.appSubtitle = 'Sign in to continue',
     this.showTestServer = false,
     this.onForgotPassword,
+    this.allowRegistration = true,
   });
+
+  /// Whether the sign-up half of the form is reachable. Off for an app whose
+  /// server has no registration endpoint — otherwise the toggle offers a
+  /// screen that can only ever fail.
+  final bool allowRegistration;
 
   /// Icon displayed in the auth header (e.g. `Icons.restaurant_menu`).
   /// Used as fallback when [appIconImage] is not provided.

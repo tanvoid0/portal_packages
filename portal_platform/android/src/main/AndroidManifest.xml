@@ -1,0 +1,20 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      Package visibility for the sibling Portal apps, named one by one.
+
+      The alternative is QUERY_ALL_PACKAGES, which is Play-restricted and would
+      be merged into every app that depends on this package. Nothing here needs
+      to see a package that is not a Portal app, so this list is the whole
+      requirement. A slug added to updates.json needs a line here too, or its
+      row reads as "not installed" on Android 11+.
+    -->
+    <queries>
+        <package android:name="com.tanvoid0.portal_gym" />
+        <package android:name="com.tanvoid0.portal_recipe" />
+        <package android:name="com.tanvoid0.portal_shopping" />
+        <package android:name="com.tanvoid0.portal_lifestyle" />
+        <package android:name="com.tanvoid0.portal_finance" />
+        <package android:name="com.tanvoid0.portal_task" />
+        <package android:name="com.tanvoid0.portallauncher" />
+    </queries>
+</manifest>

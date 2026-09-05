@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../update/portal_installed_apps.dart';
 import '../update/portal_release.dart';
 import '../update/portal_update_service.dart';
 import '../update/portal_update_tile.dart';
@@ -27,12 +28,14 @@ bool portalCanInstallApps(PortalUpdateService service) =>
 /// Safe to drop into an app's own settings screen; `portal_task` does exactly
 /// that. Pass [labels] to translate it, [tileBuilder] to restyle it.
 ///
-/// Installed apps say **Open** and launch; the rest say **Install**. That works
-/// off each app's `portal-x://` scheme rather than a package query, so the only
-/// thing this app learns about the device is whether a Portal app answers a
-/// Portal scheme. Both halves need the `<queries>` block in the manifest —
-/// without it `canLaunchUrl` is false on Android 11+ and everything looks
-/// uninstalled, which is why [portalAppUri] and the manifests must agree.
+/// A row says **Install** when the app is absent, **Update** when the published
+/// `versionCode` is higher than the installed one, and **Open** otherwise;
+/// installed rows also carry an uninstall button. The installed version comes
+/// from the PackageManager through [PortalInstalledApps], scoped to the Portal
+/// packages named in this package's own `<queries>` block — an app whose
+/// applicationId is not listed there reads as not installed. Opening still
+/// goes through the `portal-x://` scheme, which needs the `<queries>` intent
+/// block in each app manifest.
 class PortalAppsSection extends StatefulWidget {
   const PortalAppsSection({
     super.key,
@@ -46,11 +49,12 @@ class PortalAppsSection extends StatefulWidget {
   final EdgeInsetsGeometry? contentPadding;
   final PortalSettingsLabels labels;
 
-  /// Renders one app row. Given the release, whether tapping it opens or
-  /// installs, and the callback that does it — so an app with its own row
-  /// widget can use it instead of the [ListTile] here.
+  /// Renders one app row. Given the release, the installed build if there is
+  /// one, what tapping it does, and the callback that does it — so an app with
+  /// its own row widget can use it instead of the [ListTile] here.
   final Widget Function(
     PortalRelease release,
+    PortalInstalledApp? installed,
     PortalAppAction action,
     VoidCallback onTap,
   )? tileBuilder;
@@ -64,11 +68,11 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
   List<PortalRelease>? _apps;
   String? _error;
 
-  /// Slugs that answered their scheme. Absent means "not installed, or we
-  /// could not tell" — both lead to Install, which is the safe offer either
-  /// way: Android turns an install of something already present into an
-  /// update rather than a failure.
-  final _installed = <String>{};
+  /// Installed builds by slug. Absent means "not installed, or we could not
+  /// tell" — both lead to Install, which is the safe offer either way: Android
+  /// turns an install of something already present into an update rather than
+  /// a failure.
+  final _installed = <String, PortalInstalledApp>{};
 
   bool _refreshing = false;
   bool _batching = false;
@@ -95,16 +99,17 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
     if (state == AppLifecycleState.resumed && _apps != null) _probeInstalled();
   }
 
-  /// Asks each listed app whether it is there. Cheap enough to repeat, but not
-  /// per-rebuild: it is a platform round-trip per app and the list rebuilds on
-  /// every scroll frame.
+  /// Asks each listed app what version is installed. Cheap enough to repeat,
+  /// but not per-rebuild: it is a platform round-trip per app and the list
+  /// rebuilds on every scroll frame.
   Future<void> _probeInstalled() async {
     final apps = _apps;
     if (apps == null) return;
     if (mounted) setState(() => _refreshing = true);
-    final found = <String>{};
+    final found = <String, PortalInstalledApp>{};
     for (final app in apps) {
-      if (await _isInstalled(app.slug)) found.add(app.slug);
+      final info = await PortalInstalledApps.version(app.slug);
+      if (info != null) found[app.slug] = info;
     }
     if (!mounted) return;
     setState(() {
@@ -134,22 +139,61 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
     }
   }
 
-  /// Never throws: a platform that has no answer is simply not installed.
-  static Future<bool> _isInstalled(String slug) async {
-    try {
-      return await canLaunchUrl(portalAppUri(slug));
-    } catch (_) {
-      return false;
-    }
-  }
-
+  /// Scheme first, launch activity second.
+  ///
+  /// The scheme is the app's own front door and lands on whatever it routes
+  /// `open` to. But it only exists if that app declared the intent filter —
+  /// `portal_launcher` declares none — and `launchUrl` throws rather than
+  /// returning false when nothing handles it. The PackageManager fallback
+  /// needs no cooperation from the other side.
   Future<void> _open(PortalRelease release) async {
     try {
-      await launchUrl(portalAppUri(release.slug));
+      if (await launchUrl(portalAppUri(release.slug))) return;
     } catch (_) {
-      // The app answered the query and then would not open. Nothing useful to
-      // say about that beyond leaving the row alone.
+      // Nothing registered for the scheme; the fallback below is the answer.
     }
+    await PortalInstalledApps.launch(release.slug);
+  }
+
+  PortalAppAction _actionFor(PortalRelease release) =>
+      portalAppActionFor(release, _installed[release.slug]);
+
+  void _tap(PortalRelease release) => switch (_actionFor(release)) {
+        PortalAppAction.open => _open(release),
+        PortalAppAction.install || PortalAppAction.update => _install(release),
+      };
+
+  /// Hands the app to Android's uninstall confirmation.
+  ///
+  /// Confirmed here first: Android's own prompt is easy to wave through, and
+  /// this row is one tap away from Open. Whether it actually went through is
+  /// only knowable by asking again, which the resume re-probe does — the
+  /// system UI reports nothing back.
+  Future<void> _uninstall(PortalRelease release) async {
+    final labels = widget.labels;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${labels.uninstall} ${release.displayName}?'),
+        content: Text(labels.uninstallConfirmMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(labels.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(labels.uninstall),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await PortalInstalledApps.uninstall(release.slug);
+    // The system prompt may never have opened (an app that vanished between
+    // the probe and the tap), in which case nothing backgrounds this app and
+    // no resume fires.
+    await _probeInstalled();
   }
 
   Future<void> _install(PortalRelease release) async {
@@ -157,7 +201,8 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
       context,
       widget.service,
       release,
-      title: '${widget.labels.install} ${release.displayName}',
+      title: '${_actionFor(release) == PortalAppAction.update ? widget.labels.update : widget.labels.install} '
+          '${release.displayName}',
       // Not this app's build, so a "not now" must not touch this app's
       // dismissed-version key.
       rememberRefusal: false,
@@ -317,20 +362,20 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
       );
     }
 
-    final pending =
-        apps.where((a) => !_installed.contains(a.slug)).toList(growable: false);
+    // Missing and out-of-date both count: to Android an install of a newer
+    // build of something present is an update, so one batch covers both.
+    final pending = apps
+        .where((a) => _actionFor(a) != PortalAppAction.open)
+        .toList(growable: false);
 
     return Column(
       children: [
         for (final app in apps)
           widget.tileBuilder?.call(
                 app,
-                _installed.contains(app.slug)
-                    ? PortalAppAction.open
-                    : PortalAppAction.install,
-                () => _installed.contains(app.slug)
-                    ? _open(app)
-                    : _install(app),
+                _installed[app.slug],
+                _actionFor(app),
+                () => _tap(app),
               ) ??
               ListTile(
                 contentPadding: padding,
@@ -339,25 +384,51 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
                   child: Icon(portalAppIconFor(app.slug), color: cs.onSurfaceVariant),
                 ),
                 title: Text(app.displayName),
-                subtitle: Text(
-                  [
-                    if (app.versionName.isNotEmpty) 'v${app.versionName}',
-                    if (app.readableSize.isNotEmpty) app.readableSize,
-                  ].join('  ·  '),
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: cs.onSurfaceVariant),
-                ),
-                trailing: _installed.contains(app.slug)
-                    ? TextButton(
-                        onPressed: () => _open(app),
-                        child: Text(labels.open),
-                      )
-                    : TextButton(
-                        onPressed: () => _install(app),
-                        child: Text(labels.install),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      portalAppVersionLine(app, _installed[app.slug]),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: _actionFor(app) == PortalAppAction.update
+                                ? cs.primary
+                                : cs.onSurfaceVariant,
+                          ),
+                    ),
+                    // What the update actually changes. Only on the rows where
+                    // it is a decision — on an up-to-date row it would be the
+                    // notes for the build already installed, which is history.
+                    if (_actionFor(app) == PortalAppAction.update &&
+                        (app.notes?.isNotEmpty ?? false))
+                      Text(
+                        app.notes!,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
                       ),
+                  ],
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_installed.containsKey(app.slug))
+                      IconButton(
+                        tooltip: labels.uninstall,
+                        onPressed: () => _uninstall(app),
+                        icon: const Icon(Icons.delete_outline_rounded),
+                      ),
+                    TextButton(
+                      onPressed: () => _tap(app),
+                      child: Text(switch (_actionFor(app)) {
+                        PortalAppAction.open => labels.open,
+                        PortalAppAction.install => labels.install,
+                        PortalAppAction.update => labels.update,
+                      }),
+                    ),
+                  ],
+                ),
               ),
         // Only worth offering for more than one: for a single app it is the
         // row's own button with an extra confirmation in front of it.
@@ -404,11 +475,50 @@ IconData portalAppIconFor(String slug) => switch (slug) {
       'portal-lifestyle' => Icons.spa_outlined,
       'portal-finance' => Icons.account_balance_outlined,
       'portal-task' => Icons.task_alt,
+      'portal-launcher' => Icons.home_outlined,
       _ => Icons.apps_outlined,
     };
 
 /// What tapping an app row does.
-enum PortalAppAction { open, install }
+enum PortalAppAction { open, install, update }
+
+/// What a row offers for [release] given the [installed] build, if any.
+///
+/// A published build *behind* what is installed is Open, not a downgrade
+/// offer: local builds carry a higher commit count than the last publish, and
+/// Android refuses to install an older versionCode anyway.
+PortalAppAction portalAppActionFor(
+  PortalRelease release,
+  PortalInstalledApp? installed,
+) {
+  if (installed == null) return PortalAppAction.install;
+  return release.versionCode > installed.versionCode
+      ? PortalAppAction.update
+      : PortalAppAction.open;
+}
+
+/// `v1.2.0` when it matches, `v1.2.0 → v1.4.0` when the publish is ahead
+/// of what is installed. Size trails both; an app that is not installed shows
+/// the published version alone.
+String portalAppVersionLine(
+  PortalRelease release,
+  PortalInstalledApp? installed,
+) {
+  final latest = release.versionName.isEmpty ? '' : 'v${release.versionName}';
+  final current = (installed == null || installed.versionName.isEmpty)
+      ? ''
+      : 'v${installed.versionName}';
+  final version = switch (portalAppActionFor(release, installed)) {
+    PortalAppAction.update when current.isNotEmpty && latest.isNotEmpty =>
+      '$current → $latest',
+    PortalAppAction.open when current.isNotEmpty => current,
+    _ => latest,
+  };
+  return [
+    if (version.isNotEmpty) version,
+    if (release.readableSize.isNotEmpty) release.readableSize,
+  ].join('  ·  ');
+}
 
 /// The scheme a Portal app answers on: `portal-gym` -> `portal-gym://open`.
 ///

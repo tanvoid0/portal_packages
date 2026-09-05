@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:app_links/app_links.dart';
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
 import '../config/app_config.dart';
@@ -29,6 +30,7 @@ class DeepLinkService extends GetxService {
 
   /// Call once after the first frame (e.g. from the root app widget).
   Future<void> attach() async {
+    await _awaitNavigator();
     if (!_initialConsumed) {
       _initialConsumed = true;
       final initial = await _appLinks.getInitialLink();
@@ -49,6 +51,21 @@ class DeepLinkService extends GetxService {
         );
       },
     );
+  }
+
+  /// Blocks until there is a router to navigate with.
+  ///
+  /// Bootstrap schedules [attach] in a post-frame callback, but the startup
+  /// gate draws its own frames from a plain MaterialApp while it works -- so
+  /// that callback fires several frames before GetMaterialApp exists. Get's
+  /// contextless navigation throws in that window, and [attach] is started
+  /// unawaited, so the throw is swallowed: a cold deep link silently opened
+  /// the app on its normal route instead. Bounded at 120 frames (~2s at 60Hz)
+  /// so an app that never builds a router cannot hang here.
+  Future<void> _awaitNavigator() async {
+    for (var i = 0; i < 120 && Get.key.currentContext == null; i++) {
+      await WidgetsBinding.instance.endOfFrame;
+    }
   }
 
   /// After login / register success: navigate to pending target or [fallback].
