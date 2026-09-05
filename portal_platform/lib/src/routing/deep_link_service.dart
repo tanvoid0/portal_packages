@@ -30,11 +30,11 @@ class DeepLinkService extends GetxService {
 
   /// Call once after the first frame (e.g. from the root app widget).
   Future<void> attach() async {
-    await _awaitNavigator();
     if (!_initialConsumed) {
       _initialConsumed = true;
       final initial = await _appLinks.getInitialLink();
       if (initial != null) {
+        await _awaitNavigator();
         await handleUri(initial);
       }
     }
@@ -62,6 +62,10 @@ class DeepLinkService extends GetxService {
   /// unawaited, so the throw is swallowed: a cold deep link silently opened
   /// the app on its normal route instead. Bounded at 120 frames (~2s at 60Hz)
   /// so an app that never builds a router cannot hang here.
+  ///
+  /// Called only once there is a launch link to deliver. `endOfFrame` never
+  /// completes unless something is driving frames, so waiting unconditionally
+  /// in [attach] hangs any widget test that calls it without pumping.
   Future<void> _awaitNavigator() async {
     for (var i = 0; i < 120 && Get.key.currentContext == null; i++) {
       await WidgetsBinding.instance.endOfFrame;

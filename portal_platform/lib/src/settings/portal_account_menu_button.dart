@@ -20,19 +20,12 @@ class PortalAccountMenuButton extends StatelessWidget {
     this.settingsRoute,
     this.labels = const PortalSettingsLabels(),
     this.radius = 18,
-    this.onSignOut,
   });
 
   final String? settingsRoute;
   final PortalSettingsLabels labels;
   final double radius;
 
-  /// Overrides the default [SessionController.signOut] when an app keeps a
-  /// second, app-local auth stack alongside the shared session (portal_finance:
-  /// its dashboard is otherwise the only sign-out entry point, and the shared
-  /// sign-out alone would clear this menu's session while leaving the rest of
-  /// the app's screens still showing the signed-in user's data).
-  final Future<void> Function()? onSignOut;
 
   Future<void> _confirmSignOut(
     BuildContext context,
@@ -58,7 +51,7 @@ class PortalAccountMenuButton extends StatelessWidget {
         ],
       ),
     );
-    if (confirmed == true) await (onSignOut?.call() ?? session.signOut());
+    if (confirmed == true) await session.signOut();
   }
 
   @override

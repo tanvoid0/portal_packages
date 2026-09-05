@@ -16,32 +16,7 @@ import '../session/session_controller.dart';
 /// Shared authentication controller used by all Portal apps that use
 /// email/password auth. Handles login, registration, demo login, and
 /// optional server health-check.
-/// How an app hands the shared auth UI its own credential calls.
-///
-/// Without this the controller signs in through [ApiClient], which writes the
-/// shared [TokenStorage] directly. An app that keeps its own token store —
-/// Finance does — passes its own [login] so the shared form drives the stack
-/// the rest of that app reads, instead of a second, parallel session.
-class PortalAuthCredentials {
-  const PortalAuthCredentials({required this.login, this.register});
-
-  final Future<void> Function({required String email, required String password})
-      login;
-
-  /// Null when the app has no registration endpoint.
-  final Future<void> Function({
-    required String email,
-    required String password,
-    required String name,
-  })? register;
-}
-
 class PortalAuthController extends GetxController {
-  PortalAuthController({this.credentials});
-
-  /// The host app's own credential calls, if it has them.
-  final PortalAuthCredentials? credentials;
-
   final ApiClient _apiClient = Get.find<ApiClient>();
   final AppConfig _appConfig = Get.find<AppConfig>();
 
@@ -143,27 +118,13 @@ class PortalAuthController extends GetxController {
       final email = emailController.text.trim();
       final password = passwordController.text;
       if (isLogin.value) {
-        final override = credentials?.login;
-        if (override != null) {
-          await override(email: email, password: password);
-        } else {
-          await _apiClient.login(email: email, password: password);
-        }
+        await _apiClient.login(email: email, password: password);
       } else {
-        final override = credentials?.register;
-        if (override != null) {
-          await override(
-            email: email,
-            password: password,
-            name: nameController.text.trim(),
-          );
-        } else {
-          await _apiClient.register(
-            email: email,
-            password: password,
-            name: nameController.text.trim(),
-          );
-        }
+        await _apiClient.register(
+          email: email,
+          password: password,
+          name: nameController.text.trim(),
+        );
       }
       authenticated = true;
 
