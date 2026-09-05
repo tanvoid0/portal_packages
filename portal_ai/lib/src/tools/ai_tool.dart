@@ -328,3 +328,57 @@ AiTool? resolveTool(List<AiTool> tools, String name) {
   final bare = tools.where((t) => t.name == name).toList();
   return bare.length == 1 ? bare.first : null;
 }
+
+/// Picks the rows of [pool] that a tool call named.
+///
+/// Models refer to a row by whichever handle is in front of them: the id a
+/// list tool printed, or the name the user said. Both are accepted, ids
+/// first, so `add_item`'s echo and the user's own words resolve alike.
+///
+/// [keys] usually comes from [AiToolCall.argStringList], which reads a JSON
+/// array and a comma-separated string the same way -- so one call can name
+/// several rows. That matters: the agent loop spends one step per tool call
+/// and stops after a handful, so "tick off everything in the fridge" has to
+/// be one call, not ten.
+///
+/// Duplicates collapse. Throws when nothing matched, naming [noun] and the
+/// [listTool] that would have printed the right handles -- a model given
+/// that can correct itself on the next step, where a bare failure ends the
+/// run.
+List<T> resolveAiRows<T>({
+  required List<String> keys,
+  required List<T> pool,
+  required String Function(T row) idOf,
+  required String Function(T row) nameOf,
+  required String noun,
+  required String listTool,
+}) {
+  if (keys.isEmpty) throw ArgumentError('no $noun given');
+  final matched = <T>[];
+  final missing = <String>[];
+  for (final key in keys) {
+    final needle = key.trim().toLowerCase();
+    final row = pool.firstWhereOrNull((r) => idOf(r) == key) ??
+        pool.firstWhereOrNull((r) => nameOf(r).toLowerCase() == needle);
+    if (row == null) {
+      missing.add(key);
+    } else if (!matched.any((m) => idOf(m) == idOf(row))) {
+      matched.add(row);
+    }
+  }
+  if (matched.isEmpty) {
+    throw ArgumentError(
+      'no $noun matched ${missing.join(', ')} -- try $listTool first',
+    );
+  }
+  return matched;
+}
+
+extension _FirstWhereOrNull<T> on List<T> {
+  T? firstWhereOrNull(bool Function(T) test) {
+    for (final item in this) {
+      if (test(item)) return item;
+    }
+    return null;
+  }
+}
