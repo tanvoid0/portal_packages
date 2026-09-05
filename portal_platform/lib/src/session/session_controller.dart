@@ -45,6 +45,18 @@ class SessionController extends GetxController {
     await reloadFromStorage();
   }
 
+  /// Deletes the account and everything on the server that belongs to it,
+  /// then signs out locally.
+  ///
+  /// Irreversible, and Play requires every Portal app to offer it. The local
+  /// teardown only runs once the server has confirmed the delete — a failed
+  /// request must leave the user signed in and told, not signed out of an
+  /// account that still exists.
+  Future<void> deleteAccount() async {
+    await _api.delete('/auth/me');
+    await signOut();
+  }
+
   /// Clears tokens, session cache, pending deep links, and returns to login.
   Future<void> signOut() async {
     await _api.logout();

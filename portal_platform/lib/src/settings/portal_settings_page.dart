@@ -165,8 +165,10 @@ class PortalSettingsPage extends StatelessWidget {
               PortalAppVersionListTile(title: labels.appVersion),
             if (Get.isRegistered<DeviceSecurityController>())
               const PortalDeviceSecuritySettingsTile(contentPadding: _padding),
-            if (Get.isRegistered<SessionController>())
+            if (Get.isRegistered<SessionController>()) ...[
               _SignOutTile(labels: labels),
+              _DeleteAccountTile(labels: labels),
+            ],
           ]));
       }
     }
@@ -275,6 +277,61 @@ class _SignOutTile extends StatelessWidget {
       leading: Icon(Icons.logout_rounded, color: cs.error),
       title: Text(labels.signOut, style: TextStyle(color: cs.error)),
       onTap: () => _signOut(context),
+    );
+  }
+}
+
+/// Deletes the account server-side, then signs out.
+///
+/// Play requires an in-app deletion path for any app that creates accounts,
+/// so this belongs here rather than in one app's own settings.
+class _DeleteAccountTile extends StatelessWidget {
+  const _DeleteAccountTile({required this.labels});
+
+  final PortalSettingsLabels labels;
+
+  Future<void> _delete(BuildContext context) async {
+    final session = Get.find<SessionController>();
+    final cs = Theme.of(context).colorScheme;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(labels.deleteAccountConfirmTitle),
+        content: Text(labels.deleteAccountConfirmMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(labels.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: cs.error),
+            child: Text(labels.deleteAccount),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await session.deleteAccount();
+    } catch (error) {
+      // Still signed in, and the account still exists. Saying nothing here
+      // would read as a delete that worked.
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${labels.deleteAccountFailed} $error')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return ListTile(
+      contentPadding: PortalSettingsPage._padding,
+      leading: Icon(Icons.person_remove_rounded, color: cs.error),
+      title: Text(labels.deleteAccount, style: TextStyle(color: cs.error)),
+      onTap: () => _delete(context),
     );
   }
 }

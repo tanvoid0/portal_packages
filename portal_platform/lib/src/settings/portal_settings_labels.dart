@@ -25,6 +25,12 @@ class PortalSettingsLabels {
     this.signOut = 'Sign out',
     this.signOutConfirmTitle = 'Sign out?',
     this.signOutConfirmMessage = 'You will need to sign in again.',
+    this.deleteAccount = 'Delete account',
+    this.deleteAccountConfirmTitle = 'Delete your account?',
+    this.deleteAccountConfirmMessage =
+        'This deletes your Portal account and everything stored against it on '
+            'the server, in every Portal app. It cannot be undone.',
+    this.deleteAccountFailed = 'Could not delete your account.',
     this.notSignedIn = 'Not signed in',
     this.appVersion = 'App version',
     this.serverTitle = 'Server',
@@ -81,6 +87,10 @@ class PortalSettingsLabels {
   final String signOut;
   final String signOutConfirmTitle;
   final String signOutConfirmMessage;
+  final String deleteAccount;
+  final String deleteAccountConfirmTitle;
+  final String deleteAccountConfirmMessage;
+  final String deleteAccountFailed;
   final String notSignedIn;
   final String appVersion;
 
