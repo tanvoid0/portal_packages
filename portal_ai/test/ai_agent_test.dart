@@ -73,6 +73,18 @@ void main() {
     expect(extractJsonObject('{broken'), isNull);
   });
 
+  test('ignores a reasoning block that quotes JSON of its own', () {
+    expect(
+      extractJsonObject(
+        '<think>They want {"exercise_ids": [...]}, so I will pick four.</think>'
+        '{"exercise_ids":["a","b"]}',
+      ),
+      {
+        'exercise_ids': ['a', 'b']
+      },
+    );
+  });
+
   test('runs a tool then finishes, coercing string args', () async {
     final client = _ScriptedClient([
       '{"tool":"add_item","args":{"name":"Milk","quantity":"2"}}',

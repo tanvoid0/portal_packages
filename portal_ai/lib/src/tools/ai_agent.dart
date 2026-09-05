@@ -11,8 +11,13 @@ import 'ai_tool.dart';
 /// model batching several tool calls into one turn) yields its first object;
 /// the agent loop asks again for the rest. Returns null when there is nothing
 /// to parse.
+///
+/// A reasoning model's `<think>` block is dropped first. It is prose, it
+/// quotes the very braces being looked for, and every caller wants the answer
+/// rather than the reasoning — leaving that to each caller is what made a
+/// thinking model look like an unreachable one.
 Map<String, dynamic>? extractJsonObject(String raw) {
-  final trimmed = raw.trim();
+  final trimmed = splitThinking(raw).rest.trim();
   for (final delimiters in const [
     ['{', '}'],
     ['[', ']'],
