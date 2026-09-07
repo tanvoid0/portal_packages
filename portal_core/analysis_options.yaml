@@ -19,6 +19,8 @@ analyzer:
     # there is no field to move it to, the fields are generated. This is the
     # suppression freezed's own docs prescribe.
     invalid_annotation_target: ignore
+  exclude:
+    - build/**
 
 # Uncomment the following section to specify additional rules.
 
