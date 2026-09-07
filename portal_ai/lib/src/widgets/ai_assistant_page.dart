@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../chat/ai_chat_export.dart';
+import '../chat/ai_error_message.dart';
 import '../chat/ai_chat_session.dart';
 import '../chat/ai_proposal.dart';
 import '../chat/ai_suggestion.dart';
@@ -617,9 +618,21 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   /// [refill] puts the question's own text back in the composer — that's
   /// "edit". A plain delete (`refill: false`) just removes it.
   Future<void> _rewindToLastQuestion({bool refill = true}) async {
-    final turns = _visibleTurns;
-    final index = turns.lastIndexWhere((t) => t.isUser);
+    final index = _visibleTurns.lastIndexWhere((t) => t.isUser);
     if (index < 0) return;
+    await _rewindTo(index, refill: refill);
+  }
+
+  /// [index] is the question to go back to. Everything from it onwards goes,
+  /// which for an older question means dropping answers the user has read --
+  /// so that case asks first.
+  Future<void> _rewindTo(int index, {bool refill = true}) async {
+    final turns = _visibleTurns;
+    if (index < 0 || index >= turns.length) return;
+    // Its own answer going with it is the point; anything beyond that is
+    // work the user has already read, so ask.
+    final after = turns.length - index - 1;
+    if (after > 1 && !await _confirmRewind(after)) return;
     setState(() {
       if (refill) {
         _input.text = turns[index].content;
@@ -632,7 +645,31 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     if (widget.onSend != null) await widget.onRewind?.call(index);
   }
 
-  Future<void> _deleteLastQuestion() => _rewindToLastQuestion(refill: false);
+  Future<bool> _confirmRewind(int dropped) async {
+    final labels = widget.labels;
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        content: Text(labels.rewindWarning.replaceAll('@count', '$dropped')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(labels.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(labels.rewind),
+          ),
+        ],
+      ),
+    );
+    return approved ?? false;
+  }
+
+  /// Host-driven mode owns its own transcript; without an [onRewind] to tell
+  /// it, going back would only lie to the screen.
+  bool _canRewind(AiChatTurn turn) =>
+      turn.isUser && (widget.onSend == null || widget.onRewind != null);
 
   Future<void> _retry() async {
     await _rewindToLastQuestion();
@@ -655,7 +692,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         await send(prompt);
         if (mounted && !_cancelled) _followNewest();
       } catch (e) {
-        if (mounted && !_cancelled) setState(() => _error = e.toString());
+        if (mounted && !_cancelled) setState(() => _error = _messageFor(e));
       } finally {
         if (mounted) setState(() => _running = false);
       }
@@ -732,7 +769,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     } catch (e) {
       if (!mounted || _cancelled) return;
       setState(() {
-        _error = e.toString();
+        _error = _messageFor(e);
         _streamingReply = null;
       });
       // Keep the question even though the answer failed: without this the
@@ -904,6 +941,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     return approved ?? false;
   }
 
+  String _messageFor(Object error) =>
+      aiErrorMessage(error, offline: widget.labels.offline);
+
   void _copyTurn(AiChatTurn turn) {
     Clipboard.setData(ClipboardData(text: turn.content));
     HapticFeedback.selectionClick();
@@ -1061,15 +1101,19 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                         onCopy: () => _copyTurn(turn),
                         copyLabel: widget.labels.copy,
                         copiedLabel: widget.labels.copied,
-                        // Only the newest question can be acted on:
-                        // rewriting or dropping an older one would mean
-                        // throwing away every answer after it, which is a
-                        // bigger promise than "let me fix that typo".
-                        onEdit: !_busy && identical(turn, _lastUserTurn)
-                            ? () => _rewindToLastQuestion()
+                        // Any question can be reworked, not just the newest:
+                        // the mistake worth fixing is often three turns back.
+                        // Going back drops the answers after it, so
+                        // _rewindTo asks before throwing away more than the
+                        // last exchange.
+                        onEdit: !_busy && _canRewind(turn)
+                            ? () => _rewindTo(_visibleTurns.indexOf(turn))
                             : null,
-                        onDelete: !_busy && identical(turn, _lastUserTurn)
-                            ? _deleteLastQuestion
+                        onDelete: !_busy && _canRewind(turn)
+                            ? () => _rewindTo(
+                                _visibleTurns.indexOf(turn),
+                                refill: false,
+                              )
                             : null,
                         editLabel: widget.labels.edit,
                         deleteLabel: widget.labels.delete,

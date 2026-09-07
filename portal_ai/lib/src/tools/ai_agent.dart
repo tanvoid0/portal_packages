@@ -88,6 +88,7 @@ class AiAgent {
     required this.tools,
     this.appDescription = '',
     this.maxSteps = 6,
+    this.historyBudget = 6000,
   });
 
   final AiCompletionClient client;
@@ -96,6 +97,17 @@ class AiAgent {
   /// One or two lines telling the model what app it is acting inside.
   final String appDescription;
   final int maxSteps;
+
+  /// How much earlier conversation travels with a follow-up, in characters.
+  ///
+  /// The whole thread used to go every time, so a long conversation cost more
+  /// on each turn than the one before it and eventually stopped fitting at
+  /// all. The newest turns are the ones a follow-up refers to, so those are
+  /// what survive the cut.
+  ///
+  /// ponytail: oldest turns are dropped, not summarised. Summarising means
+  /// another model call per send; add one if threads routinely outgrow this.
+  final int historyBudget;
 
   /// Runs [prompt] to completion.
   ///
@@ -281,10 +293,25 @@ Rules:
     List<String> transcript,
     List<AiChatTurn> history,
   ) {
-    final earlier = history
-        .where((t) => t.content.trim().isNotEmpty)
-        .map((t) => '${t.isUser ? 'User' : 'Assistant'}: ${t.content.trim()}')
-        .join('\n');
+    final kept = <String>[];
+    var budget = historyBudget;
+    var dropped = 0;
+    // Filled newest-first so what falls off the end is the oldest.
+    for (final turn in history.reversed) {
+      final content = turn.content.trim();
+      if (content.isEmpty) continue;
+      final line = '${turn.isUser ? 'User' : 'Assistant'}: $content';
+      if (line.length > budget) {
+        dropped++;
+        continue;
+      }
+      budget -= line.length;
+      kept.add(line);
+    }
+    final earlier = [
+      if (dropped > 0) '[$dropped earlier turns omitted]',
+      ...kept.reversed,
+    ].join('\n');
     return [
       if (earlier.isNotEmpty) 'Earlier in this conversation:\n$earlier\n',
       'User request: $prompt',

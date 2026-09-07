@@ -38,6 +38,12 @@ class AiChatLabels {
     this.renameTitle = 'Rename chat',
     this.cancel = 'Cancel',
     this.save = 'Save',
+    this.offline =
+        'No connection. The assistant needs one to answer -- try again once '
+        'you are back online.',
+    this.rewind = 'Go back',
+    this.rewindWarning =
+        'Going back to this message drops the @count messages after it.',
     this.copy = 'Copy',
     this.copied = 'Copied',
     this.deleted = 'Chat deleted',
@@ -107,6 +113,14 @@ class AiChatLabels {
   final String save;
   final String deleted;
   final String undo;
+
+  /// Confirming a rewind past the last exchange. `@count` is the number of
+  /// messages that would be dropped.
+  final String rewind;
+  final String rewindWarning;
+
+  /// Shown instead of a raw socket error when the network is the problem.
+  final String offline;
 
   /// Per-message copy, and what the snackbar says once it lands.
   final String copy;

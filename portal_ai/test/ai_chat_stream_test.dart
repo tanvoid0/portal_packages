@@ -117,4 +117,35 @@ void main() {
 
     expect(clipboard, ['the answer']);
   });
+
+  testWidgets('an older question can be reworked, once confirmed', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = await PrefsAiChatStore.open('portal_test_rewind');
+    await tester.pumpWidget(
+      _page(_DrippingClient(['{"final": "an answer"}']), store: store),
+    );
+
+    for (final question in ['first question', 'second question']) {
+      await tester.enterText(find.byType(TextField), question);
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+    }
+    expect(find.text('second question'), findsOneWidget);
+
+    await tester.longPress(find.text('first question'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit').last);
+    await tester.pumpAndSettle();
+
+    // Three messages would go, so it asks first.
+    expect(find.textContaining('drops the 3 messages'), findsOneWidget);
+    await tester.tap(find.text('Go back'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('second question'), findsNothing);
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.controller?.text, 'first question');
+  });
 }
