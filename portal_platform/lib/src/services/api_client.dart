@@ -567,6 +567,66 @@ class ApiClient extends GetxService {
     );
   }
 
+  /// POST that reads the reply as it arrives, one server-sent event at a time.
+  ///
+  /// Yields the payload of each `data:` frame, `[DONE]` included, and leaves
+  /// the parsing to the caller -- the frames differ per route and this has no
+  /// business knowing what an assistant chunk looks like.
+  ///
+  /// Deliberately thinner than [post]: no retry, no refresh-and-replay. Half
+  /// an answer has already been delivered by the time most failures happen,
+  /// and replaying the request would bill the user twice for one question.
+  /// A 401 still refreshes once, before anything has been streamed.
+  Stream<String> postStream(String endpoint, {dynamic body}) async* {
+    final uri = endpoint.startsWith('http')
+        ? resolveServerAssetUri(endpoint)
+        : Uri.parse('$baseUrl$endpoint').collapseSlashes();
+    final traceId = _newTraceId();
+    final client = http.Client();
+    try {
+      var response = await _sendStream(client, uri, body, traceId);
+      if (response.statusCode == 401 && await refreshToken()) {
+        response = await _sendStream(client, uri, body, traceId);
+      }
+      if (response.statusCode >= 400) {
+        final detail = await response.stream.bytesToString();
+        throw ApiException(
+          detail.isEmpty ? 'Request failed' : detail,
+          response.statusCode,
+          traceId: traceId,
+        );
+      }
+      _reportReachability(reachable: true);
+      await for (final line in response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())) {
+        if (!line.startsWith('data:')) continue;
+        yield line.substring(5).trim();
+      }
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      _reportReachability(reachable: false);
+      throw _asApiException(e, traceId);
+    } finally {
+      client.close();
+    }
+  }
+
+  Future<http.StreamedResponse> _sendStream(
+    http.Client client,
+    Uri uri,
+    dynamic body,
+    String traceId,
+  ) async {
+    final request = http.Request('POST', uri)
+      ..headers.addAll(await _getHeaders(traceId: traceId))
+      ..headers['Accept'] = 'text/event-stream';
+    final encoded = _encodeJsonBody(body);
+    if (encoded != null) request.body = encoded;
+    return client.send(request);
+  }
+
   /// POST without Authorization (password reset, vault recovery after reset).
   Future<dynamic> postPublic(String endpoint, {dynamic body}) async {
     final uri = endpoint.startsWith('http')

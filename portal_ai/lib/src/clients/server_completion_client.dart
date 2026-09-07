@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../models/ai_sampler_config.dart';
 import 'ai_completion_client.dart';
 import 'ai_completion_stats.dart';
@@ -11,6 +13,16 @@ typedef AiPostJson = Future<dynamic> Function(
   dynamic body,
 });
 
+/// Streams a reply from the app's API, one server-sent event payload at a
+/// time.
+///
+/// Matches `ApiClient.postStream` in portal_platform, the same way
+/// [AiPostJson] matches `post`.
+typedef AiPostStream = Stream<String> Function(
+  String path, {
+  dynamic body,
+});
+
 /// Runs completions through the Portal server, which holds the API key, picks
 /// the model and enforces the per-user AI quota.
 ///
@@ -20,11 +32,17 @@ class ServerCompletionClient
     implements AiCompletionClient {
   ServerCompletionClient({
     required this.post,
+    this.postStream,
     this.path = '/ai/complete',
     this.feature = 'assistant',
   });
 
   final AiPostJson post;
+
+  /// Streaming transport. Without one the client still answers -- in a single
+  /// chunk, which is what it did before the route existed.
+  final AiPostStream? postStream;
+
   final String path;
 
   /// Groups server-side usage stats. Lowercase, digits and dashes only.
@@ -74,17 +92,47 @@ class ServerCompletionClient
     return stats.isEmpty ? null : stats;
   }
 
-  /// The server route is not streaming; this yields the whole reply at once.
+  /// `POST /ai/complete/stream` -> `data: {"text": "..."}` frames, then
+  /// `data: [DONE]`.
+  ///
+  /// An error arrives as a frame rather than a status code: by the time the
+  /// provider fails the headers are long since sent. Falls back to one chunk
+  /// when the host wired no streaming transport.
   @override
   Stream<String> completeStream({
     required String systemPrompt,
     required String userPrompt,
     AiSamplerConfig sampler = const AiSamplerConfig(),
   }) async* {
-    yield await complete(
-      systemPrompt: systemPrompt,
-      userPrompt: userPrompt,
-      sampler: sampler,
-    );
+    final stream = postStream;
+    if (stream == null) {
+      yield await complete(
+        systemPrompt: systemPrompt,
+        userPrompt: userPrompt,
+        sampler: sampler,
+      );
+      return;
+    }
+
+    await for (final payload in stream(
+      '$path/stream',
+      body: <String, dynamic>{
+        'systemPrompt': systemPrompt,
+        'prompt': userPrompt,
+        'temperature': sampler.temperature,
+        'jsonMode': true,
+        'feature': feature,
+      },
+    )) {
+      if (payload.isEmpty || payload == '[DONE]') continue;
+      final frame = jsonDecode(payload);
+      if (frame is! Map) continue;
+      if (frame['error'] case final String error when error.isNotEmpty) {
+        throw AiCompletionException(error);
+      }
+      if (frame['text'] case final String text when text.isNotEmpty) {
+        yield text;
+      }
+    }
   }
 }

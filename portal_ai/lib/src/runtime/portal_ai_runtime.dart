@@ -55,8 +55,12 @@ class PortalAiRuntime {
   /// [post] is the app's authenticated JSON POST (`ApiClient.post`). It may be
   /// omitted only by apps with no Portal server session, which must then set
   /// [AiDevEnvKeys.ollamaModel].
+  /// [postStream] is the same app's streaming POST (`ApiClient.postStream`).
+  /// Without it the server answers in one piece, as it always did; with it
+  /// the assistant renders the reply as the model writes it.
   factory PortalAiRuntime.create({
     AiPostJson? post,
+    AiPostStream? postStream,
     Map<String, String> env = const {},
     String feature = 'assistant',
     String appDescription = '',
@@ -66,7 +70,11 @@ class PortalAiRuntime {
   }) {
     final server = post == null
         ? null
-        : ServerCompletionClient(post: post, feature: feature);
+        : ServerCompletionClient(
+            post: post,
+            postStream: postStream,
+            feature: feature,
+          );
     final factory = clientFactory ?? AiCompletionClientFactory();
 
     AiCompletionClient? client;
