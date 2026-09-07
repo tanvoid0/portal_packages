@@ -49,6 +49,26 @@ import 'sync_operation.dart';
 class SyncQueue extends GetxService {
   static const _storageKeyBase = 'portal_sync_queue';
 
+  /// Hard ceiling on pending operations.
+  ///
+  /// The queue is one SharedPreferences string, encrypted and rewritten in
+  /// full on every mutation, so its cost is quadratic in a long offline
+  /// stretch. Dedup keeps it to one operation per entity, which bounds normal
+  /// use well below this; the cap only catches genuine runaway.
+  static const int maxOperations = 500;
+
+  /// How long an un-pushed operation is kept before it is abandoned.
+  ///
+  /// A change that has failed to reach the server for a month is not going to,
+  /// and replaying it against a server that has moved on is more likely to
+  /// resurrect deleted data than to help.
+  static const Duration maxOperationAge = Duration(days: 30);
+
+  /// Called when operations are discarded to respect [maxOperations] or
+  /// [maxOperationAge]. This drops user data, so it must not be silent —
+  /// apps wire it to the same place they show sync failures.
+  static void Function(int dropped, String reason)? onEvicted;
+
   String get _storageKey =>
       UserStorageScope.scopeKey(_storageKeyBase);
 
@@ -81,7 +101,12 @@ class SyncQueue extends GetxService {
   /// [Get.putAsync].
   Future<SyncQueue> init() async {
     try {
-      final ops = await _withLock(_load);
+      final ops = await _withLock(() async {
+        final loaded = await _load();
+        final kept = _prune(loaded);
+        if (kept.length != loaded.length) await _save(kept);
+        return kept;
+      });
       pendingCount.value = ops.length;
     } catch (e) {
       // Startup must not fail on an unreadable queue. The badge count is
@@ -115,8 +140,9 @@ class SyncQueue extends GetxService {
           ops.add(op);
         }
 
-        await _save(ops);
-        pendingCount.value = ops.length;
+        final kept = _prune(ops);
+        await _save(kept);
+        pendingCount.value = kept.length;
       });
 
   /// Return all pending operations for [entityType], sorted by
@@ -146,6 +172,47 @@ class SyncQueue extends GetxService {
         await _save(ops);
         pendingCount.value = ops.length;
       });
+
+  // ─── Eviction ───────────────────────────────────────────────────────
+
+  /// Drop operations that are too old, then the oldest above [maxOperations].
+  ///
+  /// Pure and synchronous so the policy is testable on its own. Oldest-first
+  /// because dedup already means each entity appears once: the oldest entries
+  /// are the ones that have failed longest and whose data is most stale.
+  List<SyncOperation> _prune(List<SyncOperation> ops) {
+    final now = DateTime.now();
+    // An operation stamped in the future means the device clock has moved —
+    // a timezone change, a manual adjustment, an emulator resuming from a
+    // snapshot. Age is meaningless against a clock we cannot trust, and the
+    // cost of being wrong here is deleting somebody's unsynced work, so the
+    // age rule sits out and the size cap still applies.
+    final clockTrusted = !ops.any((o) => o.createdAt.isAfter(now));
+    final cutoff = now.subtract(maxOperationAge);
+    final fresh = clockTrusted
+        ? ops.where((o) => o.createdAt.isAfter(cutoff)).toList()
+        : List<SyncOperation>.of(ops);
+    final expired = ops.length - fresh.length;
+    if (expired > 0) {
+      _reportEvicted(expired, 'older than ${maxOperationAge.inDays} days');
+    }
+
+    if (fresh.length <= maxOperations) return fresh;
+
+    fresh.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    final overflow = fresh.length - maxOperations;
+    _reportEvicted(overflow, 'the pending limit of $maxOperations was reached');
+    return fresh.sublist(overflow);
+  }
+
+  void _reportEvicted(int dropped, String reason) {
+    debugPrint('[SyncQueue] Dropped $dropped operation(s): $reason');
+    try {
+      onEvicted?.call(dropped, reason);
+    } catch (e) {
+      debugPrint('[SyncQueue] onEvicted threw: $e');
+    }
+  }
 
   // ─── Deduplication ──────────────────────────────────────────────────
 

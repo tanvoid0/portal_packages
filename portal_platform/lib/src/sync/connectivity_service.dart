@@ -36,14 +36,54 @@ class ConnectivityService extends GetxService {
   StreamSubscription<List<ConnectivityResult>>? _sub;
   final _reconnectListeners = <VoidCallback>[];
 
-  /// Whether the device currently has a network interface available.
+  /// Whether a network interface exists, per `connectivity_plus`.
+  bool _hasInterface = true;
+
+  /// Whether the server actually answered the last time we tried it.
   ///
-  /// Defaults to `true` until the first check completes so that the
-  /// app attempts network calls optimistically on cold-start.
+  /// An interface is not a connection. Captive-portal wifi, an expired DHCP
+  /// lease, a VPN that is up but routing nowhere, and a server that is simply
+  /// down all present a perfectly healthy interface — so on interface alone
+  /// the app reported itself online, hid the offline banner, and burned a full
+  /// request timeout per call while quietly queueing every write. [ApiClient]
+  /// reports what it observes through [reportReachable] and the two are
+  /// combined.
+  bool _isReachable = true;
+
+  /// Whether the app can currently reach the server.
+  ///
+  /// True only when a network interface exists *and* the server has not just
+  /// failed to answer. Defaults to `true` until proven otherwise so a
+  /// cold-start still tries optimistically.
   bool get isOnline => _isOnline.value;
 
   /// Observable version of [isOnline] for use with `Obx` / `ever`.
   RxBool get isOnlineRx => _isOnline;
+
+  /// Report the outcome of a real request against the server.
+  ///
+  /// Called by [ApiClient]: `true` when a response came back (any status — a
+  /// 500 still proves the server is there), `false` when the request never
+  /// reached it. This is what makes "connected to wifi, no actual internet"
+  /// visible; nothing else can see it.
+  void reportReachable(bool reachable) {
+    if (_isReachable == reachable) return;
+    _isReachable = reachable;
+    _recompute();
+  }
+
+  /// Folds [_hasInterface] and [_isReachable] into [isOnline], firing the
+  /// reconnect listeners on a genuine offline → online edge.
+  void _recompute() {
+    final online = _hasInterface && _isReachable;
+    if (_isOnline.value == online) return;
+    _isOnline.value = online;
+    if (!online) return;
+    debugPrint('[ConnectivityService] Back online — notifying listeners');
+    for (final cb in List<VoidCallback>.of(_reconnectListeners)) {
+      cb();
+    }
+  }
 
   /// Register a [callback] to be invoked each time the device
   /// transitions from offline → online.
@@ -63,27 +103,24 @@ class ConnectivityService extends GetxService {
   Future<ConnectivityService> init() async {
     try {
       final results = await _connectivity.checkConnectivity();
-      _isOnline.value = _hasNetwork(results);
+      _hasInterface = _hasNetwork(results);
     } catch (e) {
       debugPrint('[ConnectivityService] Initial check failed: $e');
-      _isOnline.value = true;
+      _hasInterface = true;
     }
+    _isOnline.value = _hasInterface && _isReachable;
 
     _sub = _connectivity.onConnectivityChanged.listen(_onChanged);
     return this;
   }
 
   void _onChanged(List<ConnectivityResult> results) {
-    final online = _hasNetwork(results);
-    final wasOffline = !_isOnline.value;
-    _isOnline.value = online;
-
-    if (online && wasOffline) {
-      debugPrint('[ConnectivityService] Back online — notifying listeners');
-      for (final cb in _reconnectListeners) {
-        cb();
-      }
-    }
+    _hasInterface = _hasNetwork(results);
+    // A new interface deserves an optimistic retry: whatever made the last
+    // one unreachable (captive portal, dead router) does not carry over to a
+    // network we have not tried yet.
+    if (_hasInterface) _isReachable = true;
+    _recompute();
   }
 
   bool _hasNetwork(List<ConnectivityResult> results) =>

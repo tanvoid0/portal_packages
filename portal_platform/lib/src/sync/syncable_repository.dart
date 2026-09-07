@@ -17,6 +17,52 @@ abstract class Syncable {
   Future<void> sync();
 }
 
+/// App-supplied feedback for the offline-first write path.
+///
+/// The repository layer cannot import UI, and a write that quietly lands in
+/// [SyncQueue] instead of on the server is indistinguishable from one that
+/// did nothing — which is exactly how it read to users. These hooks let an
+/// app render that state (a toast, a banner) without the sync layer knowing
+/// what a toast is. Unset by default, so nothing changes for apps that do not
+/// opt in.
+class SyncFeedback {
+  SyncFeedback._();
+
+  /// Called after a write is queued for later replay rather than pushed.
+  ///
+  /// [entityType] is the repository's own [SyncableRepository.entityType];
+  /// [pendingCount] is the queue depth across all entity types afterwards.
+  static void Function(String entityType, int pendingCount)? onQueued;
+
+  /// Called after a sync cycle drains at least one queued operation.
+  /// [pushed] is how many operations were accepted by the server.
+  static void Function(int pushed)? onPushed;
+
+  /// Called when the server *rejected* queued operations outright and they
+  /// were dropped. This is the one case where a local change is lost, so it
+  /// must never be silent.
+  static void Function(String entityType, int dropped)? onRejected;
+}
+
+/// True when [error] means "the server refused this change" rather than "the
+/// server was not reachable".
+///
+/// A refused mutation must be dropped: replaying it produces the same refusal
+/// on every sync, forever, and it blocks nothing behind it from being noticed.
+/// The excluded statuses are the ones that are really transient —
+/// 401/403 clear after a token refresh or re-auth, 408 and 429 are explicit
+/// "try again" answers — and offline (status 0) is never permanent.
+bool isPermanentSyncFailure(Object error) {
+  if (error is! ApiException) return false;
+  if (error.statusCode == 401 ||
+      error.statusCode == 403 ||
+      error.statusCode == 408 ||
+      error.statusCode == 429) {
+    return false;
+  }
+  return error.statusCode >= 400 && error.statusCode < 500;
+}
+
 /// Abstract **offline-first** repository for **simple** entities stored in
 /// [SharedPreferences].
 ///
@@ -158,13 +204,36 @@ abstract class SyncableRepository<T> implements Syncable {
             ? serverList
             : _mergeWithPending(serverList, await readCache(), pendingOps);
         await writeCache(merged);
+        _lastReadError = null;
         return merged;
+      } on ApiException catch (e) {
+        debugPrint('[$entityType] API fetch failed, using cache: $e');
+        _lastReadError = e;
       } catch (e) {
         debugPrint('[$entityType] API fetch failed, using cache: $e');
+        _lastReadError = ApiException('$e', -1);
       }
+    } else {
+      _lastReadError = ApiException.networkFailure();
     }
     return readCache();
   }
+
+  /// Why the last [getAll] fell back to the cache, or `null` if it returned
+  /// live server data.
+  ///
+  /// [getAll] deliberately does not throw — an offline read returning cached
+  /// data is the feature, not a failure. But it swallowed *server* failures
+  /// the same way, so during an outage the app served stale data with no
+  /// indication and every caller's error handler was unreachable. Read this
+  /// straight after awaiting [getAll] to tell the three cases apart:
+  /// live (`null`), offline (`isOffline`), and the server refusing or
+  /// failing (anything else).
+  ApiException? get lastReadError => _lastReadError;
+  ApiException? _lastReadError;
+
+  /// True when the last [getAll] served cached data instead of live data.
+  bool get lastReadWasStale => _lastReadError != null;
 
   /// Fetch a single entity by [id].
   ///
@@ -234,6 +303,7 @@ abstract class SyncableRepository<T> implements Syncable {
       type: opType,
       data: toWireJson(entity, isCreate: isCreate),
     ));
+    await _reportQueued();
   }
 
   /// Delete an entity by [id].
@@ -259,6 +329,20 @@ abstract class SyncableRepository<T> implements Syncable {
       entityId: id,
       type: SyncOperationType.delete,
     ));
+    await _reportQueued();
+  }
+
+  /// Notify [SyncFeedback.onQueued] that a write is waiting to be pushed.
+  ///
+  /// Never lets a UI callback break the write it is reporting on.
+  Future<void> _reportQueued() async {
+    final cb = SyncFeedback.onQueued;
+    if (cb == null) return;
+    try {
+      cb(entityType, syncQueue.pendingCount.value);
+    } catch (e) {
+      debugPrint('[$entityType] SyncFeedback.onQueued threw: $e');
+    }
   }
 
   // ─── Sync ───────────────────────────────────────────────────────────
@@ -293,6 +377,8 @@ abstract class SyncableRepository<T> implements Syncable {
 
     debugPrint('[$entityType] Pushing ${ops.length} pending operations');
 
+    var pushed = 0;
+    var rejected = 0;
     for (final op in ops) {
       try {
         switch (op.type) {
@@ -304,15 +390,41 @@ abstract class SyncableRepository<T> implements Syncable {
             await api.delete('$apiBasePath/${op.entityId}');
         }
         await syncQueue.remove(op.id);
+        pushed++;
       } catch (e) {
         debugPrint('[$entityType] Failed to push ${op.type.name} '
             'for ${op.entityId}: $e');
-        if (e is ApiException &&
-            e.statusCode == 404 &&
-            op.type != SyncOperationType.create) {
+        // Nothing reached the server, so the rest of the queue will fail the
+        // same way. Stop instead of burning a 30s timeout per operation.
+        if (e is ApiException && e.isOffline) break;
+        if (isPermanentSyncFailure(e)) {
+          // The server will refuse this on every future sync too. Left queued
+          // it retries forever, and the pending count never returns to zero —
+          // which reads to the user as "syncing" that never finishes.
           await syncQueue.remove(op.id);
+          rejected++;
         }
       }
+    }
+
+    _notify(
+      () => pushed > 0 ? SyncFeedback.onPushed?.call(pushed) : null,
+      'onPushed',
+    );
+    _notify(
+      () => rejected > 0
+          ? SyncFeedback.onRejected?.call(entityType, rejected)
+          : null,
+      'onRejected',
+    );
+  }
+
+  /// Runs a [SyncFeedback] callback without letting it break the sync cycle.
+  void _notify(void Function() body, String name) {
+    try {
+      body();
+    } catch (e) {
+      debugPrint('[$entityType] SyncFeedback.$name threw: $e');
     }
   }
 
@@ -320,10 +432,23 @@ abstract class SyncableRepository<T> implements Syncable {
   /// the entity — the case where an earlier push committed but its response
   /// never reached the device.
   Future<void> _pushCreate(SyncOperation op) async {
+    Object postError;
     try {
       await api.post(apiBasePath, body: op.data);
-    } catch (_) {
+      return;
+    } catch (e) {
+      postError = e;
+    }
+    try {
       await api.put('$apiBasePath/${op.entityId}', body: op.data);
+    } on ApiException catch (e) {
+      // A 404 here means the entity really is absent server-side, so the POST
+      // is still the operation that matters and its error is the real cause.
+      // Reporting the 404 instead hid it — a create the server had *refused*
+      // (a rejected field, say) looked identical to one that simply had not
+      // landed yet, so it stayed queued and retried forever.
+      if (e.statusCode == 404) throw postError;
+      rethrow;
     }
   }
 

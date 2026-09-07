@@ -9,13 +9,16 @@ const _queueKey = 'portal_sync_queue';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  SyncOperation op(String id) => SyncOperation(
+  // Relative, not a fixed date: the queue evicts operations past
+  // [SyncQueue.maxOperationAge], so a hardcoded timestamp silently starts
+  // being pruned once it ages past the cutoff in real time.
+  SyncOperation op(String id, {Duration age = Duration.zero}) => SyncOperation(
         id: 'op-$id',
         type: SyncOperationType.create,
         entityType: 'recipe',
         entityId: id,
         data: {'title': 'Recipe $id'},
-        createdAt: DateTime.utc(2026, 1, 1),
+        createdAt: DateTime.now().subtract(age),
       );
 
   Future<List<String>> storedEntityIds() async {
@@ -101,5 +104,82 @@ void main() {
 
     final queue = await SyncQueue().init();
     expect(queue.pendingCount.value, 0);
+  });
+
+  group('eviction', () {
+    tearDown(() => SyncQueue.onEvicted = null);
+
+    /// The queue is one encrypted SharedPreferences string rewritten on every
+    /// mutation, so it cannot be allowed to grow without bound.
+    test('operations past the age limit are dropped', () async {
+      final queue = await SyncQueue().init();
+      await queue.enqueue(op('fresh'));
+      await queue.enqueue(
+        op('ancient', age: SyncQueue.maxOperationAge + const Duration(days: 1)),
+      );
+
+      expect(await storedEntityIds(), ['fresh']);
+      expect(queue.pendingCount.value, 1);
+    });
+
+    test('an operation just inside the limit is kept', () async {
+      final queue = await SyncQueue().init();
+      await queue.enqueue(
+        op('recent', age: SyncQueue.maxOperationAge - const Duration(days: 1)),
+      );
+
+      expect(await storedEntityIds(), ['recent']);
+    });
+
+    /// Dropping a change is data loss, so it must reach the user.
+    test('eviction is reported, with a count and a reason', () async {
+      var dropped = 0;
+      String? reason;
+      SyncQueue.onEvicted = (n, why) {
+        dropped += n;
+        reason = why;
+      };
+
+      final queue = await SyncQueue().init();
+      await queue.enqueue(
+        op('ancient', age: SyncQueue.maxOperationAge + const Duration(days: 1)),
+      );
+
+      expect(dropped, 1);
+      expect(reason, contains('${SyncQueue.maxOperationAge.inDays} days'));
+    });
+
+    /// A clock that has moved makes every age comparison meaningless, and the
+    /// cost of getting it wrong is deleting unsynced work.
+    test('a future timestamp suspends the age rule entirely', () async {
+      final queue = await SyncQueue().init();
+      await queue.enqueue(
+        op('ancient', age: SyncQueue.maxOperationAge + const Duration(days: 1)),
+      );
+      expect(await storedEntityIds(), isEmpty);
+
+      await queue.enqueue(op('tomorrow', age: const Duration(days: -1)));
+      await queue.enqueue(
+        op('ancient2', age: SyncQueue.maxOperationAge + const Duration(days: 1)),
+      );
+
+      expect(await storedEntityIds(), contains('ancient2'));
+    });
+
+    test('the size cap keeps the newest and reports the overflow', () async {
+      var dropped = 0;
+      SyncQueue.onEvicted = (n, _) => dropped += n;
+
+      final queue = await SyncQueue().init();
+      for (var i = 0; i < SyncQueue.maxOperations + 5; i++) {
+        await queue.enqueue(op('e$i', age: Duration(seconds: 1000 - i)));
+      }
+
+      final stored = await storedEntityIds();
+      expect(stored.length, SyncQueue.maxOperations);
+      expect(stored, isNot(contains('e0')));
+      expect(stored, contains('e${SyncQueue.maxOperations + 4}'));
+      expect(dropped, 5);
+    });
   });
 }

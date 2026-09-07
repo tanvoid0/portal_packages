@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import 'connectivity_service.dart';
+import 'sync_queue.dart';
 import 'syncable_repository.dart';
 
 /// Central orchestrator that keeps all registered repositories in sync
@@ -82,7 +85,41 @@ class SyncManager extends GetxService {
 
   void _onReconnect() {
     debugPrint('[SyncManager] Device reconnected — syncing all');
+    _retryDelay = _minRetryDelay;
     syncAll();
+  }
+
+  /// Backoff schedule for a queue the server would not take.
+  ///
+  /// Reconnect covers "the network came back", but not "the network is fine
+  /// and the server is failing": a 5xx used to park the queue until the next
+  /// app launch, however long that was. Doubling from 30s to 15m keeps a
+  /// short outage nearly invisible without hammering a struggling server.
+  static const Duration _minRetryDelay = Duration(seconds: 30);
+  static const Duration _maxRetryDelay = Duration(minutes: 15);
+  Duration _retryDelay = _minRetryDelay;
+  Timer? _retryTimer;
+
+  /// Schedule another attempt when work is still queued after a cycle.
+  ///
+  /// Deliberately not scheduled while offline: reconnect already wakes the
+  /// queue, and a timer firing into an interface that is down only burns the
+  /// request timeout.
+  void _scheduleRetry() {
+    _retryTimer?.cancel();
+    if (!Get.isRegistered<SyncQueue>()) return;
+    if (Get.find<SyncQueue>().pendingCount.value == 0) {
+      _retryDelay = _minRetryDelay;
+      return;
+    }
+    if (Get.isRegistered<ConnectivityService>() &&
+        !Get.find<ConnectivityService>().isOnline) {
+      return;
+    }
+    debugPrint('[SyncManager] ${_retryDelay.inSeconds}s until next attempt');
+    _retryTimer = Timer(_retryDelay, syncAll);
+    final next = _retryDelay * 2;
+    _retryDelay = next > _maxRetryDelay ? _maxRetryDelay : next;
   }
 
   /// Push pending changes and pull fresh data for **every** registered
@@ -113,11 +150,14 @@ class SyncManager extends GetxService {
       );
     } finally {
       isSyncing.value = false;
+      _scheduleRetry();
     }
   }
 
   @override
   void onClose() {
+    _retryTimer?.cancel();
+    _retryTimer = null;
     try {
       final connectivity = Get.find<ConnectivityService>();
       connectivity.removeReconnectListener(_onReconnect);

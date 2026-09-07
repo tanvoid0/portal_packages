@@ -14,6 +14,7 @@ import '../observability/portal_logger.dart';
 import '../routing/deep_link_service.dart';
 import '../routing/portal_navigation.dart';
 import '../session/session_controller.dart';
+import '../sync/connectivity_service.dart';
 import 'token_storage.dart';
 
 /// Per-request tracing (start/success). Errors still log in [kDebugMode] without this.
@@ -67,7 +68,12 @@ class ApiClient extends GetxService {
   /// Applied in the two request funnels rather than at each call site, so a
   /// black-holed connection surfaces as a TimeoutException instead of hanging
   /// the caller forever. Health checks pass their own shorter budget.
-  static const Duration _requestTimeout = Duration(seconds: 30);
+  ///
+  /// 15s, not 30: this is the budget a *user* waits on a dead connection
+  /// before the app admits it is offline, and every queued write pays it
+  /// again on the next sync. Long enough for a slow cold-started Cloud Run
+  /// instance, short enough that a black hole is not mistaken for progress.
+  static const Duration _requestTimeout = Duration(seconds: 15);
 
   /// Slug sent as `X-Portal-App` so the server knows which app is calling —
   /// it picks the branding for server-rendered output such as reset emails.
@@ -402,6 +408,34 @@ class ApiClient extends GetxService {
     return _failSessionExpired();
   }
 
+  /// Normalises anything escaping the request funnels into an [ApiException].
+  ///
+  /// [_handleResponse] already throws [ApiException] for HTTP error statuses,
+  /// so whatever else lands here never reached a server: no network, DNS
+  /// failure, connection refused, or the funnel's own 30s timeout. Callers
+  /// used to receive the raw `SocketException` / `ClientException` /
+  /// `TimeoutException`, which is why "no network" surfaced to users as
+  /// `SocketException: Failed host lookup: '...'` — or as nothing at all.
+  Object _asApiException(Object e, String traceId) {
+    if (e is ApiException || e is FormatException) return e;
+    return ApiException.networkFailure(traceId: traceId);
+  }
+
+  /// Tell [ConnectivityService] what this request actually observed.
+  ///
+  /// A response of any status — a 500 included — proves the server is
+  /// reachable; only a transport failure says otherwise. Without this the app
+  /// trusted the network interface alone and reported itself online while
+  /// sitting behind a captive portal.
+  ///
+  /// Looked up rather than injected: [ApiClient] is registered before
+  /// [ConnectivityService] (and apps without offline support never register
+  /// one at all), so this has to tolerate its absence.
+  void _reportReachability({required bool reachable}) {
+    if (!Get.isRegistered<ConnectivityService>()) return;
+    Get.find<ConnectivityService>().reportReachable(reachable);
+  }
+
   /// Make a request with automatic token refresh
   Future<dynamic> _requestWithRetry(
     String method,
@@ -417,6 +451,7 @@ class ApiClient extends GetxService {
     );
     try {
       final response = await _authorizeWithRetry(traceId, request);
+      _reportReachability(reachable: true);
       final result = _handleResponse(response, traceId: traceId);
       _logApi(
         'INFO',
@@ -427,7 +462,11 @@ class ApiClient extends GetxService {
       return result;
     } catch (e, st) {
       _logRequestError(method, url, e, st, traceId: traceId);
-      rethrow;
+      final mapped = _asApiException(e, traceId);
+      if (mapped is ApiException) {
+        _reportReachability(reachable: !mapped.isOffline);
+      }
+      throw mapped;
     }
   }
 
@@ -446,6 +485,7 @@ class ApiClient extends GetxService {
     try {
       final response =
           await request(_publicHeaders(traceId)).timeout(_requestTimeout);
+      _reportReachability(reachable: true);
       final result = _handleResponse(response, traceId: traceId);
       _logApi(
         'INFO',
@@ -456,7 +496,11 @@ class ApiClient extends GetxService {
       return result;
     } catch (e, st) {
       _logRequestError(method, url, e, st, traceId: traceId);
-      rethrow;
+      final mapped = _asApiException(e, traceId);
+      if (mapped is ApiException) {
+        _reportReachability(reachable: !mapped.isOffline);
+      }
+      throw mapped;
     }
   }
 
@@ -985,10 +1029,67 @@ class ApiException implements Exception {
 
   ApiException(this.message, this.statusCode, {this.traceId, this.code});
 
+  /// Status code used for "the request never reached a server": no network,
+  /// DNS failure, connection refused, or a timeout. Distinct from every real
+  /// HTTP status so callers can branch on it.
+  static const int offlineStatusCode = 0;
+
+  /// Code carried by the exception [networkFailure] builds.
+  static const String offlineCode = 'NETWORK_UNREACHABLE';
+
+  /// Wraps a transport-level failure ([SocketException],
+  /// [http.ClientException], [TimeoutException]) so callers see one typed
+  /// error instead of a raw dart:io exception whose `toString()` is
+  /// "SocketException: Failed host lookup ...".
+  factory ApiException.networkFailure({String? traceId}) => ApiException(
+        'No connection to the server.',
+        offlineStatusCode,
+        traceId: traceId,
+        code: offlineCode,
+      );
+
+  /// True when the request never reached the server — the caller is offline,
+  /// the host is unreachable, or the request timed out.
+  bool get isOffline => statusCode == offlineStatusCode;
+
   @override
   String toString() {
     final traceSuffix = traceId == null ? '' : ' (traceId: $traceId)';
     final codeSuffix = code == null ? '' : ' [${code!}]';
     return 'ApiException: $message (status: $statusCode)$codeSuffix$traceSuffix';
   }
+}
+
+/// One line of copy a user can act on, for any error thrown by [ApiClient].
+///
+/// Call sites used to render `e.toString()`, which produces
+/// `ApiException: ... (status: 503) (traceId: ...)` or, before transport
+/// errors were typed, `SocketException: Failed host lookup`. Neither tells
+/// somebody what to do next.
+///
+/// [offlineHint] is appended to the offline message; pass what the caller can
+/// promise, e.g. `'Your changes are saved and will sync later.'` for a write
+/// that was queued, or nothing at all for a read.
+String portalErrorMessage(Object error, {String? offlineHint}) {
+  if (error is ApiException) {
+    if (error.isOffline) {
+      const base = "You're offline.";
+      return offlineHint == null ? base : '$base $offlineHint';
+    }
+    if (error.statusCode == 401 || error.statusCode == 403) {
+      return 'Your session expired. Sign in again to continue.';
+    }
+    if (error.statusCode == 404) return 'That is no longer on the server.';
+    if (error.statusCode == 429) {
+      return 'Too many requests. Try again in a moment.';
+    }
+    if (error.statusCode >= 500) {
+      return 'The server had a problem. Try again shortly.';
+    }
+    return error.message;
+  }
+  if (error is FormatException) {
+    return 'The server sent something unreadable. Try again shortly.';
+  }
+  return 'Something went wrong. Try again.';
 }

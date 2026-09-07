@@ -105,7 +105,33 @@ class AppToast {
     );
   }
 
+  /// Toasts waiting for the current one to finish.
+  ///
+  /// Presenting used to replace whatever was on screen, so two messages
+  /// raised together left only the second — a sync result could erase the
+  /// error that explained it. They queue instead.
+  static final _pending = <PortalToastData>[];
+
+  /// Backlog ceiling. Past this the oldest waiting toast is dropped: a burst
+  /// this large is a loop, and making somebody dismiss a dozen stale messages
+  /// is worse than losing the middle of the burst.
+  static const int maxPending = 3;
+
   static void present(PortalToastData data) {
+    if (current.value != null) {
+      // A repeat of what is already on screen or already waiting adds
+      // nothing — several repositories failing the same way in one sync
+      // cycle is the common case.
+      if (_isDuplicate(current.value!, data)) return;
+      if (_pending.any((p) => _isDuplicate(p, data))) return;
+      _pending.add(data);
+      if (_pending.length > maxPending) _pending.removeAt(0);
+      return;
+    }
+    _present(data);
+  }
+
+  static void _present(PortalToastData data) {
     _fallbackEntry?.remove();
     _fallbackEntry = null;
     _timer?.cancel();
@@ -115,12 +141,27 @@ class AppToast {
     }
   }
 
+  static bool _isDuplicate(PortalToastData a, PortalToastData b) =>
+      a.title == b.title &&
+      a.description == b.description &&
+      a.variant == b.variant;
+
   static void dismiss() {
     _timer?.cancel();
     _timer = null;
     current.value = null;
     _fallbackEntry?.remove();
     _fallbackEntry = null;
+    if (_pending.isNotEmpty) _present(_pending.removeAt(0));
+  }
+
+  /// Drop the current toast and everything waiting behind it.
+  ///
+  /// For a context change that makes the backlog meaningless, such as signing
+  /// out. Tests use it to isolate cases.
+  static void clear() {
+    _pending.clear();
+    dismiss();
   }
 }
 
