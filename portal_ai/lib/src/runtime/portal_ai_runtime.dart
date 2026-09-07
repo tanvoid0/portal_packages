@@ -216,6 +216,36 @@ class PortalAiRuntime {
     }
   }
 
+  /// A short name for a thread, from what has been said in it so far.
+  ///
+  /// The first message truncated is a poor title -- half the threads in an
+  /// app start "can you" -- so the model names them once the exchange is old
+  /// enough to have a subject. Returns an empty string on any failure, and
+  /// the caller keeps whatever title it already had.
+  Future<String> suggestTitle(List<AiChatTurn> turns) async {
+    if (turns.isEmpty) return '';
+    final transcript = [
+      for (final t in turns.take(6))
+        '${t.isUser ? 'User' : 'Assistant'}: ${t.content.trim()}',
+    ].join('\n');
+    try {
+      final reply = await client.complete(
+        systemPrompt: 'You name chat threads. $appDescription. '
+            'Reply with JSON only: {"title": "..."}. '
+            'The title is 2-5 words naming what the thread is about, in the '
+            "user's own language. No quotes, no trailing punctuation.",
+        userPrompt: transcript,
+        jsonMode: true,
+      );
+      final title = extractJsonObject(splitThinking(reply).rest)?['title'];
+      if (title is! String) return '';
+      final trimmed = title.trim();
+      return trimmed.length <= 48 ? trimmed : '${trimmed.substring(0, 45)}...';
+    } catch (_) {
+      return '';
+    }
+  }
+
   /// The instructions the agent runs on, for a transcript export.
   String systemPromptFor([List<AiTool>? tools]) => AiAgent(
         client: client,

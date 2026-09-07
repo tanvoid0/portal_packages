@@ -252,6 +252,11 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   final _sessions = <AiChatSessionSummary>[];
   String? _sessionId;
 
+  /// Threads this page has already asked the model to name, and threads the
+  /// user has named. Both keep [_autoTitle] from overwriting a good title.
+  final _autoTitled = <String>{};
+  final _renamed = <String>{};
+
   /// Which prompts the deck shows, and what swaps them. Seeded from the app's
   /// own list so two visits do not open on the same three cards, topped up
   /// with whatever the model suggests.
@@ -350,8 +355,47 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
         turns: List.of(_turns),
+        pinned: existing?.pinned ?? false,
       ),
     );
+    if (mounted) setState(_reloadSessions);
+    unawaited(_autoTitle(id));
+  }
+
+  /// Threads titled from the first message all read alike ("Can you help me
+  /// wi..."), so the model names one once there is an exchange to name. Once
+  /// only, and never over a title the user typed -- [_renameSession] marks
+  /// those so this leaves them alone.
+  Future<void> _autoTitle(String id) async {
+    final runtime = widget.runtime;
+    final store = widget.store;
+    if (runtime == null || store == null) return;
+    if (_autoTitled.contains(id) || _renamed.contains(id)) return;
+    final session = store.load(id);
+    if (session == null || session.turns.length < 2) return;
+    _autoTitled.add(id);
+    final title = await runtime.suggestTitle(session.turns);
+    if (title.isEmpty || _renamed.contains(id)) return;
+    final latest = store.load(id);
+    if (latest == null) return;
+    await store.save(latest.copyWith(title: title));
+    if (mounted) setState(_reloadSessions);
+  }
+
+  Future<void> _renameSession(String id, String title) async {
+    final store = widget.store;
+    final session = store?.load(id);
+    if (store == null || session == null) return;
+    _renamed.add(id);
+    await store.save(session.copyWith(title: title));
+    if (mounted) setState(_reloadSessions);
+  }
+
+  Future<void> _setPinned(String id, bool pinned) async {
+    final store = widget.store;
+    final session = store?.load(id);
+    if (store == null || session == null) return;
+    await store.save(session.copyWith(pinned: pinned));
     if (mounted) setState(_reloadSessions);
   }
 
@@ -443,6 +487,14 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
               onClose: () => Navigator.of(dialogContext).pop(),
               onSelect: (id) => Navigator.of(dialogContext).pop(id),
               onNewChat: () => Navigator.of(dialogContext).pop(''),
+              onRename: (id, title) async {
+                await _renameSession(id, title);
+                if (dialogContext.mounted) setDialogState(() {});
+              },
+              onSetPinned: (id, pinned) async {
+                await _setPinned(id, pinned);
+                if (dialogContext.mounted) setDialogState(() {});
+              },
               onDelete: (id) async {
                 await _deleteSession(id);
                 if (_sessions.isEmpty) {
@@ -451,7 +503,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                   }
                   return;
                 }
-                setDialogState(() {});
+                if (dialogContext.mounted) setDialogState(() {});
               },
             ),
           ),

@@ -144,7 +144,12 @@ void main() {
     // Deleting the open thread clears the sheet and empties the store.
     await tester.tap(find.byIcon(Icons.history));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.delete_outline));
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete').last);
+    await tester.pumpAndSettle();
+    // The list defers the delete until its undo window closes.
+    await tester.pump(const Duration(seconds: 6));
     await tester.pumpAndSettle();
 
     expect(store.listSummaries(), isEmpty);

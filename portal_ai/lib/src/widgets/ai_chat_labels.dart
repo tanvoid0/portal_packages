@@ -31,6 +31,15 @@ class AiChatLabels {
     this.yesterday = 'Yesterday',
     this.earlier = 'Earlier',
     this.noMatches = 'No chats match that.',
+    this.pinned = 'Pinned',
+    this.pin = 'Pin',
+    this.unpin = 'Unpin',
+    this.rename = 'Rename',
+    this.renameTitle = 'Rename chat',
+    this.cancel = 'Cancel',
+    this.save = 'Save',
+    this.deleted = 'Chat deleted',
+    this.undo = 'Undo',
   });
 
   final String inputHint;
@@ -84,4 +93,16 @@ class AiChatLabels {
 
   /// Shown when a search matches no thread.
   final String noMatches;
+
+  /// History list: the pinned group, the row menu, the rename dialog and the
+  /// snackbar that undoes a delete.
+  final String pinned;
+  final String pin;
+  final String unpin;
+  final String rename;
+  final String renameTitle;
+  final String cancel;
+  final String save;
+  final String deleted;
+  final String undo;
 }

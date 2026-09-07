@@ -99,4 +99,53 @@ void main() {
       }
     });
   });
+
+  test('suggestTitle names a thread, and shrugs off a bad reply', () async {
+    final replies = <String>[
+      '{"title": "Weekly shop"}',
+      'sorry, I cannot do that',
+    ];
+    final runtime = PortalAiRuntime(
+      client: _ScriptedClient(replies),
+      tools: const [],
+      appDescription: 'A test app.',
+    );
+    const turns = [
+      AiChatTurn(role: 'user', content: 'what is on my list'),
+      AiChatTurn(role: 'assistant', content: 'milk and eggs'),
+    ];
+
+    expect(await runtime.suggestTitle(turns), 'Weekly shop');
+    // Not JSON: the caller keeps the title it had.
+    expect(await runtime.suggestTitle(turns), '');
+    // Nothing said yet, nothing to name -- and no call made.
+    expect(await runtime.suggestTitle(const []), '');
+  });
+
+}
+class _ScriptedClient implements AiCompletionClient {
+  _ScriptedClient(this.replies);
+
+  final List<String> replies;
+  var _index = 0;
+
+  @override
+  Future<bool> isAvailable() async => true;
+
+  @override
+  Future<String> complete({
+    required String systemPrompt,
+    required String userPrompt,
+    AiSamplerConfig sampler = const AiSamplerConfig(),
+    bool jsonMode = false,
+  }) async => _index < replies.length ? replies[_index++] : replies.last;
+
+  @override
+  Stream<String> completeStream({
+    required String systemPrompt,
+    required String userPrompt,
+    AiSamplerConfig sampler = const AiSamplerConfig(),
+  }) async* {
+    yield await complete(systemPrompt: systemPrompt, userPrompt: userPrompt);
+  }
 }

@@ -56,6 +56,11 @@ class PrefsAiChatStore implements AiChatStore {
               updatedAt: s.updatedAt,
               turnCount: s.turns.length,
               preview: s.turns.isEmpty ? '' : s.turns.last.content.trim(),
+              pinned: s.pinned,
+              // ponytail: whole transcript in memory so search can reach a
+              // line buried in a thread. Tens of threads of chat text; index
+              // it if that ever stops being true.
+              searchText: s.turns.map((t) => t.content).join(' '),
               payload: s.payload,
             ),
           )

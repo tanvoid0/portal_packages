@@ -59,6 +59,7 @@ class AiChatSession {
     required this.updatedAt,
     required this.turns,
     this.summary = '',
+    this.pinned = false,
     this.payload = const {},
   });
 
@@ -68,6 +69,10 @@ class AiChatSession {
   final DateTime updatedAt;
   final List<AiChatTurn> turns;
   final String summary;
+
+  /// Kept above the day groups in the history list.
+  final bool pinned;
+
   final Map<String, dynamic> payload;
 
   AiChatSession copyWith({
@@ -75,6 +80,7 @@ class AiChatSession {
     DateTime? updatedAt,
     List<AiChatTurn>? turns,
     String? summary,
+    bool? pinned,
     Map<String, dynamic>? payload,
   }) {
     return AiChatSession(
@@ -84,6 +90,7 @@ class AiChatSession {
       updatedAt: updatedAt ?? this.updatedAt,
       turns: turns ?? this.turns,
       summary: summary ?? this.summary,
+      pinned: pinned ?? this.pinned,
       payload: payload ?? this.payload,
     );
   }
@@ -98,6 +105,8 @@ class AiChatSessionSummary {
     required this.turnCount,
     this.itemCount = 0,
     this.preview = '',
+    this.pinned = false,
+    this.searchText = '',
     this.payload = const {},
   });
 
@@ -113,6 +122,14 @@ class AiChatSessionSummary {
   /// falls back to the turn count, which is what a store written before this
   /// existed will keep reporting.
   final String preview;
+
+  /// Sorted above everything else, in its own group.
+  final bool pinned;
+
+  /// Everything said in the thread, so search finds a thread by a line buried
+  /// in it rather than only by its title and its last message. A store that
+  /// leaves this empty still gets title-and-preview search.
+  final String searchText;
 
   final Map<String, dynamic> payload;
 }
@@ -169,6 +186,7 @@ extension AiChatSessionJson on AiChatSession {
     'created_at': createdAt.toIso8601String(),
     'updated_at': updatedAt.toIso8601String(),
     'summary': summary,
+    if (pinned) 'pinned': true,
     'payload': payload,
     'turns': turns.map((t) => t.toJson()).toList(),
   };
@@ -180,6 +198,7 @@ AiChatSession aiChatSessionFromJson(Map<String, dynamic> json) => AiChatSession(
   createdAt: DateTime.parse(json['created_at'] as String),
   updatedAt: DateTime.parse(json['updated_at'] as String),
   summary: json['summary'] as String? ?? '',
+  pinned: json['pinned'] as bool? ?? false,
   payload: Map<String, dynamic>.from(
     json['payload'] as Map? ?? const <String, dynamic>{},
   ),

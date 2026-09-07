@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../chat/ai_chat_session.dart';
@@ -10,7 +12,9 @@ import 'ai_chat_labels.dart';
 ///
 /// Rows are grouped by day and carry the last thing said, because a list of
 /// first-messages-and-a-count made every thread look alike after a week --
-/// finding one meant opening three.
+/// finding one meant opening three. Pinned threads sit in their own group
+/// above the days, and search reads whole transcripts where the store fills
+/// [AiChatSessionSummary.searchText].
 class AiChatHistoryList extends StatefulWidget {
   const AiChatHistoryList({
     super.key,
@@ -21,6 +25,8 @@ class AiChatHistoryList extends StatefulWidget {
     this.onClose,
     this.subtitleFor,
     this.onDelete,
+    this.onRename,
+    this.onSetPinned,
     this.labels = const AiChatLabels(),
     this.width = 280,
   });
@@ -38,8 +44,17 @@ class AiChatHistoryList extends StatefulWidget {
   /// [AiChatSessionSummary.payload] (a plan date, say) can format it here.
   final String Function(AiChatSessionSummary)? subtitleFor;
 
-  /// Removes a thread. No button is drawn when this is null.
+  /// Removes a thread. No menu entry is drawn when this is null.
+  ///
+  /// Called after the undo snackbar closes without being undone, so a host
+  /// only ever hears about deletes the user let stand.
   final Future<void> Function(String id)? onDelete;
+
+  /// Retitles a thread. No menu entry is drawn when this is null.
+  final Future<void> Function(String id, String title)? onRename;
+
+  /// Pins or unpins a thread. No menu entry is drawn when this is null.
+  final Future<void> Function(String id, bool pinned)? onSetPinned;
 
   final AiChatLabels labels;
   final double width;
@@ -51,19 +66,94 @@ class AiChatHistoryList extends StatefulWidget {
 class _AiChatHistoryListState extends State<AiChatHistoryList> {
   String _query = '';
 
-  /// Only worth the row of chrome once the list is long enough to lose
-  /// something in.
-  static const _searchFrom = 6;
+  /// Rows hidden while their undo window is open, against the timer that
+  /// commits them. The host is not told until that fires, so undo is a local
+  /// un-hide rather than a restore every store would have to implement.
+  final _pendingDelete = <String, Timer>{};
+
+  static const _undoWindow = Duration(seconds: 5);
+
+  @override
+  void dispose() {
+    // Leaving the list does not undo a delete: commit whatever is still
+    // pending, unhooked from this state.
+    for (final entry in _pendingDelete.entries) {
+      entry.value.cancel();
+      widget.onDelete?.call(entry.key);
+    }
+    _pendingDelete.clear();
+    super.dispose();
+  }
 
   List<AiChatSessionSummary> get _matches {
     final query = _query.trim().toLowerCase();
-    if (query.isEmpty) return widget.sessions;
-    return [
+    final visible = [
       for (final s in widget.sessions)
-        if (s.title.toLowerCase().contains(query) ||
-            s.preview.toLowerCase().contains(query))
-          s,
+        if (!_pendingDelete.containsKey(s.id)) s,
     ];
+    final matched = query.isEmpty
+        ? visible
+        : [
+            for (final s in visible)
+              if (s.title.toLowerCase().contains(query) ||
+                  s.preview.toLowerCase().contains(query) ||
+                  s.searchText.toLowerCase().contains(query))
+                s,
+          ];
+    // Pinned first; the host's order is kept inside each block.
+    return [
+      for (final s in matched)
+        if (s.pinned) s,
+      for (final s in matched)
+        if (!s.pinned) s,
+    ];
+  }
+
+  void _delete(AiChatSessionSummary item) {
+    final onDelete = widget.onDelete;
+    if (onDelete == null) return;
+    setState(() {
+      _pendingDelete[item.id] = Timer(_undoWindow, () => _commit(item.id));
+    });
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        duration: _undoWindow,
+        content: Text(widget.labels.deleted),
+        action: SnackBarAction(
+          label: widget.labels.undo,
+          onPressed: () => _undo(item.id),
+        ),
+      ),
+    );
+  }
+
+  void _undo(String id) {
+    _pendingDelete.remove(id)?.cancel();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _commit(String id) async {
+    _pendingDelete.remove(id);
+    await widget.onDelete?.call(id);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _rename(AiChatSessionSummary item) async {
+    final onRename = widget.onRename;
+    if (onRename == null) return;
+    final title = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) =>
+          _RenameDialog(initial: item.title, labels: widget.labels),
+    );
+    if (title == null || title.isEmpty || title == item.title) return;
+    await onRename(item.id, title);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _togglePin(AiChatSessionSummary item) async {
+    await widget.onSetPinned?.call(item.id, !item.pinned);
+    if (mounted) setState(() {});
   }
 
   @override
@@ -110,7 +200,7 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
               label: Text(labels.newChat),
             ),
           ),
-          if (widget.sessions.length >= _searchFrom)
+          if (widget.sessions.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
               child: TextField(
@@ -144,17 +234,24 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
                     itemCount: matches.length,
                     itemBuilder: (context, index) {
                       final item = matches[index];
-                      final group = _groupOf(item.updatedAt, labels);
+                      final group = _groupOf(item, labels);
                       final newGroup =
                           index == 0 ||
-                          _groupOf(matches[index - 1].updatedAt, labels) !=
-                              group;
+                          _groupOf(matches[index - 1], labels) != group;
                       final row = _Row(
                         item: item,
                         selected: item.id == widget.selectedId,
                         subtitle: _subtitleFor(item),
                         onTap: () => widget.onSelect(item.id),
-                        onDelete: widget.onDelete,
+                        onDelete: widget.onDelete == null
+                            ? null
+                            : () => _delete(item),
+                        onRename: widget.onRename == null
+                            ? null
+                            : () => _rename(item),
+                        onTogglePin: widget.onSetPinned == null
+                            ? null
+                            : () => _togglePin(item),
                         labels: labels,
                       );
                       if (!newGroup) return row;
@@ -188,7 +285,9 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
     return '${item.turnCount} ${widget.labels.messages}';
   }
 
-  static String _groupOf(DateTime at, AiChatLabels labels) {
+  static String _groupOf(AiChatSessionSummary item, AiChatLabels labels) {
+    if (item.pinned) return labels.pinned;
+    final at = item.updatedAt;
     final now = DateTime.now();
     final days = DateTime(
       now.year,
@@ -203,6 +302,51 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
   }
 }
 
+/// Owns its own controller so it is disposed with the route rather than the
+/// moment `showDialog` returns -- the field is still on screen while the
+/// dialog animates out.
+class _RenameDialog extends StatefulWidget {
+  const _RenameDialog({required this.initial, required this.labels});
+
+  final String initial;
+  final AiChatLabels labels;
+
+  @override
+  State<_RenameDialog> createState() => _RenameDialogState();
+}
+
+class _RenameDialogState extends State<_RenameDialog> {
+  late final _controller = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() => Navigator.of(context).pop(_controller.text.trim());
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.labels.renameTitle),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(widget.labels.cancel),
+        ),
+        FilledButton(onPressed: _submit, child: Text(widget.labels.save)),
+      ],
+    );
+  }
+}
+
 class _Row extends StatelessWidget {
   const _Row({
     required this.item,
@@ -211,23 +355,37 @@ class _Row extends StatelessWidget {
     required this.onTap,
     required this.labels,
     this.onDelete,
+    this.onRename,
+    this.onTogglePin,
   });
 
   final AiChatSessionSummary item;
   final bool selected;
   final String subtitle;
   final VoidCallback onTap;
-  final Future<void> Function(String id)? onDelete;
+  final VoidCallback? onDelete;
+  final VoidCallback? onRename;
+  final VoidCallback? onTogglePin;
   final AiChatLabels labels;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hasMenu = onDelete != null || onRename != null || onTogglePin != null;
     return ListTile(
       selected: selected,
       dense: true,
       title: Row(
         children: [
+          if (item.pinned)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Icon(
+                Icons.push_pin,
+                size: 14,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           Expanded(
             child: Text(
               item.title,
@@ -267,11 +425,55 @@ class _Row extends StatelessWidget {
               ),
             ),
           if (selected) const Icon(Icons.check_circle_rounded, size: 18),
-          if (onDelete != null)
-            IconButton(
-              icon: const Icon(Icons.delete_outline, size: 18),
-              tooltip: labels.delete,
-              onPressed: () => onDelete!(item.id),
+          if (hasMenu)
+            PopupMenuButton<VoidCallback>(
+              icon: const Icon(Icons.more_vert, size: 18),
+              tooltip: '',
+              onSelected: (action) => action(),
+              itemBuilder: (context) => [
+                if (onRename case final rename?)
+                  PopupMenuItem(
+                    value: rename,
+                    child: ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.edit_outlined, size: 18),
+                      title: Text(labels.rename),
+                    ),
+                  ),
+                if (onTogglePin case final pin?)
+                  PopupMenuItem(
+                    value: pin,
+                    child: ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        item.pinned
+                            ? Icons.push_pin_outlined
+                            : Icons.push_pin,
+                        size: 18,
+                      ),
+                      title: Text(item.pinned ? labels.unpin : labels.pin),
+                    ),
+                  ),
+                if (onDelete case final delete?)
+                  PopupMenuItem(
+                    value: delete,
+                    child: ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        Icons.delete_outline,
+                        size: 18,
+                        color: theme.colorScheme.error,
+                      ),
+                      title: Text(
+                        labels.delete,
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
+                    ),
+                  ),
+              ],
             ),
         ],
       ),
