@@ -47,4 +47,32 @@ void main() {
     final out = portalSchemeWithSeed(base, seed);
     expect(out.onPrimary, isNot(base.onPrimary));
   });
+
+  group('portalSeedForPaletteId', () {
+    test('resolves a stored id to its catalog seed', () {
+      expect(
+        portalSeedForPaletteId(PortalThemePaletteId.violet.name),
+        PortalThemeCatalog.byId(PortalThemePaletteId.violet).seedColor,
+      );
+    });
+
+    test('is null for nothing stored, empty, or an id this build lost', () {
+      // All three mean the same thing to a theme: keep the app's own accent.
+      expect(portalSeedForPaletteId(null), isNull);
+      expect(portalSeedForPaletteId(''), isNull);
+      expect(portalSeedForPaletteId('chartreuse'), isNull);
+    });
+
+    test('every catalog palette round-trips through its own id', () {
+      // The picker writes `palette.id.name`; if that stops being what the
+      // lookup reads, the swatches still render and simply do nothing on tap.
+      for (final palette in PortalThemeCatalog.all) {
+        expect(
+          portalSeedForPaletteId(palette.id.name),
+          palette.seedColor,
+          reason: palette.id.name,
+        );
+      }
+    });
+  });
 }

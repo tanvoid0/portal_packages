@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../tokens/design_tokens.dart';
+import 'portal_theme_palette.dart';
+import 'portal_theme_palette_id.dart';
 import 'portal_ui_theme.dart';
 
 /// Shorthand for [PortalUiTheme.of].
@@ -156,4 +158,18 @@ ColorScheme portalSchemeWithSeed(ColorScheme base, Color seed) {
     onPrimaryContainer: derived.onPrimaryContainer,
     inversePrimary: derived.inversePrimary,
   );
+}
+
+/// The seed colour a stored palette id names, or null if it names nothing.
+///
+/// Null covers both "the user never picked one" and "the id came from a build
+/// with palettes this one does not have" — either way the app keeps its own
+/// hand-tuned accent rather than falling back to some other app's default.
+/// Pair with [portalSchemeWithSeed].
+Color? portalSeedForPaletteId(String? paletteId) {
+  if (paletteId == null || paletteId.isEmpty) return null;
+  for (final id in PortalThemePaletteId.values) {
+    if (id.name == paletteId) return PortalThemeCatalog.byId(id).seedColor;
+  }
+  return null;
 }
