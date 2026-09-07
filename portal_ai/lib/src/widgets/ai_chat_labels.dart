@@ -38,6 +38,8 @@ class AiChatLabels {
     this.renameTitle = 'Rename chat',
     this.cancel = 'Cancel',
     this.save = 'Save',
+    this.copy = 'Copy',
+    this.copied = 'Copied',
     this.deleted = 'Chat deleted',
     this.undo = 'Undo',
   });
@@ -105,4 +107,8 @@ class AiChatLabels {
   final String save;
   final String deleted;
   final String undo;
+
+  /// Per-message copy, and what the snackbar says once it lands.
+  final String copy;
+  final String copied;
 }

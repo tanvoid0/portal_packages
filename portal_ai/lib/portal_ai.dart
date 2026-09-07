@@ -26,6 +26,7 @@ export 'src/widgets/ai_settings_section.dart';
 export 'src/runtime/portal_ai_runtime.dart';
 export 'src/tools/ai_agent.dart';
 export 'src/chat/ai_chat_export.dart';
+export 'src/chat/streamed_final_text.dart';
 export 'src/chat/ai_chat_session.dart';
 export 'src/chat/ai_proposal.dart';
 export 'src/chat/ai_suggestion.dart';

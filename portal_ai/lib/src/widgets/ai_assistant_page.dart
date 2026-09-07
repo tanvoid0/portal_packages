@@ -17,6 +17,7 @@ import 'ai_suggestion_cards.dart';
 import 'ai_item_list.dart';
 import 'ai_markdown.dart';
 import 'ai_prompt_composer.dart';
+import 'ai_settings_section.dart';
 import 'ai_thinking_tile.dart';
 
 /// Drop-in assistant UI: prompt box, live step log and a confirmation prompt
@@ -239,6 +240,10 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   /// Reasoning behind [_reply]; only used in one-shot mode, since a kept turn
   /// carries its own in the payload.
   String? _replyThinking;
+
+  /// The answer as it is being written, before the turn it belongs to exists.
+  /// Null between runs.
+  String? _streamingReply;
   String? _error;
 
   /// Accepting or discarding removes a card here and now; the host is told, but
@@ -267,6 +272,11 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   /// Cancelled the moment a conversation starts -- nothing should move under a
   /// reply someone is reading.
   Timer? _rotation;
+
+  /// Kept so the keyboard does not drop after every send. A composer that
+  /// closes the keyboard on submit makes a back-and-forth conversation a
+  /// tap-to-reopen chore.
+  final _inputFocus = FocusNode();
 
   bool _loadingIdeas = false;
 
@@ -549,6 +559,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   @override
   void dispose() {
     _rotation?.cancel();
+    _inputFocus.dispose();
     _input.dispose();
     _scroll.dispose();
     super.dispose();
@@ -556,7 +567,11 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
 
   /// Keeps the newest turn in view; a long thread otherwise grows below the
   /// fold and the reply looks like it never arrived.
-  void _followNewest() {
+  void _followNewest({bool force = true}) {
+    // Reading back through a long answer must not be yanked to the end by the
+    // next chunk arriving, so a stream only follows when the user is already
+    // at the bottom.
+    if (!force && !_atBottom) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scroll.hasClients) return;
       _scroll.animateTo(
@@ -565,6 +580,14 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         curve: Curves.easeOut,
       );
     });
+  }
+
+  static const _bottomSlack = 80.0;
+
+  bool get _atBottom {
+    if (!_scroll.hasClients) return true;
+    final position = _scroll.position;
+    return position.maxScrollExtent - position.pixels <= _bottomSlack;
   }
 
   void _stop() {
@@ -665,12 +688,18 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
           setState(() => _steps.add(step));
           _followNewest();
         },
+        onReply: (delta) {
+          if (!mounted || _cancelled) return;
+          setState(() => _streamingReply = (_streamingReply ?? '') + delta);
+          _followNewest(force: false);
+        },
       );
       if (!mounted || _cancelled) return;
       if (!keeping) {
         setState(() {
           _reply = result.message;
           _replyThinking = result.thinking;
+          _streamingReply = null;
         });
         return;
       }
@@ -696,17 +725,29 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
           ),
         );
         _steps.clear();
+        _streamingReply = null;
       });
       _followNewest();
       await _persist();
     } catch (e) {
       if (!mounted || _cancelled) return;
-      setState(() => _error = e.toString());
+      setState(() {
+        _error = e.toString();
+        _streamingReply = null;
+      });
       // Keep the question even though the answer failed: without this the
       // user's turn is on screen but gone after a reload.
       await _persist();
     } finally {
-      if (mounted) setState(() => _running = false);
+      if (mounted) {
+        setState(() {
+          _running = false;
+          _streamingReply = null;
+        });
+        // Straight back to typing: the keyboard staying up is the difference
+        // between a conversation and a form you fill in one field at a time.
+        _inputFocus.requestFocus();
+      }
     }
   }
 
@@ -863,6 +904,42 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     return approved ?? false;
   }
 
+  void _copyTurn(AiChatTurn turn) {
+    Clipboard.setData(ClipboardData(text: turn.content));
+    HapticFeedback.selectionClick();
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(content: Text(widget.labels.copied)),
+    );
+  }
+
+  /// The provider and model picker, one tap from the conversation.
+  ///
+  /// Switching model mid-thread is the whole point -- ask the cheap local one
+  /// first, hand the hard question to the cloud -- and sending someone to the
+  /// app's settings screen and back loses the thread they were in.
+  Future<void> _showBackendPicker() async {
+    final runtime = widget.runtime;
+    final store = runtime?.backendStore;
+    if (runtime == null || store == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: AiSettingsSection(
+            store: store,
+            onChanged: (option) {
+              runtime.applyBackend(option);
+              if (mounted) setState(() {});
+            },
+          ),
+        ),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -888,6 +965,16 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                 Expanded(
                   child: Text(widget.title, style: theme.textTheme.titleMedium),
                 ),
+                if (widget.runtime?.backendStore != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: ActionChip(
+                      avatar: const Icon(Icons.memory, size: 16),
+                      label: Text(widget.runtime!.backendLabel),
+                      onPressed: _showBackendPicker,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
                 if (_visibleTurns.isNotEmpty)
                   IconButton(
                     tooltip: 'Copy conversation as JSON',
@@ -971,6 +1058,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _TurnBubble(
                         turn: turn,
+                        onCopy: () => _copyTurn(turn),
+                        copyLabel: widget.labels.copy,
+                        copiedLabel: widget.labels.copied,
                         // Only the newest question can be acted on:
                         // rewriting or dropping an older one would mean
                         // throwing away every answer after it, which is a
@@ -992,6 +1082,12 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                       ),
                   ],
                   for (final step in _steps) _stepView(step, theme),
+                  if (_streamingReply case final partial?
+                      when partial.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: AiMarkdown(text: partial),
+                    ),
                   if (_replyThinking case final thinking?)
                     AiThinkingTile(
                       thinking: thinking,
@@ -1070,6 +1166,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
           const SizedBox(height: 8),
           AiPromptComposer(
             controller: _input,
+            focusNode: _inputFocus,
             enabled: !_gated,
             busy: _busy,
             onStop: _stop,
@@ -1238,8 +1335,11 @@ class _TurnBubble extends StatelessWidget {
     required this.turn,
     this.onEdit,
     this.onDelete,
+    this.onCopy,
     this.editLabel = 'Edit',
     this.deleteLabel = 'Delete',
+    this.copyLabel = 'Copy',
+    this.copiedLabel = 'Copied',
   });
 
   final AiChatTurn turn;
@@ -1250,8 +1350,14 @@ class _TurnBubble extends StatelessWidget {
   /// Drops this turn (and everything after it) with no re-typing. Null for
   /// anything not deletable.
   final VoidCallback? onDelete;
+
+  /// Puts this turn on the clipboard. Offered on every turn, including the
+  /// assistant's -- an answer you cannot copy out is an answer you retype.
+  final VoidCallback? onCopy;
   final String editLabel;
   final String deleteLabel;
+  final String copyLabel;
+  final String copiedLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -1260,17 +1366,37 @@ class _TurnBubble extends StatelessWidget {
     final meta = _meta(context);
     // Only the user gets a bubble. The assistant's reply is the page's own
     // content -- boxing it just fights the app's background for contrast.
+    final scheme = theme.colorScheme;
     if (!isUser) {
+      // A visible button rather than the bubble's long-press menu: the reply
+      // is selectable text, and a long press there belongs to the selection.
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AiMarkdown(text: turn.content),
-          if (meta != null) _metaText(theme, meta),
+          AiMarkdown(
+            text: turn.content,
+            copyCodeLabel: copyLabel,
+            copiedLabel: copiedLabel,
+          ),
+          Row(
+            children: [
+              if (meta != null) _metaText(theme, meta),
+              if (onCopy != null)
+                IconButton(
+                  onPressed: onCopy,
+                  tooltip: copyLabel,
+                  icon: const Icon(Icons.copy_outlined, size: 16),
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  constraints: const BoxConstraints(),
+                  color: scheme.onSurfaceVariant,
+                ),
+            ],
+          ),
         ],
       );
     }
-    final scheme = theme.colorScheme;
-    final canAct = onEdit != null || onDelete != null;
+    final canAct = onEdit != null || onDelete != null || onCopy != null;
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -1336,6 +1462,16 @@ class _TurnBubble extends StatelessWidget {
         Offset.zero & overlay.size,
       ),
       items: [
+        if (onCopy != null)
+          PopupMenuItem(
+            value: onCopy,
+            child: ListTile(
+              leading: const Icon(Icons.copy_outlined),
+              title: Text(copyLabel),
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+            ),
+          ),
         if (onEdit != null)
           PopupMenuItem(
             value: onEdit,

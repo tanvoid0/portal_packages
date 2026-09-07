@@ -16,6 +16,7 @@ class AiPromptComposer extends StatelessWidget {
     super.key,
     required this.controller,
     required this.onSubmit,
+    this.focusNode,
     this.enabled = true,
     this.busy = false,
     this.onStop,
@@ -30,6 +31,9 @@ class AiPromptComposer extends StatelessWidget {
   });
 
   final TextEditingController controller;
+
+  /// Kept by the page so focus (and the keyboard with it) survives a send.
+  final FocusNode? focusNode;
 
   /// Called by the button and by the keyboard's send action.
   final VoidCallback onSubmit;
@@ -80,6 +84,7 @@ class AiPromptComposer extends StatelessWidget {
     // lands on nothing. Only the parts that read the text rebuild.
     final field = TextField(
       controller: controller,
+      focusNode: focusNode,
       enabled: enabled,
       // Read-only rather than disabled while a run is in flight: a disabled
       // field disables its own suffix, which is where the stop button lives,

@@ -141,6 +141,26 @@ class PortalAiRuntime {
   /// The client the assistant is talking to right now.
   AiCompletionClient get client => _client;
 
+  /// Where the provider and model choice is kept, for a UI that wants to
+  /// offer the switch itself. Null for a runtime built without one, which is
+  /// every app that only ever talks to the server.
+  AiBackendStore? get backendStore => _store;
+
+  /// What to call the model in a one-line badge: the chosen model's own name
+  /// where there is one, the provider otherwise.
+  String get backendLabel {
+    final store = _store;
+    final kind = store?.selectedKind ?? AiBackendKind.cloudGemini;
+    final model = store?.modelFor(kind);
+    if (model != null && model.isNotEmpty) return model;
+    return switch (kind) {
+      AiBackendKind.cloudGemini => 'Cloud',
+      AiBackendKind.ollama => 'Ollama',
+      AiBackendKind.systemOnDevice => 'On-device',
+      AiBackendKind.edgeGalleryDelegate => 'Edge Gallery',
+    };
+  }
+
   /// True when generation happens on this device rather than on the server.
   bool get usesLocalModel => _client is! ServerCompletionClient;
 
@@ -259,6 +279,7 @@ class PortalAiRuntime {
     List<AiTool>? tools,
     Future<bool> Function(AiTool tool, AiToolCall call)? confirm,
     void Function(AiAgentStep step)? onStep,
+    void Function(String delta)? onReply,
     int maxSteps = 6,
     List<AiChatTurn> history = const [],
   }) {
@@ -272,6 +293,7 @@ class PortalAiRuntime {
       prompt,
       confirm: confirm,
       onStep: onStep,
+      onReply: onReply,
       history: history,
     );
   }

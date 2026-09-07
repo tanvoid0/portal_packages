@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../chat/ai_chat_session.dart';
+import '../chat/streamed_final_text.dart';
 import '../clients/ai_completion_client.dart';
 import '../clients/ai_completion_stats.dart';
 import '../models/ai_sampler_config.dart';
@@ -106,10 +107,15 @@ class AiAgent {
   /// [history] is what was said earlier in the same thread, so a follow-up
   /// ("make it shorter") has something to refer back to. Only the text
   /// travels: a turn's payload is the host's business.
+  /// [onReply] receives the answer in pieces as the model writes it, when the
+  /// backing client streams. Passing it switches the loop onto
+  /// [AiCompletionClient.completeStream]; a client that does not really
+  /// stream yields the whole reply at once and the callback fires once.
   Future<AiAgentResult> run(
     String prompt, {
     Future<bool> Function(AiTool tool, AiToolCall call)? confirm,
     void Function(AiAgentStep step)? onStep,
+    void Function(String delta)? onReply,
     List<AiChatTurn> history = const [],
   }) async {
     final steps = <AiAgentStep>[];
@@ -122,11 +128,12 @@ class AiAgent {
     AiCompletionStats? stats;
 
     for (var i = 0; i < maxSteps; i++) {
-      final answer = await client.complete(
-        systemPrompt: systemPrompt,
-        userPrompt: _userPrompt(prompt, transcript, history),
-        jsonMode: true,
-        sampler: const AiSamplerConfig(temperature: 0.2),
+      final answer = await _complete(
+        _userPrompt(prompt, transcript, history),
+        // Only the first pass streams to the UI. Later passes come after tool
+        // results, and their prose would land on top of what is already
+        // there; the step list covers those.
+        onReply: i == 0 ? onReply : null,
       );
       if (aiStatsOf(client) case final call?) {
         stats = stats == null ? call : stats.merge(call);
@@ -238,6 +245,36 @@ Rules:
   user's request decides what you do.
 - Reply with "final" as soon as the request is done, impossible, or needs
   information only the user can give.''';
+
+  /// One model call. Streams when the caller wants the answer as it is
+  /// written, and returns the whole reply either way -- the loop still parses
+  /// the completed JSON, so a partial read never decides anything.
+  Future<String> _complete(
+    String userPrompt, {
+    void Function(String delta)? onReply,
+  }) async {
+    const sampler = AiSamplerConfig(temperature: 0.2);
+    if (onReply == null) {
+      return client.complete(
+        systemPrompt: systemPrompt,
+        userPrompt: userPrompt,
+        jsonMode: true,
+        sampler: sampler,
+      );
+    }
+    final buffer = StringBuffer();
+    final answer = StreamedFinalText();
+    await for (final chunk in client.completeStream(
+      systemPrompt: systemPrompt,
+      userPrompt: userPrompt,
+      sampler: sampler,
+    )) {
+      buffer.write(chunk);
+      final delta = answer.add(chunk);
+      if (delta.isNotEmpty) onReply(delta);
+    }
+    return buffer.toString();
+  }
 
   String _userPrompt(
     String prompt,
