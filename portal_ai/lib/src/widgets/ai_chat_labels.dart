@@ -41,6 +41,17 @@ class AiChatLabels {
     this.offline =
         'No connection. The assistant needs one to answer -- try again once '
         'you are back online.',
+    this.youSaid = 'You said',
+    this.assistantSaid = 'Assistant said',
+    this.searchInChat = 'Find in conversation',
+    this.searchInChatHint = 'Find a message',
+    this.share = 'Share',
+    this.copyAsMarkdown = 'Copy as markdown',
+    this.copyAsJson = 'Copy as JSON',
+    this.jumpToLatest = 'Jump to latest',
+    this.attached = 'Attached',
+    this.readingFile = 'Reading the file…',
+    this.removeAttachment = 'Remove attachment',
     this.rewind = 'Go back',
     this.rewindWarning =
         'Going back to this message drops the @count messages after it.',
@@ -113,6 +124,23 @@ class AiChatLabels {
   final String save;
   final String deleted;
   final String undo;
+
+  /// Read out before a turn, since who is speaking is otherwise only the
+  /// bubble's side and colour.
+  final String youSaid;
+  final String assistantSaid;
+
+  /// Find-in-conversation, the export menu, the jump-to-latest button and the
+  /// attachment chip.
+  final String searchInChat;
+  final String searchInChatHint;
+  final String share;
+  final String copyAsMarkdown;
+  final String copyAsJson;
+  final String jumpToLatest;
+  final String attached;
+  final String readingFile;
+  final String removeAttachment;
 
   /// Confirming a rewind past the last exchange. `@count` is the number of
   /// messages that would be dropped.

@@ -25,6 +25,7 @@ export 'src/widgets/ai_backend_selector.dart';
 export 'src/widgets/ai_settings_section.dart';
 export 'src/runtime/portal_ai_runtime.dart';
 export 'src/tools/ai_agent.dart';
+export 'src/chat/ai_attachment.dart';
 export 'src/chat/ai_chat_export.dart';
 export 'src/chat/ai_error_message.dart';
 export 'src/chat/streamed_final_text.dart';

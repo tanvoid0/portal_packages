@@ -3,12 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../chat/ai_attachment.dart';
 import '../chat/ai_chat_export.dart';
-import '../chat/ai_error_message.dart';
 import '../chat/ai_chat_session.dart';
+import '../chat/ai_error_message.dart';
 import '../chat/ai_proposal.dart';
 import '../chat/ai_suggestion.dart';
 import '../clients/ai_completion_client.dart';
+import '../documents/ai_document_client.dart';
+import '../documents/ai_document_import.dart';
 import '../runtime/portal_ai_runtime.dart';
 import '../tools/ai_tool.dart';
 import 'ai_chat_history_list.dart';
@@ -53,6 +56,7 @@ class AiAssistantPage extends StatefulWidget {
     this.autoSend = false,
     this.consent,
     this.onAttach,
+    this.documents,
     this.maxPromptLength,
   }) : assert(
          runtime != null || onSend != null,
@@ -129,6 +133,11 @@ class AiAssistantPage extends StatefulWidget {
 
   final AiChatLabels labels;
 
+  /// Reads a picked file into text on the server, so a question can be asked
+  /// about a receipt or a note. Set it and the composer's attach button picks
+  /// a file itself; leave it null and [onAttach] is whatever the host wants.
+  final AiDocumentClient? documents;
+
   /// Where to keep this app's threads, if it wants history.
   ///
   /// With a store the page records the conversation, restores it from the
@@ -192,6 +201,7 @@ class AiAssistantPage extends StatefulWidget {
     void Function(String entity, AiItem item)? onItemTap,
     AiConsent? consent,
     VoidCallback? onAttach,
+    AiDocumentClient? documents,
     int? maxPromptLength,
   }) {
     return Navigator.of(context).push<void>(
@@ -201,6 +211,7 @@ class AiAssistantPage extends StatefulWidget {
             child: AiAssistantPage(
               runtime: runtime,
               title: title,
+              documents: documents,
               suggestions: suggestions,
               onSettings: onSettings,
               tools: tools,
@@ -245,6 +256,20 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   /// The answer as it is being written, before the turn it belongs to exists.
   /// Null between runs.
   String? _streamingReply;
+
+  /// Find-in-conversation. While [_chatQuery] is set the transcript shows only
+  /// the turns that match; tapping one clears the search and scrolls to it.
+  bool _searching = false;
+  String _chatQuery = '';
+
+  /// True when the newest turn is off screen, which is the only time a
+  /// jump-to-latest button is worth the space.
+  bool _scrolledUp = false;
+
+  /// A document read for the next prompt: its name for the chip, its text for
+  /// the model. Cleared once sent.
+  ({String name, String text})? _attachment;
+  bool _reading = false;
   String? _error;
 
   /// Accepting or discarding removes a card here and now; the host is told, but
@@ -326,9 +351,60 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   List<AiChatTurn> get _visibleTurns =>
       widget.onSend != null ? widget.turns : _turns;
 
+  /// What the transcript draws: everything, or the matches while a
+  /// find-in-conversation is running.
+  List<AiChatTurn> get _shownTurns {
+    final query = _chatQuery.trim().toLowerCase();
+    if (query.isEmpty) return _visibleTurns;
+    return [
+      for (final turn in _visibleTurns)
+        if (turn.content.toLowerCase().contains(query)) turn,
+    ];
+  }
+
+  /// Leaves the search and puts [turn] on screen where it actually sits.
+  void _revealTurn(AiChatTurn turn) {
+    setState(() {
+      _searching = false;
+      _chatQuery = '';
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = GlobalObjectKey(turn).currentContext;
+      if (context == null) return;
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 250),
+        alignment: 0.2,
+      );
+    });
+  }
+
+  /// Reads a file into text for the next prompt. The text goes to the model,
+  /// not into the transcript: nobody wants a receipt pasted into their chat.
+  Future<void> _pickAttachment() async {
+    final documents = widget.documents;
+    if (documents == null || _reading) return;
+    setState(() => _reading = true);
+    try {
+      final file = await pickAiDocument();
+      if (file == null) return;
+      final read = await documents.extractText(
+        bytes: file.bytes,
+        filename: file.name,
+      );
+      if (!mounted) return;
+      setState(() => _attachment = (name: file.name, text: read.text));
+    } catch (e) {
+      if (mounted) setState(() => _error = _messageFor(e));
+    } finally {
+      if (mounted) setState(() => _reading = false);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _scroll.addListener(_watchScroll);
     _reloadSessions();
     _syncRotation();
     final initial = widget.initialPrompt?.trim();
@@ -450,7 +526,26 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   /// system prompt and tool specs go with it. The clipboard is the export:
   /// pasting into a chat or an issue is what people actually do with this, and
   /// it costs no plugin and no file permission.
-  Future<void> _exportChat() async {
+  Future<void> _exportChat({required bool asJson}) async {
+    if (!asJson) {
+      await Clipboard.setData(
+        ClipboardData(
+          text: aiChatExportMarkdown(
+            app: widget.title,
+            title: _sessionId == null
+                ? null
+                : widget.store?.load(_sessionId!)?.title,
+            turns: _visibleTurns,
+            at: DateTime.now(),
+          ),
+        ),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(content: Text(widget.labels.copied)),
+      );
+      return;
+    }
     final runtime = widget.runtime;
     String? prompt;
     var specs = const <String>[];
@@ -560,6 +655,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   @override
   void dispose() {
     _rotation?.cancel();
+    _scroll.removeListener(_watchScroll);
     _inputFocus.dispose();
     _input.dispose();
     _scroll.dispose();
@@ -581,6 +677,12 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         curve: Curves.easeOut,
       );
     });
+  }
+
+  void _watchScroll() {
+    final scrolledUp = !_atBottom;
+    if (scrolledUp == _scrolledUp) return;
+    setState(() => _scrolledUp = scrolledUp);
   }
 
   static const _bottomSlack = 80.0;
@@ -710,13 +812,22 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       if (keeping) {
         _input.clear();
         _turns.add(
-          AiChatTurn(role: 'user', content: prompt, at: DateTime.now()),
+          AiChatTurn(
+            role: 'user',
+            content: prompt,
+            at: DateTime.now(),
+            // The document's text goes to the model, not into the bubble;
+            // the name is what makes the turn make sense on a reload.
+            payload: _attachment == null
+                ? null
+                : {'attachment': _attachment!.name},
+          ),
         );
       }
     });
     try {
       final result = await widget.runtime!.ask(
-        prompt,
+        _withAttachment(prompt),
         tools: widget.tools,
         history: history,
         confirm: _confirm,
@@ -780,6 +891,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         setState(() {
           _running = false;
           _streamingReply = null;
+          // One prompt, one document: keeping it around would silently
+          // re-send it with the next question.
+          _attachment = null;
         });
         // Straight back to typing: the keyboard staying up is the difference
         // between a conversation and a form you fill in one field at a time.
@@ -941,6 +1055,16 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     return approved ?? false;
   }
 
+  String _withAttachment(String prompt) {
+    final attachment = _attachment;
+    if (attachment == null) return prompt;
+    return aiPromptWithAttachment(
+      prompt: prompt,
+      name: attachment.name,
+      text: attachment.text,
+    );
+  }
+
   String _messageFor(Object error) =>
       aiErrorMessage(error, offline: widget.labels.offline);
 
@@ -1015,12 +1139,31 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                       visualDensity: VisualDensity.compact,
                     ),
                   ),
-                if (_visibleTurns.isNotEmpty)
+                if (_visibleTurns.isNotEmpty) ...[
                   IconButton(
-                    tooltip: 'Copy conversation as JSON',
-                    icon: const Icon(Icons.data_object),
-                    onPressed: _exportChat,
+                    tooltip: widget.labels.searchInChat,
+                    icon: Icon(_searching ? Icons.search_off : Icons.search),
+                    onPressed: () => setState(() {
+                      _searching = !_searching;
+                      if (!_searching) _chatQuery = '';
+                    }),
                   ),
+                  PopupMenuButton<bool>(
+                    tooltip: widget.labels.share,
+                    icon: const Icon(Icons.ios_share),
+                    onSelected: (asJson) => _exportChat(asJson: asJson),
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: false,
+                        child: Text(widget.labels.copyAsMarkdown),
+                      ),
+                      PopupMenuItem(
+                        value: true,
+                        child: Text(widget.labels.copyAsJson),
+                      ),
+                    ],
+                  ),
+                ],
                 if (widget.store != null) ...[
                   IconButton(
                     tooltip: widget.labels.historyTitle,
@@ -1041,11 +1184,28 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                   ),
               ],
             ),
+            if (_searching)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: TextField(
+                  autofocus: true,
+                  onChanged: (value) => setState(() => _chatQuery = value),
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: widget.labels.searchInChatHint,
+                    prefixIcon: const Icon(Icons.search, size: 18),
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              ),
             const SizedBox(height: 8),
           ],
           Flexible(
             fit: widget.fill ? FlexFit.tight : FlexFit.loose,
-            child: SingleChildScrollView(
+            child: Stack(
+              children: [
+                SingleChildScrollView(
               controller: _scroll,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1085,7 +1245,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                       refreshLabel: widget.labels.moreIdeas,
                     ),
                   ],
-                  for (final turn in _visibleTurns) ...[
+                  for (final turn in _shownTurns) ...[
                     if (_thinkingOf(turn) case final thinking?)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 4),
@@ -1095,12 +1255,19 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                         ),
                       ),
                     Padding(
+                      key: GlobalObjectKey(turn),
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: _TurnBubble(
+                      child: GestureDetector(
+                        onTap: _chatQuery.trim().isEmpty
+                            ? null
+                            : () => _revealTurn(turn),
+                        child: _TurnBubble(
                         turn: turn,
                         onCopy: () => _copyTurn(turn),
                         copyLabel: widget.labels.copy,
                         copiedLabel: widget.labels.copied,
+                        youLabel: widget.labels.youSaid,
+                        assistantLabel: widget.labels.assistantSaid,
                         // Any question can be reworked, not just the newest:
                         // the mistake worth fixing is often three turns back.
                         // Going back drops the answers after it, so
@@ -1117,6 +1284,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                             : null,
                         editLabel: widget.labels.edit,
                         deleteLabel: widget.labels.delete,
+                        ),
                       ),
                     ),
                     for (final block in _blocksOf(turn))
@@ -1130,7 +1298,10 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                       when partial.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: AiMarkdown(text: partial),
+                      child: Semantics(
+                        liveRegion: true,
+                        child: AiMarkdown(text: partial),
+                      ),
                     ),
                   if (_replyThinking case final thinking?)
                     AiThinkingTile(
@@ -1197,6 +1368,21 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                 ],
               ),
             ),
+                // Only while the newest turn is off screen: an always-there
+                // button sits on top of the answer you are reading.
+                if (_scrolledUp)
+                  Positioned(
+                    right: 0,
+                    bottom: 8,
+                    child: FloatingActionButton.small(
+                      heroTag: null,
+                      tooltip: widget.labels.jumpToLatest,
+                      onPressed: _followNewest,
+                      child: const Icon(Icons.arrow_downward),
+                    ),
+                  ),
+              ],
+            ),
           ),
           if (_proposals.isNotEmpty && widget.onAcceptProposal != null)
             Padding(
@@ -1208,6 +1394,40 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
               ),
             ),
           const SizedBox(height: 8),
+          if (_reading || _attachment != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: _reading
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            widget.labels.readingFile,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ],
+                      )
+                    : InputChip(
+                        avatar: const Icon(Icons.description_outlined,
+                            size: 16),
+                        label: Text(
+                          '${widget.labels.attached}: ${_attachment!.name}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onDeleted: () => setState(() => _attachment = null),
+                        deleteButtonTooltipMessage:
+                            widget.labels.removeAttachment,
+                      ),
+              ),
+            ),
           AiPromptComposer(
             controller: _input,
             focusNode: _inputFocus,
@@ -1215,7 +1435,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
             busy: _busy,
             onStop: _stop,
             onSubmit: _send,
-            onAttach: widget.onAttach,
+            onAttach: widget.documents != null
+                ? _pickAttachment
+                : widget.onAttach,
             maxLength: widget.maxPromptLength,
             stopLabel: widget.labels.stop,
             attachLabel: widget.labels.attach,
@@ -1384,6 +1606,8 @@ class _TurnBubble extends StatelessWidget {
     this.deleteLabel = 'Delete',
     this.copyLabel = 'Copy',
     this.copiedLabel = 'Copied',
+    this.youLabel = 'You said',
+    this.assistantLabel = 'Assistant said',
   });
 
   final AiChatTurn turn;
@@ -1403,6 +1627,12 @@ class _TurnBubble extends StatelessWidget {
   final String copyLabel;
   final String copiedLabel;
 
+  /// Read out before the turn itself, so a screen reader says who is talking
+  /// -- on screen that is the bubble's side and colour, which announces
+  /// nothing.
+  final String youLabel;
+  final String assistantLabel;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1414,7 +1644,9 @@ class _TurnBubble extends StatelessWidget {
     if (!isUser) {
       // A visible button rather than the bubble's long-press menu: the reply
       // is selectable text, and a long press there belongs to the selection.
-      return Column(
+      return Semantics(
+        label: assistantLabel,
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AiMarkdown(
@@ -1435,9 +1667,10 @@ class _TurnBubble extends StatelessWidget {
                   constraints: const BoxConstraints(),
                   color: scheme.onSurfaceVariant,
                 ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       );
     }
     final canAct = onEdit != null || onDelete != null || onCopy != null;
@@ -1446,6 +1679,8 @@ class _TurnBubble extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Flexible(
+          child: Semantics(
+            label: youLabel,
           child: GestureDetector(
             // Long-press for actions, like every other chat bubble on the
             // platform -- a pencil icon sitting next to the bubble at all
@@ -1484,6 +1719,7 @@ class _TurnBubble extends StatelessWidget {
                     _metaText(theme, meta, color: scheme.onPrimaryContainer),
                 ],
               ),
+            ),
             ),
           ),
         ),

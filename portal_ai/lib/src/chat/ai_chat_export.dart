@@ -25,3 +25,31 @@ String aiChatExportJson({
       if (toolSpecs.isNotEmpty) 'tools': toolSpecs,
       'turns': [for (final turn in turns) turn.toJson()],
     });
+
+/// The same conversation as something a person reads: the transcript in
+/// markdown, ready to paste into a note or an issue.
+///
+/// The JSON export is for tuning a prompt; this one is for showing someone
+/// what the assistant said. No system prompt, no tool specs, no payloads --
+/// just who said what, and when the turn knows.
+String aiChatExportMarkdown({
+  required String app,
+  required List<AiChatTurn> turns,
+  required DateTime at,
+  String? title,
+}) {
+  final buffer = StringBuffer()
+    ..writeln('# ${title == null || title.isEmpty ? app : title}')
+    ..writeln()
+    ..writeln('_$app - ${at.toIso8601String()}_');
+  for (final turn in turns) {
+    final content = turn.content.trim();
+    if (content.isEmpty) continue;
+    buffer
+      ..writeln()
+      ..writeln('**${turn.isUser ? 'You' : 'Assistant'}**')
+      ..writeln()
+      ..writeln(content);
+  }
+  return buffer.toString();
+}
