@@ -55,6 +55,24 @@ void main() {
         },
       ),
       AiTool(
+        name: 'delete_item',
+        description: 'Delete an item.',
+        parameters: const {'id': 'item id'},
+        mutates: true,
+        preview: (call) async {
+          final id = call.argString('id');
+          final name = basket.firstWhere(
+            (item) => 'id-$item' == id,
+            orElse: () => '',
+          );
+          return name.isEmpty ? null : AiItem(id: id, title: name);
+        },
+        run: (call) async {
+          basket.removeWhere((item) => 'id-$item' == call.argString('id'));
+          return 'deleted';
+        },
+      ),
+      AiTool(
         name: 'list_items',
         description: 'List the items.',
         run: (_) async => basket.isEmpty ? 'empty' : basket.join(', '),
@@ -135,6 +153,30 @@ void main() {
     expect(basket, ['Milk']);
     expect(find.text('added Milk'), findsOneWidget);
     expect(find.text('Added milk to your list.'), findsOneWidget);
+  });
+
+  testWidgets('a mutating tool asks with the row, not the id', (tester) async {
+    basket.add('Milk');
+    await pumpSheet(
+      tester,
+      runtimeWith(const [
+        '{"tool":"delete_item","args":{"id":"id-Milk"}}',
+        '{"final":"Gone."}',
+      ]),
+    );
+
+    await tester.enterText(find.byType(TextField), 'delete the milk');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pump();
+
+    // Nobody recognises a record by its id, so the card names the row the
+    // tool resolved and drops the argument dump that held the id.
+    expect(find.text('Milk'), findsOneWidget);
+    expect(find.text('id-Milk'), findsNothing);
+
+    await tester.tap(find.text('Accept'));
+    await tester.pumpAndSettle();
+    expect(basket, isEmpty);
   });
 
   testWidgets('skipping a mutating tool leaves state untouched', (
@@ -509,4 +551,5 @@ class _MemoryStore implements AiChatStore {
 
   @override
   Future<void> delete(String id) async => _sessions.remove(id);
+
 }

@@ -1130,7 +1130,19 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     // caused the tool call and the answer so far, which is exactly the
     // context needed to judge whether to allow it -- and it did not match
     // the proposal cards portal_task already asks with.
-    final pending = _PendingConfirm(tool: tool, call: call);
+    // Resolved before the card goes up: an id in an argument row says
+    // nothing, and the answer to "delete this?" depends entirely on which
+    // one. A tool that cannot resolve it -- a bad id, a repo that will not
+    // read -- must still get its question asked, so the lookup failing is
+    // not the question failing.
+    AiItem? preview;
+    try {
+      preview = await tool.preview?.call(call);
+    } catch (_) {
+      preview = null;
+    }
+    if (!mounted) return const AiToolDecision.declined();
+    final pending = _PendingConfirm(tool: tool, call: call, preview: preview);
     setState(() => _pendingConfirm = pending);
     _followNewest();
     final decision = await pending.answer.future;
@@ -2205,10 +2217,13 @@ enum _ChatMenuAction { find, copyAsMarkdown, copyAsJson }
 
 /// A tool call waiting on the user's answer.
 class _PendingConfirm {
-  _PendingConfirm({required this.tool, required this.call});
+  _PendingConfirm({required this.tool, required this.call, this.preview});
 
   final AiTool tool;
   final AiToolCall call;
+
+  /// The row this call would change, if the tool could resolve one.
+  final AiItem? preview;
   final answer = Completer<AiToolDecision>();
 }
 
@@ -2286,11 +2301,16 @@ class _ConfirmCard extends StatelessWidget {
                 ),
               ),
             ],
-            if (pending.call.args.isNotEmpty) const SizedBox(height: 12),
-            for (final arg in pending.call.args.entries)
-              // The photo is shown, so its URL is not worth a row too.
-              if (arg.value != _previewImage(pending.call))
-                _ArgRow(name: arg.key, value: arg.value),
+            if (pending.preview case final item?) ...[
+              const SizedBox(height: 12),
+              AiItemList(items: [item]),
+            ] else ...[
+              if (pending.call.args.isNotEmpty) const SizedBox(height: 12),
+              for (final arg in pending.call.args.entries)
+                // The photo is shown, so its URL is not worth a row too.
+                if (arg.value != _previewImage(pending.call))
+                  _ArgRow(name: arg.key, value: arg.value),
+            ],
             const SizedBox(height: 4),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,

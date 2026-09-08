@@ -34,6 +34,20 @@ void main() {
     FlutterSecureStorage.setMockInitialValues({});
   });
 
+  // A restore or a keystore invalidation leaves the encrypted queue in
+  // SharedPreferences with no key that can read it. Throwing on that read
+  // wedges every later write, since each one loads before it saves.
+  test('a queue sealed under a lost key is dropped, not fatal', () async {
+    final sealed = await EncryptedSyncQueueCodec.encryptOperations([op('a')]);
+    SharedPreferences.setMockInitialValues({_queueKey: sealed});
+    FlutterSecureStorage.setMockInitialValues({});
+
+    final queue = await SyncQueue().init();
+    await queue.enqueue(op('b'));
+
+    expect(await storedEntityIds(), ['b']);
+  });
+
   test('enqueue persists operations', () async {
     final queue = await SyncQueue().init();
     await queue.enqueue(op('a'));

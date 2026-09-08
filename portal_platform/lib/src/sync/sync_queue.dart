@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -237,20 +238,41 @@ class SyncQueue extends GetxService {
 
   // ─── Persistence ───────────────────────────────────────────────────
 
-  /// Throws when the persisted queue cannot be read or decrypted.
+  /// Throws when the persisted queue cannot be read.
   ///
   /// Deliberately not swallowed: every mutating caller does load → modify →
   /// save, so returning an empty list on a transient read failure would
   /// overwrite the pending operations with whatever survived that call.
+  ///
+  /// Ciphertext that will not authenticate is the exception, because it is
+  /// not transient. The queue key lives in the Android keystore and the
+  /// queue itself in [SharedPreferences]; a restore, a reinstall or a
+  /// keystore invalidation takes the key and leaves the blob, and no key
+  /// that can read it will ever exist again. Throwing then wedges the app
+  /// for good: every write that has to queue -- which is every write the
+  /// server rejects, and every write made offline -- fails on the read
+  /// before it, so nothing can be saved or deleted again. So the
+  /// unreadable blob is dropped once and the queue starts empty. The
+  /// operations in it are lost, but they were already unrecoverable; the
+  /// local database they came from is untouched.
   Future<List<SyncOperation>> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_storageKey);
     if (raw == null || raw.isEmpty) return [];
-    final migrated = await EncryptedSyncQueueCodec.migrateIfNeeded(raw);
-    if (migrated != raw) {
-      await prefs.setString(_storageKey, migrated);
+    try {
+      final migrated = await EncryptedSyncQueueCodec.migrateIfNeeded(raw);
+      if (migrated != raw) {
+        await prefs.setString(_storageKey, migrated);
+      }
+      return await EncryptedSyncQueueCodec.decryptOperations(migrated);
+    } on SecretBoxAuthenticationError {
+      // Only this one. Malformed bytes keep throwing and keep their blob:
+      // corruption may be partial, and a queue nobody has proved
+      // unrecoverable is not ours to delete.
+      debugPrint('[sync] dropping the stored queue: its key is gone');
+      await prefs.remove(_storageKey);
+      return [];
     }
-    return await EncryptedSyncQueueCodec.decryptOperations(migrated);
   }
 
   Future<void> _save(List<SyncOperation> ops) async {

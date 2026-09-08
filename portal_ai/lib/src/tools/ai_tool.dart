@@ -14,6 +14,7 @@ class AiTool {
     this.mutates = false,
     this.namespace,
     this.runRich,
+    this.preview,
   }) : assert(run != null || runRich != null, 'a tool needs run or runRich');
 
   final String name;
@@ -37,6 +38,7 @@ class AiTool {
     mutates: mutates,
     namespace: ns,
     runRich: runRich,
+    preview: preview,
   );
   final String description;
   final Map<String, String> parameters;
@@ -47,6 +49,14 @@ class AiTool {
   /// Returns a short human-readable result fed back to the model. Null when
   /// [runRich] answers instead.
   final Future<String> Function(AiToolCall call)? run;
+
+  /// The record this call would act on, resolved for the confirmation card.
+  ///
+  /// A mutating tool takes an id, so the card could only print the id it was
+  /// handed -- and nobody recognises a recipe by its UUID. Returning the row
+  /// lets the card show the same picture and title the thread already showed
+  /// when it listed the thing. Null (or a throw) leaves the card as it was.
+  final Future<AiItem?> Function(AiToolCall call)? preview;
 
   /// Richer form of [run] that also returns blocks to render.
   ///
