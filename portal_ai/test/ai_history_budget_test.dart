@@ -57,10 +57,13 @@ void main() {
     final client = _RecordingClient();
     final agent = AiAgent(client: client, tools: const []);
 
-    await agent.run('and now?', history: const [
-      AiChatTurn(role: 'user', content: 'first'),
-      AiChatTurn(role: 'assistant', content: 'second'),
-    ]);
+    await agent.run(
+      'and now?',
+      history: const [
+        AiChatTurn(role: 'user', content: 'first'),
+        AiChatTurn(role: 'assistant', content: 'second'),
+      ],
+    );
 
     final sent = client.prompts.single;
     expect(sent, contains('first'));

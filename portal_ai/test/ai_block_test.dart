@@ -17,8 +17,7 @@ class _ScriptedClient implements AiCompletionClient {
     required String userPrompt,
     AiSamplerConfig sampler = const AiSamplerConfig(),
     bool jsonMode = false,
-  }) async =>
-      _index < replies.length ? replies[_index++] : replies.last;
+  }) async => _index < replies.length ? replies[_index++] : replies.last;
 
   @override
   Stream<String> completeStream({
@@ -67,14 +66,14 @@ void main() {
 
   group('the agent surfacing blocks', () {
     AiTool richTool() => AiTool(
-          name: 'spending',
-          description: 'shows spending',
-          run: (_) async => 'unused',
-          runRich: (_) async => const AiToolResult(
-            forModel: 'spent 42',
-            blocks: [AiBlock(kind: 'finance.spending_chart')],
-          ),
-        );
+      name: 'spending',
+      description: 'shows spending',
+      run: (_) async => 'unused',
+      runRich: (_) async => const AiToolResult(
+        forModel: 'spent 42',
+        blocks: [AiBlock(kind: 'finance.spending_chart')],
+      ),
+    );
 
     test('runRich supplies both the model text and the blocks', () async {
       final client = _ScriptedClient([
@@ -82,8 +81,10 @@ void main() {
         '{"message":"done"}',
       ]);
 
-      final result =
-          await AiAgent(client: client, tools: [richTool()]).run('spending?');
+      final result = await AiAgent(
+        client: client,
+        tools: [richTool()],
+      ).run('spending?');
 
       // The model sees the text, the user sees the block.
       expect(result.steps.single.result, 'spent 42');

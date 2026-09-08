@@ -12,8 +12,8 @@ class GeminiCompletionClient
   GeminiCompletionClient({
     required GeminiModelCatalog catalog,
     required String model,
-  })  : _catalog = catalog,
-        _modelName = catalog.resolveModel(model);
+  }) : _catalog = catalog,
+       _modelName = catalog.resolveModel(model);
 
   final GeminiModelCatalog _catalog;
   final String _modelName;

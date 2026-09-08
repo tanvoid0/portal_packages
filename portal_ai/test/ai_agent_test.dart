@@ -39,34 +39,37 @@ void main() {
   final added = <String>[];
 
   AiTool addItem() => AiTool(
-        name: 'add_item',
-        description: 'Add an item.',
-        parameters: const {'name': 'item name', 'quantity': 'how many'},
-        mutates: true,
-        run: (call) async {
-          added.add('${call.argString('name')} x${call.argInt('quantity') ?? 1}');
-          return 'added ${call.argString('name')}';
-        },
-      );
+    name: 'add_item',
+    description: 'Add an item.',
+    parameters: const {'name': 'item name', 'quantity': 'how many'},
+    mutates: true,
+    run: (call) async {
+      added.add('${call.argString('name')} x${call.argInt('quantity') ?? 1}');
+      return 'added ${call.argString('name')}';
+    },
+  );
 
   AiTool listItems() => AiTool(
-        name: 'list_items',
-        description: 'List the items.',
-        run: (_) async => added.isEmpty ? 'empty' : added.join(', '),
-      );
+    name: 'list_items',
+    description: 'List the items.',
+    run: (_) async => added.isEmpty ? 'empty' : added.join(', '),
+  );
 
   setUp(added.clear);
 
   test('extracts JSON from fenced or chatty replies', () {
     expect(extractJsonObject('```json\n{"final":"hi"}\n```'), {'final': 'hi'});
-    expect(extractJsonObject('Sure! {"tool":"a","args":{}} done'),
-        {'tool': 'a', 'args': <String, dynamic>{}});
+    expect(extractJsonObject('Sure! {"tool":"a","args":{}} done'), {
+      'tool': 'a',
+      'args': <String, dynamic>{},
+    });
     expect(
       extractJsonObject(
-          '[{"tool":"a","args":{"name":"pasta"}},{"tool":"a","args":{}}]'),
+        '[{"tool":"a","args":{"name":"pasta"}},{"tool":"a","args":{}}]',
+      ),
       {
         'tool': 'a',
-        'args': {'name': 'pasta'}
+        'args': {'name': 'pasta'},
       },
     );
     expect(extractJsonObject('no json here'), isNull);
@@ -80,7 +83,7 @@ void main() {
         '{"exercise_ids":["a","b"]}',
       ),
       {
-        'exercise_ids': ['a', 'b']
+        'exercise_ids': ['a', 'b'],
       },
     );
   });
@@ -90,8 +93,10 @@ void main() {
       '{"tool":"add_item","args":{"name":"Milk","quantity":"2"}}',
       '{"final":"Added milk."}',
     ]);
-    final result = await AiAgent(client: client, tools: [addItem()])
-        .run('buy milk', confirm: (_, _) async => true);
+    final result = await AiAgent(
+      client: client,
+      tools: [addItem()],
+    ).run('buy milk', confirm: (_, _) async => const AiToolDecision.accepted());
 
     expect(added, ['Milk x2']);
     expect(result.message, 'Added milk.');
@@ -100,41 +105,51 @@ void main() {
     expect(client.prompts[1], contains('added Milk'));
   });
 
-  test('a mutating tool is refused when there is nobody to approve it',
-      () async {
-    final client = _ScriptedClient([
-      '{"tool":"add_item","args":{"name":"Milk"}}',
-      '{"final":"Could not add it."}',
-    ]);
-    // No confirm callback: a caller with no UI must not write user data.
-    final result = await AiAgent(client: client, tools: [addItem()])
-        .run('buy milk');
+  test(
+    'a mutating tool is refused when there is nobody to approve it',
+    () async {
+      final client = _ScriptedClient([
+        '{"tool":"add_item","args":{"name":"Milk"}}',
+        '{"final":"Could not add it."}',
+      ]);
+      // No confirm callback: a caller with no UI must not write user data.
+      final result = await AiAgent(
+        client: client,
+        tools: [addItem()],
+      ).run('buy milk');
 
-    expect(added, isEmpty);
-    expect(result.steps.single.failed, isTrue);
-    expect(client.prompts[1], contains('refused'));
-  });
+      expect(added, isEmpty);
+      expect(result.steps.single.failed, isTrue);
+      expect(client.prompts[1], contains('refused'));
+    },
+  );
 
-  test('tool results reach the model fenced as data, not instructions',
-      () async {
-    final client = _ScriptedClient([
-      '{"tool":"list_items","args":{}}',
-      '{"final":"done"}',
-    ]);
-    await AiAgent(client: client, tools: [addItem(), listItems()])
-        .run('what is on my list');
+  test(
+    'tool results reach the model fenced as data, not instructions',
+    () async {
+      final client = _ScriptedClient([
+        '{"tool":"list_items","args":{}}',
+        '{"final":"done"}',
+      ]);
+      await AiAgent(
+        client: client,
+        tools: [addItem(), listItems()],
+      ).run('what is on my list');
 
-    expect(client.prompts[1], contains('BEGIN TOOL RESULTS'));
-    expect(client.prompts[1], contains('END TOOL RESULTS'));
-  });
+      expect(client.prompts[1], contains('BEGIN TOOL RESULTS'));
+      expect(client.prompts[1], contains('END TOOL RESULTS'));
+    },
+  );
 
   test('declining a mutating tool skips it and tells the model', () async {
     final client = _ScriptedClient([
       '{"tool":"add_item","args":{"name":"Milk"}}',
       '{"final":"Left it out."}',
     ]);
-    final result = await AiAgent(client: client, tools: [addItem()])
-        .run('buy milk', confirm: (_, _) async => false);
+    final result = await AiAgent(
+      client: client,
+      tools: [addItem()],
+    ).run('buy milk', confirm: (_, _) async => const AiToolDecision.declined());
 
     expect(added, isEmpty);
     expect(result.steps.single.failed, isTrue);
@@ -168,8 +183,11 @@ void main() {
     final client = _ScriptedClient(
       List.filled(3, '{"tool":"add_item","args":{"name":"Milk"}}'),
     );
-    final result =
-        await AiAgent(client: client, tools: [addItem()], maxSteps: 3).run('spam');
+    final result = await AiAgent(
+      client: client,
+      tools: [addItem()],
+      maxSteps: 3,
+    ).run('spam');
 
     expect(result.steps, hasLength(3));
     expect(result.message, contains('Stopped after 3 steps'));
@@ -177,7 +195,9 @@ void main() {
 }
 
 /// A client that reports usage, to prove a multi-call run sums it.
-class _CountingClient with AiCompletionStatsSource implements AiCompletionClient {
+class _CountingClient
+    with AiCompletionStatsSource
+    implements AiCompletionClient {
   _CountingClient(this.replies);
 
   final List<String> replies;
@@ -220,11 +240,7 @@ void _statsTests() {
     final agent = AiAgent(
       client: client,
       tools: [
-        AiTool(
-          name: 'echo',
-          description: 'echo',
-          run: (_) async => 'ok',
-        ),
+        AiTool(name: 'echo', description: 'echo', run: (_) async => 'ok'),
       ],
     );
     final result = await agent.run('go');

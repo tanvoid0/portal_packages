@@ -155,9 +155,9 @@ class AiPromptComposer extends StatelessWidget {
 
   /// Rebuilds one small thing whenever what is typed changes.
   Widget _live(Widget Function(BuildContext) build) => ListenableBuilder(
-        listenable: controller,
-        builder: (context, _) => build(context),
-      );
+    listenable: controller,
+    builder: (context, _) => build(context),
+  );
 
   Widget _submitButton(BuildContext context) {
     final canSubmit = _canSubmit;

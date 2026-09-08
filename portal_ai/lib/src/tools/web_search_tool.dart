@@ -72,64 +72,66 @@ AiTool webSearchTool({
   // Move the budget server-side along with the key.
   final cache = <String, String>{};
   return AiTool(
-      name: 'web_search',
-      description: 'Look something up on the web. For facts you cannot know: '
-          'current prices, news, opening times. Not for general knowledge you '
-          'already have, and not for the user\'s own saved data.',
-      parameters: const {'query': 'what to search for (required)'},
-      run: (call) async {
-        final query = call.argString('query');
-        if (query == null) throw ArgumentError('query is required');
+    name: 'web_search',
+    description:
+        'Look something up on the web. For facts you cannot know: '
+        'current prices, news, opening times. Not for general knowledge you '
+        'already have, and not for the user\'s own saved data.',
+    parameters: const {'query': 'what to search for (required)'},
+    run: (call) async {
+      final query = call.argString('query');
+      if (query == null) throw ArgumentError('query is required');
 
-        // An agent asking the same thing twice in one run is the common case,
-        // not the exception: it searches, misreads the answer, searches again.
-        final cached = cache[query.toLowerCase()];
-        if (cached != null) return cached;
+      // An agent asking the same thing twice in one run is the common case,
+      // not the exception: it searches, misreads the answer, searches again.
+      final cached = cache[query.toLowerCase()];
+      if (cached != null) return cached;
 
-        if (!await _spendOne(dailyLimit)) {
-          return 'search budget for today is used up. Answer from what you '
-              'already know, and say you could not look it up.';
+      if (!await _spendOne(dailyLimit)) {
+        return 'search budget for today is used up. Answer from what you '
+            'already know, and say you could not look it up.';
+      }
+
+      final client = httpClient ?? http.Client();
+      try {
+        final response = await client
+            .post(
+              Uri.parse('https://api.tavily.com/search'),
+              headers: {
+                'content-type': 'application/json',
+                'authorization': 'Bearer $apiKey',
+              },
+              body: jsonEncode({'query': query, 'max_results': maxResults}),
+            )
+            .timeout(const Duration(seconds: 20));
+        if (response.statusCode != 200) {
+          // Returned, not thrown: a dead search is one failed step the agent
+          // can answer around, not a failed conversation.
+          return 'search failed (${response.statusCode})';
         }
-
-        final client = httpClient ?? http.Client();
-        try {
-          final response = await client
-              .post(
-                Uri.parse('https://api.tavily.com/search'),
-                headers: {
-                  'content-type': 'application/json',
-                  'authorization': 'Bearer $apiKey',
-                },
-                body: jsonEncode({
-                  'query': query,
-                  'max_results': maxResults,
-                }),
-              )
-              .timeout(const Duration(seconds: 20));
-          if (response.statusCode != 200) {
-            // Returned, not thrown: a dead search is one failed step the agent
-            // can answer around, not a failed conversation.
-            return 'search failed (${response.statusCode})';
-          }
-          final results = (jsonDecode(response.body) as Map)['results'];
-          if (results is! List || results.isEmpty) {
-            return 'no results for "$query"';
-          }
-          final text = results.whereType<Map>().take(maxResults).map((result) {
-            final extract = '${result['content'] ?? ''}'.trim();
-            return '${result['title'] ?? 'untitled'} (${result['url'] ?? ''})\n'
-                '${extract.length > _extractChars ? '${extract.substring(0, _extractChars)}...' : extract}';
-          }).join('\n\n');
-          // Only answers are cached. A cheap failure should be free to
-          // succeed on the next try.
-          if (cache.length >= _cacheEntries) cache.remove(cache.keys.first);
-          cache[query.toLowerCase()] = text;
-          return text;
-        } on Exception catch (error) {
-          return 'search failed ($error)';
-        } finally {
-          if (httpClient == null) client.close();
+        final results = (jsonDecode(response.body) as Map)['results'];
+        if (results is! List || results.isEmpty) {
+          return 'no results for "$query"';
         }
-      },
-    );
+        final text = results
+            .whereType<Map>()
+            .take(maxResults)
+            .map((result) {
+              final extract = '${result['content'] ?? ''}'.trim();
+              return '${result['title'] ?? 'untitled'} (${result['url'] ?? ''})\n'
+                  '${extract.length > _extractChars ? '${extract.substring(0, _extractChars)}...' : extract}';
+            })
+            .join('\n\n');
+        // Only answers are cached. A cheap failure should be free to
+        // succeed on the next try.
+        if (cache.length >= _cacheEntries) cache.remove(cache.keys.first);
+        cache[query.toLowerCase()] = text;
+        return text;
+      } on Exception catch (error) {
+        return 'search failed ($error)';
+      } finally {
+        if (httpClient == null) client.close();
+      }
+    },
+  );
 }

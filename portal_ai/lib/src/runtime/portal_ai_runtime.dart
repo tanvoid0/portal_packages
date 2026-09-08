@@ -154,11 +154,24 @@ class PortalAiRuntime {
   /// every app that only ever talks to the server.
   AiBackendStore? get backendStore => _store;
 
+  /// The provider actually answering right now.
+  ///
+  /// Not the same as the stored choice. [_clientForStored] and [applyBackend]
+  /// both keep the server when the selected provider will not build — Edge
+  /// Gallery picked as a delegate, Ollama with no model — so a badge read off
+  /// the stored kind names a provider that never runs, and disagrees with the
+  /// assistant row in Settings, which reports what answered.
+  AiBackendKind get activeBackendKind {
+    if (_client is ServerCompletionClient) return AiBackendKind.cloudGemini;
+    if (_client is OllamaCompletionClient) return AiBackendKind.ollama;
+    return _store?.selectedKind ?? AiBackendKind.cloudGemini;
+  }
+
   /// What to call the model in a one-line badge: the chosen model's own name
   /// where there is one, the provider otherwise.
   String get backendLabel {
     final store = _store;
-    final kind = store?.selectedKind ?? AiBackendKind.cloudGemini;
+    final kind = activeBackendKind;
     final model = store?.modelFor(kind);
     if (model != null && model.isNotEmpty) return model;
     return switch (kind) {
@@ -219,7 +232,8 @@ class PortalAiRuntime {
   }) async {
     try {
       final reply = await client.complete(
-        systemPrompt: 'You suggest things a user could ask an in-app '
+        systemPrompt:
+            'You suggest things a user could ask an in-app '
             'assistant. $appDescription. '
             'Reply with JSON only: {"prompts": ["...", "..."]}. '
             'Each prompt is a short first-person request, under 8 words, '
@@ -228,7 +242,7 @@ class PortalAiRuntime {
         userPrompt: seed.isEmpty
             ? 'Give $count varied prompts.'
             : 'Give $count varied prompts in the style of these, but '
-                'different from them: ${seed.join(' | ')}',
+                  'different from them: ${seed.join(' | ')}',
         jsonMode: true,
         sampler: const AiSamplerConfig(temperature: 1),
       );
@@ -258,7 +272,8 @@ class PortalAiRuntime {
     ].join('\n');
     try {
       final reply = await client.complete(
-        systemPrompt: 'You name chat threads. $appDescription. '
+        systemPrompt:
+            'You name chat threads. $appDescription. '
             'Reply with JSON only: {"title": "..."}. '
             'The title is 2-5 words naming what the thread is about, in the '
             "user's own language. No quotes, no trailing punctuation.",
@@ -276,16 +291,16 @@ class PortalAiRuntime {
 
   /// The instructions the agent runs on, for a transcript export.
   String systemPromptFor([List<AiTool>? tools]) => AiAgent(
-        client: client,
-        tools: tools ?? this.tools,
-        appDescription: appDescription,
-      ).systemPrompt;
+    client: client,
+    tools: tools ?? this.tools,
+    appDescription: appDescription,
+  ).systemPrompt;
 
   /// Runs [prompt] through the tool loop. See [AiAgent.run] for [confirm].
   Future<AiAgentResult> ask(
     String prompt, {
     List<AiTool>? tools,
-    Future<bool> Function(AiTool tool, AiToolCall call)? confirm,
+    Future<AiToolDecision> Function(AiTool tool, AiToolCall call)? confirm,
     void Function(AiAgentStep step)? onStep,
     void Function(String delta)? onReply,
     int maxSteps = 6,

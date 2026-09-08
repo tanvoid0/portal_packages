@@ -272,7 +272,8 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     final selected = option.kind == _selected;
     final widgets = <Widget>[];
 
-    if (option.kind == AiBackendKind.ollama && (selected || !option.available)) {
+    if (option.kind == AiBackendKind.ollama &&
+        (selected || !option.available)) {
       widgets.addAll([
         _OllamaHostField(
           // Keyed on the host so a value found by the scan replaces what is in
@@ -307,9 +308,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
               labels.ollamaNotFound,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.error,
               ),
             ),
@@ -405,8 +404,8 @@ class _OptionTile extends StatelessWidget {
     final borderColor = highlighted
         ? cs.primary
         : option.available
-            ? cs.outlineVariant
-            : cs.outlineVariant.withValues(alpha: 0.5);
+        ? cs.outlineVariant
+        : cs.outlineVariant.withValues(alpha: 0.5);
     final fillColor = highlighted
         ? cs.primaryContainer.withValues(alpha: 0.45)
         : cs.surfaceContainerHigh.withValues(alpha: 0.5);
@@ -437,8 +436,9 @@ class _OptionTile extends StatelessWidget {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyLarge
-                      ?.copyWith(fontWeight: FontWeight.w600),
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               if (highlighted) ...[
@@ -486,9 +486,9 @@ class _StatusBadge extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }

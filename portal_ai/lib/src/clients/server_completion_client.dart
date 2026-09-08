@@ -8,20 +8,14 @@ import 'ai_completion_stats.dart';
 ///
 /// Matches `ApiClient.post` in portal_platform, so apps pass that directly and
 /// the assistant inherits their auth, retries and session handling.
-typedef AiPostJson = Future<dynamic> Function(
-  String path, {
-  dynamic body,
-});
+typedef AiPostJson = Future<dynamic> Function(String path, {dynamic body});
 
 /// Streams a reply from the app's API, one server-sent event payload at a
 /// time.
 ///
 /// Matches `ApiClient.postStream` in portal_platform, the same way
 /// [AiPostJson] matches `post`.
-typedef AiPostStream = Stream<String> Function(
-  String path, {
-  dynamic body,
-});
+typedef AiPostStream = Stream<String> Function(String path, {dynamic body});
 
 /// Runs completions through the Portal server, which holds the API key, picks
 /// the model and enforces the per-user AI quota.
@@ -83,8 +77,9 @@ class ServerCompletionClient
     final usage = response['usage'];
     final stats = AiCompletionStats(
       model: response['model'] as String?,
-      promptTokens:
-          usage is Map ? (usage['promptTokens'] ?? usage['prompt_tokens']) as int? : null,
+      promptTokens: usage is Map
+          ? (usage['promptTokens'] ?? usage['prompt_tokens']) as int?
+          : null,
       replyTokens: usage is Map
           ? (usage['completionTokens'] ?? usage['completion_tokens']) as int?
           : null,

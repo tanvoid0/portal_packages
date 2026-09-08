@@ -16,9 +16,7 @@ class OllamaProbe {
   }) async {
     final normalized = _normalizeBaseUrl(baseUrl);
     try {
-      final root = await _client
-          .get(Uri.parse(normalized))
-          .timeout(timeout);
+      final root = await _client.get(Uri.parse(normalized)).timeout(timeout);
       if (root.statusCode != 200) {
         return OllamaProbeResult.unavailable(
           host: normalized,
@@ -30,10 +28,7 @@ class OllamaProbe {
           .get(Uri.parse('$normalized/api/tags'))
           .timeout(timeout);
       if (tagsResponse.statusCode != 200) {
-        return OllamaProbeResult.available(
-          host: normalized,
-          models: const [],
-        );
+        return OllamaProbeResult.available(host: normalized, models: const []);
       }
 
       final body = jsonDecode(tagsResponse.body) as Map<String, dynamic>;
@@ -83,22 +78,14 @@ class OllamaProbeResult {
     required String host,
     required List<String> models,
   }) {
-    return OllamaProbeResult._(
-      host: host,
-      isAvailable: true,
-      models: models,
-    );
+    return OllamaProbeResult._(host: host, isAvailable: true, models: models);
   }
 
   factory OllamaProbeResult.unavailable({
     required String host,
     required String reason,
   }) {
-    return OllamaProbeResult._(
-      host: host,
-      isAvailable: false,
-      reason: reason,
-    );
+    return OllamaProbeResult._(host: host, isAvailable: false, reason: reason);
   }
 
   final String host;

@@ -26,18 +26,12 @@ class EdgeGalleryProbe {
 
     // iOS: assume available via App Store but we cannot detect install without
     // a native check yet.
-    return const EdgeGalleryProbeResult(
-      isInstalled: true,
-      reason: null,
-    );
+    return const EdgeGalleryProbeResult(isInstalled: true, reason: null);
   }
 }
 
 class EdgeGalleryProbeResult {
-  const EdgeGalleryProbeResult({
-    required this.isInstalled,
-    this.reason,
-  });
+  const EdgeGalleryProbeResult({required this.isInstalled, this.reason});
 
   final bool isInstalled;
   final String? reason;

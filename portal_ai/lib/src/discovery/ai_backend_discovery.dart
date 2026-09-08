@@ -14,9 +14,9 @@ class AiBackendDiscovery {
     EdgeGalleryProbe? edgeGalleryProbe,
     SystemAiProbe? systemAiProbe,
     this._geminiCatalog,
-  })  : _ollamaProbe = ollamaProbe ?? OllamaProbe(),
-        _edgeGalleryProbe = edgeGalleryProbe ?? EdgeGalleryProbe(),
-        _systemAiProbe = systemAiProbe ?? SystemAiProbe();
+  }) : _ollamaProbe = ollamaProbe ?? OllamaProbe(),
+       _edgeGalleryProbe = edgeGalleryProbe ?? EdgeGalleryProbe(),
+       _systemAiProbe = systemAiProbe ?? SystemAiProbe();
 
   final OllamaProbe _ollamaProbe;
   final EdgeGalleryProbe _edgeGalleryProbe;
@@ -40,7 +40,9 @@ class AiBackendDiscovery {
       AiBackendOption(
         kind: AiBackendKind.ollama,
         available: ollamaResult.isAvailable,
-        unavailableReason: ollamaResult.isAvailable ? null : ollamaResult.reason,
+        unavailableReason: ollamaResult.isAvailable
+            ? null
+            : ollamaResult.reason,
         models: ollamaResult.models,
         metadata: {'host': ollamaResult.host},
       ),
@@ -117,7 +119,8 @@ class AiBackendDiscovery {
           defaultTargetPlatform == TargetPlatform.iOS) {
         return OllamaProbeResult.unavailable(
           host: host,
-          reason: 'Not reachable from this device. Tap Find on my network, '
+          reason:
+              'Not reachable from this device. Tap Find on my network, '
               "or enter your computer's address.",
         );
       }

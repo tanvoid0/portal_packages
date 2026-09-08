@@ -5,10 +5,7 @@ import '../models/ai_backend_option.dart';
 
 /// Persists AI backend preferences per app.
 class AiBackendStore {
-  AiBackendStore({
-    required this._prefs,
-    this.keyPrefix = 'portal_ai',
-  });
+  AiBackendStore({required this._prefs, this.keyPrefix = 'portal_ai'});
 
   final SharedPreferences _prefs;
   final String keyPrefix;
@@ -19,10 +16,10 @@ class AiBackendStore {
   /// Gemini and Ollama keep their original key names so an existing install
   /// does not silently forget the model the user picked.
   String _modelKey(AiBackendKind kind) => switch (kind) {
-        AiBackendKind.ollama => '${keyPrefix}_ollama_model',
-        AiBackendKind.cloudGemini => '${keyPrefix}_gemini_model',
-        _ => '${keyPrefix}_model_${kind.id}',
-      };
+    AiBackendKind.ollama => '${keyPrefix}_ollama_model',
+    AiBackendKind.cloudGemini => '${keyPrefix}_gemini_model',
+    _ => '${keyPrefix}_model_${kind.id}',
+  };
 
   AiBackendKind? get selectedKind =>
       AiBackendKindIds.fromId(_prefs.getString(_selectedBackendKey));

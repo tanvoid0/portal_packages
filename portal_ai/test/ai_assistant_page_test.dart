@@ -125,11 +125,11 @@ void main() {
     await tester.pump();
 
     // A tool that changes data must ask before it runs.
-    expect(find.text('add item'), findsOneWidget);
-    expect(find.text('Allow'), findsOneWidget);
+    expect(find.text('Add item'), findsOneWidget);
+    expect(find.text('Accept'), findsOneWidget);
     expect(basket, isEmpty);
 
-    await tester.tap(find.text('Allow'));
+    await tester.tap(find.text('Accept'));
     await tester.pumpAndSettle();
 
     expect(basket, ['Milk']);
@@ -152,11 +152,13 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.send);
     await tester.pump();
 
-    await tester.tap(find.text('Skip'));
+    await tester.tap(find.text('Decline'));
     await tester.pumpAndSettle();
 
     expect(basket, isEmpty);
-    expect(find.text('user declined this action'), findsOneWidget);
+    // The step log shows the user their own refusal, not the sentence the
+    // model was handed.
+    expect(find.text('Declined'), findsOneWidget);
     expect(find.text('Left it out.'), findsOneWidget);
   });
 
@@ -174,7 +176,7 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.send);
     await tester.pumpAndSettle();
 
-    expect(find.text('Allow'), findsNothing);
+    expect(find.text('Accept'), findsNothing);
     expect(find.text('Bread'), findsOneWidget);
     expect(find.text('You have bread.'), findsOneWidget);
   });

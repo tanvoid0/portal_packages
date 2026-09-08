@@ -80,10 +80,7 @@ class AiPrefsSyncService {
       final model = store.modelFor(kind);
       if (model != null) models[kind.id] = model;
     }
-    return {
-      'selected_backend_id': store.selectedBackendId,
-      'models': models,
-    };
+    return {'selected_backend_id': store.selectedBackendId, 'models': models};
   }
 
   Future<void> _applyRemote(Map<String, dynamic> json) async {

@@ -40,26 +40,28 @@ void main() {
   });
 
   group('ServerCompletionClient', () {
-    test('reports usage when the route sends it, and nothing when it does not',
-        () async {
-      final withUsage = ServerCompletionClient(
-        post: (_, {body}) async => {
-          'text': 'hello',
-          'model': 'gemini-2.5-flash',
-          'usage': {'promptTokens': 120, 'completionTokens': 30},
-        },
-      );
-      await withUsage.complete(systemPrompt: 's', userPrompt: 'u');
-      expect(withUsage.lastStats?.model, 'gemini-2.5-flash');
-      expect(withUsage.lastStats?.totalTokens, 150);
+    test(
+      'reports usage when the route sends it, and nothing when it does not',
+      () async {
+        final withUsage = ServerCompletionClient(
+          post: (_, {body}) async => {
+            'text': 'hello',
+            'model': 'gemini-2.5-flash',
+            'usage': {'promptTokens': 120, 'completionTokens': 30},
+          },
+        );
+        await withUsage.complete(systemPrompt: 's', userPrompt: 'u');
+        expect(withUsage.lastStats?.model, 'gemini-2.5-flash');
+        expect(withUsage.lastStats?.totalTokens, 150);
 
-      // The live route only returns {text}; that must stay silent, not zero.
-      final plain = ServerCompletionClient(
-        post: (_, {body}) async => {'text': 'hello'},
-      );
-      await plain.complete(systemPrompt: 's', userPrompt: 'u');
-      expect(plain.lastStats, isNull);
-    });
+        // The live route only returns {text}; that must stay silent, not zero.
+        final plain = ServerCompletionClient(
+          post: (_, {body}) async => {'text': 'hello'},
+        );
+        await plain.complete(systemPrompt: 's', userPrompt: 'u');
+        expect(plain.lastStats, isNull);
+      },
+    );
 
     test('posts the prompt and returns the reply text', () async {
       Map<String, dynamic>? sent;
@@ -91,7 +93,9 @@ void main() {
         {'text': '  '},
         'not a map',
       ]) {
-        final client = ServerCompletionClient(post: (_, {body}) async => response);
+        final client = ServerCompletionClient(
+          post: (_, {body}) async => response,
+        );
         await expectLater(
           client.complete(systemPrompt: 's', userPrompt: 'u'),
           throwsA(isA<AiCompletionException>()),
@@ -121,8 +125,8 @@ void main() {
     // Nothing said yet, nothing to name -- and no call made.
     expect(await runtime.suggestTitle(const []), '');
   });
-
 }
+
 class _ScriptedClient implements AiCompletionClient {
   _ScriptedClient(this.replies);
 

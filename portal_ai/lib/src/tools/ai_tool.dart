@@ -14,10 +14,7 @@ class AiTool {
     this.mutates = false,
     this.namespace,
     this.runRich,
-  }) : assert(
-          run != null || runRich != null,
-          'a tool needs run or runRich',
-        );
+  }) : assert(run != null || runRich != null, 'a tool needs run or runRich');
 
   final String name;
 
@@ -29,19 +26,18 @@ class AiTool {
   final String? namespace;
 
   /// [name] qualified by [namespace]: `shopping.add_item`.
-  String get qualifiedName =>
-      namespace == null ? name : '$namespace.$name';
+  String get qualifiedName => namespace == null ? name : '$namespace.$name';
 
   /// A copy of this tool owned by [ns].
   AiTool withNamespace(String ns) => AiTool(
-        name: name,
-        description: description,
-        run: run,
-        parameters: parameters,
-        mutates: mutates,
-        namespace: ns,
-        runRich: runRich,
-      );
+    name: name,
+    description: description,
+    run: run,
+    parameters: parameters,
+    mutates: mutates,
+    namespace: ns,
+    runRich: runRich,
+  );
   final String description;
   final Map<String, String> parameters;
 
@@ -114,11 +110,18 @@ class AiToolCall {
   List<String> argStringList(String key) {
     final value = args[key];
     if (value is List) {
-      return value.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+      return value
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
     }
     final raw = argString(key);
     if (raw == null) return const [];
-    return raw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    return raw
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
   }
 
   @override
@@ -143,16 +146,15 @@ class AiAction {
   final String tool;
   final Map<String, dynamic> args;
 
-  Map<String, dynamic> toJson() =>
-      {'label': label, 'tool': tool, 'args': args};
+  Map<String, dynamic> toJson() => {'label': label, 'tool': tool, 'args': args};
 
   factory AiAction.fromJson(Map<String, dynamic> json) => AiAction(
-        label: json['label'] as String? ?? '',
-        tool: json['tool'] as String? ?? '',
-        args: Map<String, dynamic>.from(
-          json['args'] as Map? ?? const <String, dynamic>{},
-        ),
-      );
+    label: json['label'] as String? ?? '',
+    tool: json['tool'] as String? ?? '',
+    args: Map<String, dynamic>.from(
+      json['args'] as Map? ?? const <String, dynamic>{},
+    ),
+  );
 }
 
 /// Something the assistant shows the user, rendered by the host app.
@@ -182,15 +184,14 @@ class AiBlock {
     List<AiItem> items, {
     String entity = '',
     List<AiAction> actions = const [],
-  }) =>
-      AiBlock(
-        kind: itemsKind,
-        data: {
-          'items': [for (final item in items) item.toJson()],
-          if (entity.isNotEmpty) 'entity': entity,
-        },
-        actions: actions,
-      );
+  }) => AiBlock(
+    kind: itemsKind,
+    data: {
+      'items': [for (final item in items) item.toJson()],
+      if (entity.isNotEmpty) 'entity': entity,
+    },
+    actions: actions,
+  );
 
   /// What [items] are, for an [AiBlock.items] block. Empty when unset.
   String get entity => data['entity'] as String? ?? '';
@@ -210,20 +211,20 @@ class AiBlock {
   final List<AiAction> actions;
 
   Map<String, dynamic> toJson() => {
-        'kind': kind,
-        'data': data,
-        'actions': actions.map((a) => a.toJson()).toList(),
-      };
+    'kind': kind,
+    'data': data,
+    'actions': actions.map((a) => a.toJson()).toList(),
+  };
 
   factory AiBlock.fromJson(Map<String, dynamic> json) => AiBlock(
-        kind: json['kind'] as String? ?? '',
-        data: Map<String, dynamic>.from(
-          json['data'] as Map? ?? const <String, dynamic>{},
-        ),
-        actions: (json['actions'] as List<dynamic>? ?? const [])
-            .map((e) => AiAction.fromJson(Map<String, dynamic>.from(e as Map)))
-            .toList(),
-      );
+    kind: json['kind'] as String? ?? '',
+    data: Map<String, dynamic>.from(
+      json['data'] as Map? ?? const <String, dynamic>{},
+    ),
+    actions: (json['actions'] as List<dynamic>? ?? const [])
+        .map((e) => AiAction.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList(),
+  );
 }
 
 /// One row of an [AiBlock.items].
@@ -258,24 +259,24 @@ class AiItem {
   final String? imageUrl;
 
   Map<String, dynamic> toJson() => {
-        'title': title,
-        if (id != null) 'id': id,
-        if (subtitle.isNotEmpty) 'subtitle': subtitle,
-        if (trailing.isNotEmpty) 'trailing': trailing,
-        if (imageUrl != null && imageUrl!.isNotEmpty) 'image': imageUrl,
-        if (data.isNotEmpty) 'data': data,
-      };
+    'title': title,
+    if (id != null) 'id': id,
+    if (subtitle.isNotEmpty) 'subtitle': subtitle,
+    if (trailing.isNotEmpty) 'trailing': trailing,
+    if (imageUrl != null && imageUrl!.isNotEmpty) 'image': imageUrl,
+    if (data.isNotEmpty) 'data': data,
+  };
 
   factory AiItem.fromJson(Map<String, dynamic> json) => AiItem(
-        title: json['title'] as String? ?? '',
-        id: json['id'] as String?,
-        subtitle: json['subtitle'] as String? ?? '',
-        trailing: json['trailing'] as String? ?? '',
-        imageUrl: json['image'] as String?,
-        data: Map<String, dynamic>.from(
-          json['data'] as Map? ?? const <String, dynamic>{},
-        ),
-      );
+    title: json['title'] as String? ?? '',
+    id: json['id'] as String?,
+    subtitle: json['subtitle'] as String? ?? '',
+    trailing: json['trailing'] as String? ?? '',
+    imageUrl: json['image'] as String?,
+    data: Map<String, dynamic>.from(
+      json['data'] as Map? ?? const <String, dynamic>{},
+    ),
+  );
 }
 
 /// What a tool hands back when it has something to show.
@@ -306,7 +307,6 @@ class AiAgentStep {
   /// What the host should render for this step, if anything.
   final List<AiBlock> blocks;
 }
-
 
 /// Qualifies every tool in [tools] with [namespace].
 ///
@@ -358,7 +358,8 @@ List<T> resolveAiRows<T>({
   final missing = <String>[];
   for (final key in keys) {
     final needle = key.trim().toLowerCase();
-    final row = pool.firstWhereOrNull((r) => idOf(r) == key) ??
+    final row =
+        pool.firstWhereOrNull((r) => idOf(r) == key) ??
         pool.firstWhereOrNull((r) => nameOf(r).toLowerCase() == needle);
     if (row == null) {
       missing.add(key);
@@ -381,4 +382,15 @@ extension _FirstWhereOrNull<T> on List<T> {
     }
     return null;
   }
+}
+
+/// A tool's name as a sentence: `recipe.create_recipe` -> `Create recipe`.
+///
+/// Tool names are wire identifiers, namespaced so two apps' tools cannot
+/// collide. Both halves leaked into the confirmation card and the step log,
+/// where they read as `recipe.create recipe`.
+String aiToolTitle(String qualifiedName) {
+  final bare = qualifiedName.split('.').last.replaceAll('_', ' ').trim();
+  if (bare.isEmpty) return qualifiedName;
+  return '${bare[0].toUpperCase()}${bare.substring(1)}';
 }

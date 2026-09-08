@@ -10,9 +10,10 @@ http.Client _serving(String body, {int status = 200}) =>
     MockClient((_) async => http.Response(body, status));
 
 Future<String> _search(http.Client client, {String query = 'chicken tikka'}) =>
-    webSearchTool(apiKey: 'k', httpClient: client)
-        .call(AiToolCall('web_search', {'query': query}))
-        .then((r) => r.forModel);
+    webSearchTool(
+      apiKey: 'k',
+      httpClient: client,
+    ).call(AiToolCall('web_search', {'query': query})).then((r) => r.forModel);
 
 void main() {
   setUp(() {
@@ -21,15 +22,19 @@ void main() {
   });
 
   test('formats results as title, url and a trimmed extract', () async {
-    final result = await _search(_serving(jsonEncode({
-      'results': [
-        {
-          'title': 'Chicken Tikka',
-          'url': 'https://example.com/tikka',
-          'content': 'x' * 900,
-        },
-      ],
-    })));
+    final result = await _search(
+      _serving(
+        jsonEncode({
+          'results': [
+            {
+              'title': 'Chicken Tikka',
+              'url': 'https://example.com/tikka',
+              'content': 'x' * 900,
+            },
+          ],
+        }),
+      ),
+    );
 
     expect(result, contains('Chicken Tikka'));
     expect(result, contains('https://example.com/tikka'));
@@ -64,8 +69,9 @@ void main() {
     });
     final tool = webSearchTool(apiKey: 'k', httpClient: client);
 
-    Future<String> ask(String q) =>
-        tool.call(AiToolCall('web_search', {'query': q})).then((r) => r.forModel);
+    Future<String> ask(String q) => tool
+        .call(AiToolCall('web_search', {'query': q}))
+        .then((r) => r.forModel);
 
     expect(await ask('chicken tikka'), contains('yoghurt'));
     expect(await ask('Chicken Tikka'), contains('yoghurt'));
@@ -98,18 +104,23 @@ void main() {
       'ai_search_day': '2000-01-01',
       'ai_search_count': 99,
     });
-    expect(await _search(_serving(jsonEncode({'results': []}))),
-        contains('no results'));
+    expect(
+      await _search(_serving(jsonEncode({'results': []}))),
+      contains('no results'),
+    );
   });
 
   test('is registered only when a key is configured', () {
     List<String> toolsWith(Map<String, String> env) => PortalAiRuntime.create(
-          post: (path, {body}) async => <String, dynamic>{},
-          env: env,
-        ).tools.map((t) => t.name).toList();
+      post: (path, {body}) async => <String, dynamic>{},
+      env: env,
+    ).tools.map((t) => t.name).toList();
 
     expect(toolsWith(const {}), isNot(contains('web_search')));
-    expect(toolsWith(const {'AI_TAVILY_KEY': ' '}), isNot(contains('web_search')));
+    expect(
+      toolsWith(const {'AI_TAVILY_KEY': ' '}),
+      isNot(contains('web_search')),
+    );
     expect(toolsWith(const {'AI_TAVILY_KEY': 'k'}), contains('web_search'));
   });
 }

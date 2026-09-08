@@ -3,10 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
 
 void main() {
-  Future<void> pump(
-    WidgetTester tester,
-    Widget composer,
-  ) =>
+  Future<void> pump(WidgetTester tester, Widget composer) =>
       tester.pumpWidget(MaterialApp(home: Scaffold(body: composer)));
 
   testWidgets('the keyboard send action submits', (tester) async {
@@ -59,7 +56,7 @@ void main() {
 
     Future<bool> enabled() async =>
         tester.widget<FilledButton>(find.byType(FilledButton)).onPressed !=
-            null;
+        null;
 
     expect(await enabled(), isFalse);
     await tester.enterText(find.byType(TextField), 'ab');
@@ -74,8 +71,9 @@ void main() {
     expect(sent, 1);
   });
 
-  testWidgets('disabled locks the field, busy offers stop instead',
-      (tester) async {
+  testWidgets('disabled locks the field, busy offers stop instead', (
+    tester,
+  ) async {
     var stopped = 0;
     await pump(
       tester,
@@ -86,7 +84,6 @@ void main() {
       ),
     );
     expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
-
 
     await pump(
       tester,

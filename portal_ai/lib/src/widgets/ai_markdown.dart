@@ -40,9 +40,7 @@ class AiMarkdown extends StatelessWidget {
       config: MarkdownConfig(
         configs: [
           PConfig(textStyle: body),
-          H1Config(
-            style: theme.textTheme.titleMedium ?? body,
-          ),
+          H1Config(style: theme.textTheme.titleMedium ?? body),
           H2Config(style: theme.textTheme.titleSmall ?? body),
           H3Config(style: theme.textTheme.titleSmall ?? body),
           ListConfig(marginLeft: 16),

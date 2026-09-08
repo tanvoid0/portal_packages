@@ -10,10 +10,7 @@ void main() {
       });
 
       expect(catalog.hasApiKey, isTrue);
-      expect(catalog.availableModels, [
-        'gemini-2.0-flash',
-        'gemini-2.5-pro',
-      ]);
+      expect(catalog.availableModels, ['gemini-2.0-flash', 'gemini-2.5-pro']);
       expect(catalog.isConfigured, isTrue);
       expect(catalog.defaultModel, 'gemini-2.0-flash');
     });

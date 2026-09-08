@@ -40,26 +40,26 @@ class OllamaCompletionClient
     bool jsonMode = false,
   }) async {
     Map<String, dynamic> body({required bool think}) => {
-          'model': model,
-          'stream': false,
-          if (think) 'think': true,
-          'messages': [
-            {'role': 'system', 'content': systemPrompt},
-            {'role': 'user', 'content': userPrompt},
-          ],
-          'options': {
-            'temperature': sampler.temperature,
-            'top_p': sampler.topP,
-            if (sampler.topK != null) 'top_k': sampler.topK,
-          },
-          if (jsonMode) 'format': 'json',
-        };
+      'model': model,
+      'stream': false,
+      if (think) 'think': true,
+      'messages': [
+        {'role': 'system', 'content': systemPrompt},
+        {'role': 'user', 'content': userPrompt},
+      ],
+      'options': {
+        'temperature': sampler.temperature,
+        'top_p': sampler.topP,
+        if (sampler.topK != null) 'top_k': sampler.topK,
+      },
+      if (jsonMode) 'format': 'json',
+    };
 
     Future<http.Response> post(bool think) => _client.post(
-          Uri.parse('$_normalizedBaseUrl/api/chat'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode(body(think: think)),
-        );
+      Uri.parse('$_normalizedBaseUrl/api/chat'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body(think: think)),
+    );
 
     // Ask for the reasoning, but never at the cost of the answer: a model
     // without thinking support rejects the flag outright, so fall back to a
@@ -175,9 +175,7 @@ class CloudGeminiCompletionClient implements AiCompletionClient {
     AiSamplerConfig sampler = const AiSamplerConfig(),
     bool jsonMode = false,
   }) {
-    throw UnsupportedError(
-      'Use your app server for cloud Gemini completions.',
-    );
+    throw UnsupportedError('Use your app server for cloud Gemini completions.');
   }
 
   @override
@@ -186,8 +184,6 @@ class CloudGeminiCompletionClient implements AiCompletionClient {
     required String userPrompt,
     AiSamplerConfig sampler = const AiSamplerConfig(),
   }) {
-    throw UnsupportedError(
-      'Use your app server for cloud Gemini completions.',
-    );
+    throw UnsupportedError('Use your app server for cloud Gemini completions.');
   }
 }

@@ -16,15 +16,14 @@ String aiChatExportJson({
   String? systemPrompt,
   List<String> toolSpecs = const [],
   String? title,
-}) =>
-    const JsonEncoder.withIndent('  ').convert({
-      'app': app,
-      'exported_at': at.toIso8601String(),
-      if (title != null && title.isNotEmpty) 'title': title,
-      'system_prompt': ?systemPrompt,
-      if (toolSpecs.isNotEmpty) 'tools': toolSpecs,
-      'turns': [for (final turn in turns) turn.toJson()],
-    });
+}) => const JsonEncoder.withIndent('  ').convert({
+  'app': app,
+  'exported_at': at.toIso8601String(),
+  if (title != null && title.isNotEmpty) 'title': title,
+  'system_prompt': ?systemPrompt,
+  if (toolSpecs.isNotEmpty) 'tools': toolSpecs,
+  'turns': [for (final turn in turns) turn.toJson()],
+});
 
 /// The same conversation as something a person reads: the transcript in
 /// markdown, ready to paste into a note or an issue.

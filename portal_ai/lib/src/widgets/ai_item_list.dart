@@ -148,11 +148,11 @@ class _AiItemRow extends StatelessWidget {
   }
 
   Widget get _placeholder => ColoredBox(
-        color: theme.colorScheme.surfaceContainerHighest,
-        child: Icon(
-          Icons.image_outlined,
-          size: 20,
-          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-        ),
-      );
+    color: theme.colorScheme.surfaceContainerHighest,
+    child: Icon(
+      Icons.image_outlined,
+      size: 20,
+      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+    ),
+  );
 }

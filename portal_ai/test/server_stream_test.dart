@@ -15,9 +15,7 @@ void main() {
     );
 
     expect(
-      await client
-          .completeStream(systemPrompt: 'sys', userPrompt: 'hi')
-          .join(),
+      await client.completeStream(systemPrompt: 'sys', userPrompt: 'hi').join(),
       'one two',
     );
   });
@@ -33,10 +31,7 @@ void main() {
 
     expect(
       client.completeStream(systemPrompt: 'sys', userPrompt: 'hi'),
-      emitsInOrder([
-        'half an ans',
-        emitsError(isA<AiCompletionException>()),
-      ]),
+      emitsInOrder(['half an ans', emitsError(isA<AiCompletionException>())]),
     );
   });
 

@@ -31,7 +31,8 @@ class AiCompletionClientFactory {
         return GeminiCompletionClient(catalog: catalog, model: model);
       case AiBackendKind.ollama:
         final host = store.ollamaHost;
-        final model = store.modelFor(AiBackendKind.ollama) ??
+        final model =
+            store.modelFor(AiBackendKind.ollama) ??
             (option?.models.isNotEmpty == true ? option!.models.first : null);
         if (model == null || model.isEmpty) {
           throw const AiCompletionException(

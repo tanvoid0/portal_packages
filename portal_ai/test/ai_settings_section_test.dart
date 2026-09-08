@@ -44,8 +44,9 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('an unreachable Ollama still offers its address and a scan',
-      (tester) async {
+  testWidgets('an unreachable Ollama still offers its address and a scan', (
+    tester,
+  ) async {
     await pump(tester, const [
       AiBackendOption(kind: AiBackendKind.cloudGemini, available: true),
       AiBackendOption(
@@ -59,8 +60,9 @@ void main() {
     expect(find.text(labels.findOllama), findsOneWidget);
   });
 
-  testWidgets('the model dropdown belongs to the selected provider only',
-      (tester) async {
+  testWidgets('the model dropdown belongs to the selected provider only', (
+    tester,
+  ) async {
     await pump(tester, const [
       AiBackendOption(
         kind: AiBackendKind.cloudGemini,
@@ -83,8 +85,9 @@ void main() {
     );
   });
 
-  testWidgets('badges mark the selected provider and the unavailable one',
-      (tester) async {
+  testWidgets('badges mark the selected provider and the unavailable one', (
+    tester,
+  ) async {
     await pump(tester, const [
       AiBackendOption(kind: AiBackendKind.cloudGemini, available: true),
       AiBackendOption(
@@ -99,18 +102,20 @@ void main() {
     expect(find.text(labels.unavailable), findsOneWidget);
   });
 
-  testWidgets('a device model that only needs downloading offers the download',
-      (tester) async {
-    await pump(tester, const [
-      AiBackendOption(kind: AiBackendKind.cloudGemini, available: true),
-      AiBackendOption(
-        kind: AiBackendKind.systemOnDevice,
-        available: false,
-        unavailableReason: 'The on-device model has not been downloaded yet',
-        metadata: {'downloadable': true},
-      ),
-    ]);
+  testWidgets(
+    'a device model that only needs downloading offers the download',
+    (tester) async {
+      await pump(tester, const [
+        AiBackendOption(kind: AiBackendKind.cloudGemini, available: true),
+        AiBackendOption(
+          kind: AiBackendKind.systemOnDevice,
+          available: false,
+          unavailableReason: 'The on-device model has not been downloaded yet',
+          metadata: {'downloadable': true},
+        ),
+      ]);
 
-    expect(find.text(labels.download), findsOneWidget);
-  });
+      expect(find.text(labels.download), findsOneWidget);
+    },
+  );
 }

@@ -54,45 +54,72 @@ void main() {
     expect(runtime.usesLocalModel, isFalse);
   });
 
-  test('switching provider in settings re-points the running assistant',
-      () async {
-    final store = await storeWith({});
-    final runtime = PortalAiRuntime.create(post: noPost, store: store);
-    expect(runtime.usesLocalModel, isFalse);
+  test(
+    'the badge names what answered, not a provider that fell back',
+    () async {
+      // Edge Gallery is a delegate, never an in-app client, so the runtime
+      // quietly stays on the server. The badge used to read the stored kind and
+      // announce "Edge Gallery" while Settings reported the Gemini model that
+      // actually ran.
+      final runtime = PortalAiRuntime.create(
+        post: noPost,
+        store: await storeWith({
+          'test_selected_backend_id': AiBackendKind.edgeGalleryDelegate.id,
+          'test_gemini_model': 'gemini-3.1-flash-lite',
+        }),
+      );
 
-    await store.setSelectedKind(AiBackendKind.systemOnDevice);
-    runtime.applyBackend(
-      const AiBackendOption(kind: AiBackendKind.systemOnDevice, available: true),
-    );
-    expect(runtime.client, isA<SystemAiCompletionClient>());
+      expect(runtime.activeBackendKind, AiBackendKind.cloudGemini);
+      expect(runtime.backendLabel, 'gemini-3.1-flash-lite');
+    },
+  );
 
-    runtime.applyBackend(
-      const AiBackendOption(kind: AiBackendKind.cloudGemini, available: true),
-    );
-    expect(runtime.usesLocalModel, isFalse);
-  });
+  test(
+    'switching provider in settings re-points the running assistant',
+    () async {
+      final store = await storeWith({});
+      final runtime = PortalAiRuntime.create(post: noPost, store: store);
+      expect(runtime.usesLocalModel, isFalse);
 
-  test('the stored model is corrected when the provider stops offering it',
-      () async {
-    final store = await storeWith({'test_ollama_model': 'gone'});
+      await store.setSelectedKind(AiBackendKind.systemOnDevice);
+      runtime.applyBackend(
+        const AiBackendOption(
+          kind: AiBackendKind.systemOnDevice,
+          available: true,
+        ),
+      );
+      expect(runtime.client, isA<SystemAiCompletionClient>());
 
-    await store.ensureModelFor(
-      const AiBackendOption(
-        kind: AiBackendKind.ollama,
-        available: true,
-        models: ['llama4', 'gemma4'],
-      ),
-    );
-    expect(store.ollamaModel, 'llama4');
+      runtime.applyBackend(
+        const AiBackendOption(kind: AiBackendKind.cloudGemini, available: true),
+      );
+      expect(runtime.usesLocalModel, isFalse);
+    },
+  );
 
-    // One it still offers is left alone.
-    await store.ensureModelFor(
-      const AiBackendOption(
-        kind: AiBackendKind.ollama,
-        available: true,
-        models: ['gemma4', 'llama4'],
-      ),
-    );
-    expect(store.ollamaModel, 'llama4');
-  });
+  test(
+    'the stored model is corrected when the provider stops offering it',
+    () async {
+      final store = await storeWith({'test_ollama_model': 'gone'});
+
+      await store.ensureModelFor(
+        const AiBackendOption(
+          kind: AiBackendKind.ollama,
+          available: true,
+          models: ['llama4', 'gemma4'],
+        ),
+      );
+      expect(store.ollamaModel, 'llama4');
+
+      // One it still offers is left alone.
+      await store.ensureModelFor(
+        const AiBackendOption(
+          kind: AiBackendKind.ollama,
+          available: true,
+          models: ['gemma4', 'llama4'],
+        ),
+      );
+      expect(store.ollamaModel, 'llama4');
+    },
+  );
 }

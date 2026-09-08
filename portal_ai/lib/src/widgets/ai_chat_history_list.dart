@@ -448,9 +448,7 @@ class _Row extends StatelessWidget {
                       dense: true,
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(
-                        item.pinned
-                            ? Icons.push_pin_outlined
-                            : Icons.push_pin,
+                        item.pinned ? Icons.push_pin_outlined : Icons.push_pin,
                         size: 18,
                       ),
                       title: Text(item.pinned ? labels.unpin : labels.pin),

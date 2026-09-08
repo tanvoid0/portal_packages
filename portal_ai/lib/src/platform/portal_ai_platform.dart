@@ -30,8 +30,8 @@ class SystemAiDescription {
   });
 
   const SystemAiDescription.unavailable(this.reason)
-      : status = SystemAiStatus.unavailable,
-        models = const [];
+    : status = SystemAiStatus.unavailable,
+      models = const [];
 
   final SystemAiStatus status;
   final List<String> models;
@@ -50,7 +50,8 @@ class SystemAiDescription {
       'downloading' => SystemAiStatus.downloading,
       _ => SystemAiStatus.unavailable,
     };
-    final models = (map['models'] as List?)
+    final models =
+        (map['models'] as List?)
             ?.whereType<String>()
             .where((m) => m.trim().isNotEmpty)
             .toList() ??
@@ -88,8 +89,9 @@ abstract final class PortalAiPlatform {
   /// Asks the platform what its built-in model can do, and what it is called.
   static Future<SystemAiDescription> describeSystemAi() async {
     try {
-      final result =
-          await _channel.invokeMapMethod<Object?, Object?>('describeSystemAi');
+      final result = await _channel.invokeMapMethod<Object?, Object?>(
+        'describeSystemAi',
+      );
       if (result == null) {
         return const SystemAiDescription.unavailable(
           'The platform reported no on-device model',
@@ -101,7 +103,9 @@ abstract final class PortalAiPlatform {
         'On-device AI is not supported on this platform',
       );
     } on PlatformException catch (e) {
-      return SystemAiDescription.unavailable(e.message ?? 'On-device AI failed');
+      return SystemAiDescription.unavailable(
+        e.message ?? 'On-device AI failed',
+      );
     }
   }
 

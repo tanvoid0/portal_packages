@@ -32,10 +32,10 @@ class _ScriptedClient implements AiCompletionClient {
 }
 
 AiTool _tool(String name) => AiTool(
-      name: name,
-      description: 'test tool',
-      run: (call) async => 'ran ${call.name}',
-    );
+  name: name,
+  description: 'test tool',
+  run: (call) async => 'ran ${call.name}',
+);
 
 void main() {
   test('namespacing qualifies names without touching the bare name', () {
@@ -73,9 +73,9 @@ void main() {
 
   group('the agent resolving a namespaced tool', () {
     List<AiTool> twoApps() => [
-          ...namespacedTools('shopping', [_tool('add_item')]),
-          ...namespacedTools('lifestyle', [_tool('add_item')]),
-        ];
+      ...namespacedTools('shopping', [_tool('add_item')]),
+      ...namespacedTools('lifestyle', [_tool('add_item')]),
+    ];
 
     test('a qualified name picks exactly that one app tool', () async {
       final client = _ScriptedClient([
@@ -83,8 +83,10 @@ void main() {
         '{"message":"done"}',
       ]);
 
-      final result = await AiAgent(client: client, tools: twoApps())
-          .run('add a coat');
+      final result = await AiAgent(
+        client: client,
+        tools: twoApps(),
+      ).run('add a coat');
 
       expect(result.steps.single.failed, isFalse);
       expect(result.steps.single.result, 'ran lifestyle.add_item');
@@ -96,8 +98,10 @@ void main() {
         '{"message":"gave up"}',
       ]);
 
-      final result = await AiAgent(client: client, tools: twoApps())
-          .run('add something');
+      final result = await AiAgent(
+        client: client,
+        tools: twoApps(),
+      ).run('add something');
 
       // Nothing ran: picking either app would have been a coin flip. The
       // agent keeps asking rather than guessing, so only assert that.

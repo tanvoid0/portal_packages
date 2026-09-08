@@ -13,6 +13,7 @@ import '../clients/ai_completion_client.dart';
 import '../documents/ai_document_client.dart';
 import '../documents/ai_document_import.dart';
 import '../runtime/portal_ai_runtime.dart';
+import '../tools/ai_agent.dart';
 import '../tools/ai_tool.dart';
 import 'ai_chat_history_list.dart';
 import 'ai_chat_labels.dart';
@@ -35,6 +36,7 @@ class AiAssistantPage extends StatefulWidget {
     super.key,
     this.runtime,
     this.title = 'Assistant',
+    this.avatar,
     this.suggestions = const [],
     this.onSettings,
     this.tools,
@@ -52,6 +54,8 @@ class AiAssistantPage extends StatefulWidget {
     this.fill = false,
     this.store,
     this.onItemTap,
+    this.onEditToolCall,
+    this.canEditToolCall,
     this.initialPrompt,
     this.autoSend = false,
     this.consent,
@@ -68,6 +72,13 @@ class AiAssistantPage extends StatefulWidget {
   final PortalAiRuntime? runtime;
 
   final String title;
+
+  /// What the header shows in place of the default assistant glyph.
+  ///
+  /// An app with its own assistant identity ("Coach", "Chef") passes an
+  /// image or an icon here; it is clipped into the same circle and keeps the
+  /// presence dot, so branding never costs the busy indicator.
+  final Widget? avatar;
 
   /// Prompts offered as cards before the first run.
   ///
@@ -157,6 +168,21 @@ class AiAssistantPage extends StatefulWidget {
   /// inert without this -- only the app knows what a recipe looks like.
   final void Function(String entity, AiItem item)? onItemTap;
 
+  /// Opens the app's own add/edit screen for a proposed change, prefilled
+  /// from the call, and answers true when the user saved there.
+  ///
+  /// Only the app knows what its editor looks like or how to fill it, so the
+  /// card offers Edit only where this is wired. Saving in the editor is the
+  /// change being made -- the tool is not run again afterwards.
+  final Future<bool> Function(AiToolCall call)? onEditToolCall;
+
+  /// Whether [onEditToolCall] has a form for this call.
+  ///
+  /// An app's editor covers some of its tools and not others -- a recipe has
+  /// a form, a meal-plan row does not -- and an Edit button that opens
+  /// nothing is worse than no button. Null offers Edit for every call.
+  final bool Function(AiToolCall call)? canEditToolCall;
+
   /// Put in the composer on first mount, for a caller that already has the
   /// question -- a voice launch that has finished transcribing, or a deep link
   /// carrying one.
@@ -188,6 +214,7 @@ class AiAssistantPage extends StatefulWidget {
     BuildContext context, {
     required PortalAiRuntime runtime,
     String title = 'Assistant',
+    Widget? avatar,
     List<AiSuggestion> suggestions = const [],
     VoidCallback? onSettings,
     List<AiTool>? tools,
@@ -199,6 +226,8 @@ class AiAssistantPage extends StatefulWidget {
     AiChatLabels labels = const AiChatLabels(),
     AiChatStore? store,
     void Function(String entity, AiItem item)? onItemTap,
+    Future<bool> Function(AiToolCall call)? onEditToolCall,
+    bool Function(AiToolCall call)? canEditToolCall,
     AiConsent? consent,
     VoidCallback? onAttach,
     AiDocumentClient? documents,
@@ -211,6 +240,7 @@ class AiAssistantPage extends StatefulWidget {
             child: AiAssistantPage(
               runtime: runtime,
               title: title,
+              avatar: avatar,
               documents: documents,
               suggestions: suggestions,
               onSettings: onSettings,
@@ -223,6 +253,8 @@ class AiAssistantPage extends StatefulWidget {
               labels: labels,
               store: store,
               onItemTap: onItemTap,
+              onEditToolCall: onEditToolCall,
+              canEditToolCall: canEditToolCall,
               consent: consent,
               onAttach: onAttach,
               maxPromptLength: maxPromptLength,
@@ -241,6 +273,11 @@ class AiAssistantPage extends StatefulWidget {
 class _AiAssistantPageState extends State<AiAssistantPage> {
   final _input = TextEditingController();
   final _scroll = ScrollController();
+
+  /// Focused by hand when the field appears. `autofocus` is not enough: the
+  /// menu that opens search returns focus to whatever had it when it closes,
+  /// which is the composer, so what the user typed went into the prompt.
+  final _searchFocus = FocusNode();
 
   /// Set by the stop button. The in-flight request cannot be recalled, so the
   /// answer is dropped when it lands rather than appearing minutes later.
@@ -266,11 +303,18 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   /// jump-to-latest button is worth the space.
   bool _scrolledUp = false;
 
+  /// True once the transcript has scrolled off its top, which shrinks the
+  /// header to a single line.
+  bool _collapsed = false;
+
   /// A document read for the next prompt: its name for the chip, its text for
   /// the model. Cleared once sent.
   ({String name, String text})? _attachment;
   bool _reading = false;
   String? _error;
+
+  /// The tool waiting on the user, drawn as a card at the end of the thread.
+  _PendingConfirm? _pendingConfirm;
 
   /// Accepting or discarding removes a card here and now; the host is told, but
   /// the page does not wait for it to hand back a new list.
@@ -362,6 +406,18 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     ];
   }
 
+  /// Whether the next thing on screen is also the assistant talking.
+  ///
+  /// Messenger draws the face once per run, against the last bubble of it, so
+  /// a multi-part answer reads as one voice rather than three arrivals. The
+  /// live stream and a finished [_reply] both render below the turn list, so
+  /// the last turn has to count them as what follows it.
+  bool _assistantFollows(int index) {
+    final turns = _shownTurns;
+    if (index < turns.length - 1) return !turns[index + 1].isUser;
+    return _streamingReply != null || _reply != null;
+  }
+
   /// Leaves the search and puts [turn] on screen where it actually sits.
   void _revealTurn(AiChatTurn turn) {
     setState(() {
@@ -395,7 +451,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       if (!mounted) return;
       setState(() => _attachment = (name: file.name, text: read.text));
     } catch (e) {
-      if (mounted) setState(() => _error = _messageFor(e));
+      if (mounted) _failWith(e);
     } finally {
       if (mounted) setState(() => _reading = false);
     }
@@ -541,9 +597,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         ),
       );
       if (!mounted) return;
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(content: Text(widget.labels.copied)),
-      );
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(SnackBar(content: Text(widget.labels.copied)));
       return;
     }
     final runtime = widget.runtime;
@@ -654,9 +710,13 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
 
   @override
   void dispose() {
+    // A page torn down mid-question leaves the agent awaiting an answer that
+    // can never arrive, so it is refused on the way out.
+    _answerConfirm(false);
     _rotation?.cancel();
     _scroll.removeListener(_watchScroll);
     _inputFocus.dispose();
+    _searchFocus.dispose();
     _input.dispose();
     _scroll.dispose();
     super.dispose();
@@ -681,8 +741,15 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
 
   void _watchScroll() {
     final scrolledUp = !_atBottom;
-    if (scrolledUp == _scrolledUp) return;
-    setState(() => _scrolledUp = scrolledUp);
+    // Messenger drops its subtitle line as soon as the thread moves, giving
+    // the transcript the height back. One threshold, no animation curve of
+    // our own -- AnimatedCrossFade below owns the transition.
+    final collapsed = _scroll.hasClients && _scroll.position.pixels > 24;
+    if (scrolledUp == _scrolledUp && collapsed == _collapsed) return;
+    setState(() {
+      _scrolledUp = scrolledUp;
+      _collapsed = collapsed;
+    });
   }
 
   static const _bottomSlack = 80.0;
@@ -781,7 +848,16 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
 
   Future<void> _send() async {
     final prompt = _input.text.trim();
-    if (prompt.isEmpty || _busy) return;
+    if (prompt.isEmpty) return;
+    // With a card open the run is not busy, it is waiting on the user. What
+    // they typed is the answer: decline this call, and hand the model the
+    // correction so it proposes again rather than stopping.
+    if (_pendingConfirm != null) {
+      _input.clear();
+      _answerConfirm(false, note: prompt);
+      return;
+    }
+    if (_busy) return;
     final send = widget.onSend;
     if (send != null) {
       _input.clear();
@@ -794,7 +870,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         await send(prompt);
         if (mounted && !_cancelled) _followNewest();
       } catch (e) {
-        if (mounted && !_cancelled) setState(() => _error = _messageFor(e));
+        if (mounted && !_cancelled) _failWith(e);
       } finally {
         if (mounted) setState(() => _running = false);
       }
@@ -883,6 +959,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         _error = _messageFor(e);
         _streamingReply = null;
       });
+      _followNewest();
       // Keep the question even though the answer failed: without this the
       // user's turn is on screen but gone after a reload.
       await _persist();
@@ -916,7 +993,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       }
       return;
     }
-    if (tool.mutates && !await _confirm(tool, call)) return;
+    if (tool.mutates && !(await _confirm(tool, call)).accepted) return;
 
     setState(() => _running = true);
     try {
@@ -946,6 +1023,22 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   }
 
   /// Reasoning a turn carries, if the backend reported any.
+  /// A step's result as something worth reading.
+  ///
+  /// Tool results are written for the model. The refusal sentence in
+  /// particular carries the user's own correction back to it -- "user declined
+  /// this action and asked instead: make it vegan" -- and printing that
+  /// verbatim reads like the app talking about the user in the third person.
+  static String _stepResultText(String result) {
+    const declined = 'user declined this action';
+    if (!result.startsWith(declined)) return result;
+    final note = result.substring(declined.length).replaceFirst(
+      RegExp(r'^ and asked instead: '),
+      '',
+    );
+    return note.trim().isEmpty ? 'Declined' : 'Declined — asked for: $note';
+  }
+
   String? _thinkingOf(AiChatTurn turn) {
     if (turn.isUser) return null;
     final raw = turn.payload?['thinking'];
@@ -1011,8 +1104,17 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
           color: step.failed ? theme.colorScheme.error : null,
           size: 20,
         ),
-        title: Text(step.call.name.replaceAll('_', ' ')),
-        subtitle: step.blocks.isEmpty ? Text(step.result) : null,
+        title: Text(aiToolTitle(step.call.name)),
+        subtitle: step.blocks.isEmpty
+            // A tool result is written for the model, and some are long --
+            // image_search returns a screenful of Unsplash URLs. Two lines is
+            // enough to say what happened without burying the conversation.
+            ? Text(
+                _stepResultText(step.result),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              )
+            : null,
       ),
       for (final block in step.blocks)
         Padding(
@@ -1022,37 +1124,67 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     ],
   );
 
-  Future<bool> _confirm(AiTool tool, AiToolCall call) async {
-    if (!mounted) return false;
-    final approved = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(tool.name.replaceAll('_', ' ')),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(tool.description),
-              if (call.args.isNotEmpty) const SizedBox(height: 12),
-              for (final arg in call.args.entries)
-                _ArgRow(name: arg.key, value: arg.value),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Skip'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Allow'),
-          ),
-        ],
-      ),
+  Future<AiToolDecision> _confirm(AiTool tool, AiToolCall call) async {
+    if (!mounted) return const AiToolDecision.declined();
+    // Asked in the transcript, not over it. A modal hid the question that
+    // caused the tool call and the answer so far, which is exactly the
+    // context needed to judge whether to allow it -- and it did not match
+    // the proposal cards portal_task already asks with.
+    final pending = _PendingConfirm(tool: tool, call: call);
+    setState(() => _pendingConfirm = pending);
+    _followNewest();
+    final decision = await pending.answer.future;
+    if (mounted && identical(_pendingConfirm, pending)) {
+      setState(() => _pendingConfirm = null);
+    }
+    return decision;
+  }
+
+  bool _canEdit(AiToolCall call) =>
+      widget.onEditToolCall != null &&
+      (widget.canEditToolCall?.call(call) ?? true);
+
+  /// Hands the proposed call to the app's editor.
+  ///
+  /// Saving there *is* the change, so the tool must not also run: the call is
+  /// declined with a note saying so, or the card is left standing if the user
+  /// backed out of the editor without saving.
+  Future<void> _editPending(_PendingConfirm pending) async {
+    final edit = widget.onEditToolCall;
+    if (edit == null || pending.answer.isCompleted) return;
+    final saved = await edit(pending.call);
+    if (!mounted || pending.answer.isCompleted) return;
+    if (!saved) return;
+    _answerConfirm(
+      false,
+      note:
+          'the user opened the editor and saved this themselves; do not '
+          'call this tool again for it',
     );
-    return approved ?? false;
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _searching = !_searching;
+      if (!_searching) _chatQuery = '';
+    });
+    if (!_searching) return;
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _searchFocus.requestFocus(),
+    );
+  }
+
+  /// Answers the open card. [note] is what the user typed instead of pressing
+  /// a button: it declines this call and tells the model what to do instead,
+  /// so a proposal can be corrected without leaving the conversation.
+  void _answerConfirm(bool accepted, {String? note}) {
+    final pending = _pendingConfirm;
+    if (pending == null || pending.answer.isCompleted) return;
+    pending.answer.complete(
+      accepted
+          ? const AiToolDecision.accepted()
+          : AiToolDecision.declined(note: note),
+    );
   }
 
   String _withAttachment(String prompt) {
@@ -1065,15 +1197,26 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     );
   }
 
+  /// Records a failure and brings it into view.
+  ///
+  /// The bubble is appended at the end of the thread, so without the scroll
+  /// it lands under the composer and the run looks like it simply stopped.
+  void _failWith(Object error) {
+    setState(
+      () => _error = aiErrorMessage(error, offline: widget.labels.offline),
+    );
+    _followNewest();
+  }
+
   String _messageFor(Object error) =>
       aiErrorMessage(error, offline: widget.labels.offline);
 
   void _copyTurn(AiChatTurn turn) {
     Clipboard.setData(ClipboardData(text: turn.content));
     HapticFeedback.selectionClick();
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(content: Text(widget.labels.copied)),
-    );
+    ScaffoldMessenger.maybeOf(
+      context,
+    )?.showSnackBar(SnackBar(content: Text(widget.labels.copied)));
   }
 
   /// The provider and model picker, one tap from the conversation.
@@ -1125,54 +1268,119 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
             Row(
               children: [
                 if (widget.fill && Navigator.canPop(context))
-                  const BackButton(),
-                Expanded(
-                  child: Text(widget.title, style: theme.textTheme.titleMedium),
+                  const BackButton(
+                    style: ButtonStyle(visualDensity: VisualDensity.compact),
+                  ),
+                _AiPresenceAvatar(
+                  busy: _busy,
+                  local: widget.runtime?.usesLocalModel ?? false,
+                  avatar: widget.avatar,
                 ),
-                if (widget.runtime?.backendStore != null)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: ActionChip(
-                      avatar: const Icon(Icons.memory, size: 16),
-                      label: Text(widget.runtime!.backendLabel),
-                      onPressed: _showBackendPicker,
-                      visualDensity: VisualDensity.compact,
+                const SizedBox(width: 8),
+                Expanded(
+                  // Messenger-style stacked title: the name on one tight line
+                  // with the backend underneath it, instead of a title row
+                  // fighting an ActionChip for horizontal space.
+                  child: InkWell(
+                    onTap: widget.runtime?.backendStore == null
+                        ? null
+                        : _showBackendPicker,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.title,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              height: 1.1,
+                            ),
+                            // Without these the row's fixed children (back
+                            // button, avatar, up to five icons) leave the
+                            // title a few logical pixels, and it wraps one
+                            // letter per line down the whole screen instead
+                            // of ellipsing.
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (widget.runtime != null)
+                            AnimatedCrossFade(
+                              duration: const Duration(milliseconds: 150),
+                              firstChild: const SizedBox(
+                                height: 0,
+                                width: double.infinity,
+                              ),
+                              secondChild: Text(
+                                _busy
+                                    ? widget.labels.thinking
+                                    : widget.runtime!.backendLabel,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  height: 1.1,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              crossFadeState: _collapsed
+                                  ? CrossFadeState.showFirst
+                                  : CrossFadeState.showSecond,
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                if (_visibleTurns.isNotEmpty) ...[
-                  IconButton(
-                    tooltip: widget.labels.searchInChat,
-                    icon: Icon(_searching ? Icons.search_off : Icons.search),
-                    onPressed: () => setState(() {
-                      _searching = !_searching;
-                      if (!_searching) _chatQuery = '';
-                    }),
-                  ),
-                  PopupMenuButton<bool>(
+                ),
+                // Find and the two export formats share one overflow menu.
+                // As separate icons they were 96dp of a 411dp row that also
+                // carries the back button, the backend chip and two more
+                // icons, which left the title nothing to render into.
+                if (_visibleTurns.isNotEmpty)
+                  PopupMenuButton<_ChatMenuAction>(
                     tooltip: widget.labels.share,
-                    icon: const Icon(Icons.ios_share),
-                    onSelected: (asJson) => _exportChat(asJson: asJson),
+                    icon: const Icon(Icons.more_vert),
+                    iconSize: 20,
+                    padding: EdgeInsets.zero,
+                    onSelected: (action) => switch (action) {
+                      _ChatMenuAction.find => _toggleSearch(),
+                      _ChatMenuAction.copyAsMarkdown => _exportChat(
+                        asJson: false,
+                      ),
+                      _ChatMenuAction.copyAsJson => _exportChat(asJson: true),
+                    },
                     itemBuilder: (context) => [
                       PopupMenuItem(
-                        value: false,
+                        value: _ChatMenuAction.find,
+                        child: Text(widget.labels.searchInChat),
+                      ),
+                      PopupMenuItem(
+                        value: _ChatMenuAction.copyAsMarkdown,
                         child: Text(widget.labels.copyAsMarkdown),
                       ),
                       PopupMenuItem(
-                        value: true,
+                        value: _ChatMenuAction.copyAsJson,
                         child: Text(widget.labels.copyAsJson),
                       ),
                     ],
                   ),
-                ],
                 if (widget.store != null) ...[
                   IconButton(
                     tooltip: widget.labels.historyTitle,
                     icon: const Icon(Icons.history),
+                    iconSize: 20,
+                    visualDensity: VisualDensity.compact,
                     onPressed: _showHistory,
                   ),
                   IconButton(
                     tooltip: widget.labels.newChat,
                     icon: const Icon(Icons.add_comment_outlined),
+                    iconSize: 20,
+                    visualDensity: VisualDensity.compact,
                     onPressed: _newChat,
                   ),
                 ],
@@ -1180,6 +1388,8 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                   IconButton(
                     tooltip: 'AI settings',
                     icon: const Icon(Icons.tune),
+                    iconSize: 20,
+                    visualDensity: VisualDensity.compact,
                     onPressed: widget.onSettings,
                   ),
               ],
@@ -1188,7 +1398,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: TextField(
-                  autofocus: true,
+                  focusNode: _searchFocus,
                   onChanged: (value) => setState(() => _chatQuery = value),
                   textInputAction: TextInputAction.search,
                   decoration: InputDecoration(
@@ -1206,168 +1416,235 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
             child: Stack(
               children: [
                 SingleChildScrollView(
-              controller: _scroll,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_showingDeck) ...[
-                    if (widget.consent case final consent?
-                        when !consent.accepted)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: AiConsentCard(consent: consent),
-                      )
-                    else if (widget.labels.empty.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 24),
-                        child: Text(
-                          widget.labels.empty,
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyMedium,
+                  controller: _scroll,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_showingDeck) ...[
+                        if (widget.consent case final consent?
+                            when !consent.accepted)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: AiConsentCard(consent: consent),
+                          )
+                        else if (widget.labels.empty.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 24),
+                            child: Text(
+                              widget.labels.empty,
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          ),
+                        const SizedBox(height: 8),
+                        AiSuggestionCards(
+                          suggestions: _rotator.visible,
+                          enabled: !_gated,
+                          onTap: (suggestion) {
+                            _input.text = suggestion.prompt;
+                            _send();
+                          },
+                          onShuffle: _rotator.canRotate
+                              ? () => setState(_rotator.refresh)
+                              : null,
+                          // Only offered when there is a model to ask and a
+                          // house style to imitate.
+                          onRefresh: widget.runtime == null
+                              ? null
+                              : _freshIdeas,
+                          refreshing: _loadingIdeas,
+                          shuffleLabel: widget.labels.shuffle,
+                          refreshLabel: widget.labels.moreIdeas,
                         ),
-                      ),
-                    const SizedBox(height: 8),
-                    AiSuggestionCards(
-                      suggestions: _rotator.visible,
-                      enabled: !_gated,
-                      onTap: (suggestion) {
-                        _input.text = suggestion.prompt;
-                        _send();
-                      },
-                      onShuffle: _rotator.canRotate
-                          ? () => setState(_rotator.refresh)
-                          : null,
-                      // Only offered when there is a model to ask and a
-                      // house style to imitate.
-                      onRefresh: widget.runtime == null ? null : _freshIdeas,
-                      refreshing: _loadingIdeas,
-                      shuffleLabel: widget.labels.shuffle,
-                      refreshLabel: widget.labels.moreIdeas,
-                    ),
-                  ],
-                  for (final turn in _shownTurns) ...[
-                    if (_thinkingOf(turn) case final thinking?)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: AiThinkingTile(
+                      ],
+                      for (final (index, turn) in _shownTurns.indexed) ...[
+                        if (_thinkingOf(turn) case final thinking?)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: AiThinkingTile(
+                              thinking: thinking,
+                              label: widget.labels.thinking,
+                            ),
+                          ),
+                        Padding(
+                          key: GlobalObjectKey(turn),
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: GestureDetector(
+                            onTap: _chatQuery.trim().isEmpty
+                                ? null
+                                : () => _revealTurn(turn),
+                            child: _TurnBubble(
+                              turn: turn,
+                              avatar: widget.avatar,
+                              local: widget.runtime?.usesLocalModel ?? false,
+                              showAvatar: !_assistantFollows(index),
+                              onCopy: () => _copyTurn(turn),
+                              copyLabel: widget.labels.copy,
+                              copiedLabel: widget.labels.copied,
+                              youLabel: widget.labels.youSaid,
+                              assistantLabel: widget.labels.assistantSaid,
+                              // Any question can be reworked, not just the newest:
+                              // the mistake worth fixing is often three turns back.
+                              // Going back drops the answers after it, so
+                              // _rewindTo asks before throwing away more than the
+                              // last exchange.
+                              onEdit: !_busy && _canRewind(turn)
+                                  ? () => _rewindTo(_visibleTurns.indexOf(turn))
+                                  : null,
+                              onDelete: !_busy && _canRewind(turn)
+                                  ? () => _rewindTo(
+                                      _visibleTurns.indexOf(turn),
+                                      refill: false,
+                                    )
+                                  : null,
+                              editLabel: widget.labels.edit,
+                              deleteLabel: widget.labels.delete,
+                            ),
+                          ),
+                        ),
+                        for (final block in _blocksOf(turn))
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _blockView(block, theme),
+                          ),
+                      ],
+                      for (final step in _steps) _stepView(step, theme),
+                      if (_streamingReply case final partial?
+                          when partial.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Semantics(
+                            liveRegion: true,
+                            child: _assistantBubble(
+                              context,
+                              AiMarkdown(text: partial),
+                              avatar: widget.avatar,
+                              local: widget.runtime?.usesLocalModel ?? false,
+                            ),
+                          ),
+                        ),
+                      if (_replyThinking case final thinking?)
+                        AiThinkingTile(
                           thinking: thinking,
                           label: widget.labels.thinking,
                         ),
-                      ),
-                    Padding(
-                      key: GlobalObjectKey(turn),
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: GestureDetector(
-                        onTap: _chatQuery.trim().isEmpty
-                            ? null
-                            : () => _revealTurn(turn),
-                        child: _TurnBubble(
-                        turn: turn,
-                        onCopy: () => _copyTurn(turn),
-                        copyLabel: widget.labels.copy,
-                        copiedLabel: widget.labels.copied,
-                        youLabel: widget.labels.youSaid,
-                        assistantLabel: widget.labels.assistantSaid,
-                        // Any question can be reworked, not just the newest:
-                        // the mistake worth fixing is often three turns back.
-                        // Going back drops the answers after it, so
-                        // _rewindTo asks before throwing away more than the
-                        // last exchange.
-                        onEdit: !_busy && _canRewind(turn)
-                            ? () => _rewindTo(_visibleTurns.indexOf(turn))
-                            : null,
-                        onDelete: !_busy && _canRewind(turn)
-                            ? () => _rewindTo(
-                                _visibleTurns.indexOf(turn),
-                                refill: false,
-                              )
-                            : null,
-                        editLabel: widget.labels.edit,
-                        deleteLabel: widget.labels.delete,
+                      if (_reply != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: _assistantBubble(
+                            context,
+                            AiMarkdown(text: _reply!),
+                            avatar: widget.avatar,
+                            local: widget.runtime?.usesLocalModel ?? false,
+                          ),
                         ),
-                      ),
-                    ),
-                    for (final block in _blocksOf(turn))
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: _blockView(block, theme),
-                      ),
-                  ],
-                  for (final step in _steps) _stepView(step, theme),
-                  if (_streamingReply case final partial?
-                      when partial.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Semantics(
-                        liveRegion: true,
-                        child: AiMarkdown(text: partial),
-                      ),
-                    ),
-                  if (_replyThinking case final thinking?)
-                    AiThinkingTile(
-                      thinking: thinking,
-                      label: widget.labels.thinking,
-                    ),
-                  if (_reply != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: AiMarkdown(text: _reply!),
-                    ),
-                  for (final proposal in _proposals)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _ProposalCard(
-                        proposal: proposal,
-                        expanded: _expandedProposal == proposal.id,
-                        onTap: () => setState(
-                          () => _expandedProposal =
-                              _expandedProposal == proposal.id
-                              ? null
-                              : proposal.id,
+                      for (final proposal in _proposals)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _ProposalCard(
+                            proposal: proposal,
+                            expanded: _expandedProposal == proposal.id,
+                            onTap: () => setState(
+                              () => _expandedProposal =
+                                  _expandedProposal == proposal.id
+                                  ? null
+                                  : proposal.id,
+                            ),
+                            onAccept: widget.onAcceptProposal == null
+                                ? null
+                                : () => _resolveProposal(
+                                    proposal,
+                                    widget.onAcceptProposal,
+                                  ),
+                            labels: widget.labels,
+                            onEdit: widget.onEditProposal == null
+                                ? null
+                                : () => widget.onEditProposal!(proposal),
+                            onDiscard: widget.onDiscardProposal == null
+                                ? null
+                                : () => _resolveProposal(
+                                    proposal,
+                                    widget.onDiscardProposal,
+                                  ),
+                          ),
                         ),
-                        onAccept: widget.onAcceptProposal == null
-                            ? null
-                            : () => _resolveProposal(
-                                proposal,
-                                widget.onAcceptProposal,
+                      if (_pendingConfirm case final pending?)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _ConfirmCard(
+                            pending: pending,
+                            onAccept: () => _answerConfirm(true),
+                            onDecline: () => _answerConfirm(false),
+                            onEdit: _canEdit(pending.call)
+                                ? () => _editPending(pending)
+                                : null,
+                          ),
+                        ),
+                      // A failure is part of the conversation, so it reads as one:
+                      // the assistant's own bubble shape in the error colours,
+                      // rather than loose red text that ran the width of the page
+                      // and pushed Retry off to the side.
+                      if (_error != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Container(
+                              constraints: BoxConstraints(
+                                maxWidth:
+                                    MediaQuery.sizeOf(context).width * 0.85,
                               ),
-                        labels: widget.labels,
-                        onEdit: widget.onEditProposal == null
-                            ? null
-                            : () => widget.onEditProposal!(proposal),
-                        onDiscard: widget.onDiscardProposal == null
-                            ? null
-                            : () => _resolveProposal(
-                                proposal,
-                                widget.onDiscardProposal,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
                               ),
-                      ),
-                    ),
-                  if (_error != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _error!,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.error,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.errorContainer,
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(16),
+                                  topRight: Radius.circular(16),
+                                  bottomLeft: Radius.circular(4),
+                                  bottomRight: Radius.circular(16),
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _error!,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      height: 1.45,
+                                      color: theme.colorScheme.onErrorContainer,
+                                    ),
+                                  ),
+                                  if (_lastUserTurn != null && !_busy)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: TextButton.icon(
+                                        onPressed: _retry,
+                                        icon: const Icon(
+                                          Icons.refresh,
+                                          size: 18,
+                                        ),
+                                        label: Text(widget.labels.retry),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: theme
+                                              .colorScheme
+                                              .onErrorContainer,
+                                          padding: EdgeInsets.zero,
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                           ),
-                          if (_lastUserTurn != null && !_busy)
-                            TextButton.icon(
-                              onPressed: _retry,
-                              icon: const Icon(Icons.refresh, size: 18),
-                              label: Text(widget.labels.retry),
-                            ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
+                        ),
+                    ],
+                  ),
+                ),
                 // Only while the newest turn is off screen: an always-there
                 // button sits on top of the answer you are reading.
                 if (_scrolledUp)
@@ -1416,8 +1693,10 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                         ],
                       )
                     : InputChip(
-                        avatar: const Icon(Icons.description_outlined,
-                            size: 16),
+                        avatar: const Icon(
+                          Icons.description_outlined,
+                          size: 16,
+                        ),
                         label: Text(
                           '${widget.labels.attached}: ${_attachment!.name}',
                           overflow: TextOverflow.ellipsis,
@@ -1432,7 +1711,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
             controller: _input,
             focusNode: _inputFocus,
             enabled: !_gated,
-            busy: _busy,
+            busy: _busy && _pendingConfirm == null,
             onStop: _stop,
             onSubmit: _send,
             onAttach: widget.documents != null
@@ -1443,9 +1722,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
             attachLabel: widget.labels.attach,
             hintText: _gated
                 ? widget.labels.consentBlocked
-                : _busy
-                    ? widget.labels.working
-                    : widget.labels.inputHint,
+                : (_busy && _pendingConfirm == null)
+                ? widget.labels.working
+                : widget.labels.inputHint,
           ),
         ],
       ),
@@ -1466,10 +1745,30 @@ class _ArgRow extends StatelessWidget {
 
   static String describe(Object? value) => switch (value) {
     null => '-',
-    final List list => list.map(describe).join(', '),
-    final Map map => map.values.map(describe).join(' '),
+    // Steps and ingredients are sentences. Joined with a comma they read as
+    // "Preheat the oven., Cut the aubergine.", so each gets its own line.
+    final List list => list.map(describe).join('\n'),
+    // Rows arrive as {recipe_id, date, meal_type, servings}. The id is the
+    // one value a person cannot check -- "868faf5c-bdc9-4f55 2026-09-08
+    // dinner 4" is not an answer to "allow this?" -- so it is dropped, unless
+    // dropping leaves nothing to show.
+    final Map map => switch (map.values
+        .where((v) => !_looksLikeId(v))
+        .map(describe)
+        .join(' ')) {
+      '' => map.values.map(describe).join(' '),
+      final kept => kept,
+    },
     _ => '$value',
   };
+
+  static final _uuid = RegExp(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    caseSensitive: false,
+  );
+
+  static bool _looksLikeId(Object? value) =>
+      value is String && _uuid.hasMatch(value.trim());
 
   @override
   Widget build(BuildContext context) {
@@ -1596,9 +1895,75 @@ class _ProposalCard extends StatelessWidget {
 }
 
 /// One side of the conversation.
+/// The assistant's side of the thread.
+///
+/// Left bare, a reply sat on the page's own background at the same tone as
+/// everything around it, so a thread read as one undifferentiated block. The
+/// outline is what guarantees an edge whatever surface the host app puts
+/// behind us -- surfaceContainerHigh alone can land a hair off a tinted
+/// background.
+///
+/// The avatar repeats beside every reply, as it does in Messenger: with a
+/// header that collapses on scroll, a thread read halfway down otherwise has
+/// nothing on screen saying who is talking.
+Widget _assistantBubble(
+  BuildContext context,
+  Widget child, {
+  Widget? avatar,
+  bool local = false,
+  bool showAvatar = true,
+}) {
+  final scheme = Theme.of(context).colorScheme;
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.end,
+    mainAxisAlignment: MainAxisAlignment.start,
+    children: [
+      if (showAvatar)
+        _AiPresenceAvatar(
+          busy: false,
+          local: local,
+          avatar: avatar,
+          size: 24,
+          // The dot is the header's status line. Repeated down the thread it
+          // would claim every past reply is live.
+          showDot: false,
+        )
+      else
+        // Same width as the avatar, so a run of replies keeps one left edge
+        // instead of stepping out under the face.
+        SizedBox(
+          width: 24 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.3),
+        ),
+      const SizedBox(width: 8),
+      Flexible(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHigh,
+            border: Border.all(color: scheme.outlineVariant),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(16),
+              topRight: Radius.circular(16),
+              bottomLeft: Radius.circular(4),
+              bottomRight: Radius.circular(16),
+            ),
+          ),
+          child: child,
+        ),
+      ),
+      // Keeps a short reply from stretching to the full width, the way the
+      // user's own bubble is capped at 85%.
+      const SizedBox(width: 40),
+    ],
+  );
+}
+
 class _TurnBubble extends StatelessWidget {
   const _TurnBubble({
     required this.turn,
+    this.avatar,
+    this.local = false,
+    this.showAvatar = true,
     this.onEdit,
     this.onDelete,
     this.onCopy,
@@ -1611,6 +1976,15 @@ class _TurnBubble extends StatelessWidget {
   });
 
   final AiChatTurn turn;
+
+  /// The host's own assistant face, shown beside the reply. Null falls back
+  /// to the default glyph.
+  final Widget? avatar;
+  final bool local;
+
+  /// False on every reply but the last of a run, which leaves the gutter
+  /// empty so the bubbles still line up under the one face above them.
+  final bool showAvatar;
 
   /// Puts this turn back in the composer. Null for anything not editable.
   final VoidCallback? onEdit;
@@ -1638,8 +2012,6 @@ class _TurnBubble extends StatelessWidget {
     final theme = Theme.of(context);
     final isUser = turn.isUser;
     final meta = _meta(context);
-    // Only the user gets a bubble. The assistant's reply is the page's own
-    // content -- boxing it just fights the app's background for contrast.
     final scheme = theme.colorScheme;
     if (!isUser) {
       // A visible button rather than the bubble's long-press menu: the reply
@@ -1647,26 +2019,33 @@ class _TurnBubble extends StatelessWidget {
       return Semantics(
         label: assistantLabel,
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AiMarkdown(
-            text: turn.content,
-            copyCodeLabel: copyLabel,
-            copiedLabel: copiedLabel,
-          ),
-          Row(
-            children: [
-              if (meta != null) _metaText(theme, meta),
-              if (onCopy != null)
-                IconButton(
-                  onPressed: onCopy,
-                  tooltip: copyLabel,
-                  icon: const Icon(Icons.copy_outlined, size: 16),
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  constraints: const BoxConstraints(),
-                  color: scheme.onSurfaceVariant,
-                ),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _assistantBubble(
+              context,
+              AiMarkdown(
+                text: turn.content,
+                copyCodeLabel: copyLabel,
+                copiedLabel: copiedLabel,
+              ),
+              avatar: avatar,
+              local: local,
+              showAvatar: showAvatar,
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (meta != null) _metaText(theme, meta),
+                if (onCopy != null)
+                  IconButton(
+                    onPressed: onCopy,
+                    tooltip: copyLabel,
+                    icon: const Icon(Icons.copy_outlined, size: 16),
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    constraints: const BoxConstraints(),
+                    color: scheme.onSurfaceVariant,
+                  ),
               ],
             ),
           ],
@@ -1681,45 +2060,48 @@ class _TurnBubble extends StatelessWidget {
         Flexible(
           child: Semantics(
             label: youLabel,
-          child: GestureDetector(
-            // Long-press for actions, like every other chat bubble on the
-            // platform -- a pencil icon sitting next to the bubble at all
-            // times was one more thing to explain for an action people only
-            // ever take right after sending.
-            onLongPressStart: canAct
-                ? (details) =>
-                      _showActions(context, details.globalPosition, scheme)
-                : null,
-            child: Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.sizeOf(context).width * 0.85,
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: scheme.primaryContainer,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                  bottomLeft: Radius.circular(16),
-                  bottomRight: Radius.circular(4),
+            child: GestureDetector(
+              // Long-press for actions, like every other chat bubble on the
+              // platform -- a pencil icon sitting next to the bubble at all
+              // times was one more thing to explain for an action people only
+              // ever take right after sending.
+              onLongPressStart: canAct
+                  ? (details) =>
+                        _showActions(context, details.globalPosition, scheme)
+                  : null,
+              child: Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width * 0.85,
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: scheme.primaryContainer,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    topRight: Radius.circular(16),
+                    bottomLeft: Radius.circular(16),
+                    bottomRight: Radius.circular(4),
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      turn.content,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        height: 1.45,
+                        color: scheme.onPrimaryContainer,
+                      ),
+                    ),
+                    if (meta != null)
+                      _metaText(theme, meta, color: scheme.onPrimaryContainer),
+                  ],
                 ),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    turn.content,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      height: 1.45,
-                      color: scheme.onPrimaryContainer,
-                    ),
-                  ),
-                  if (meta != null)
-                    _metaText(theme, meta, color: scheme.onPrimaryContainer),
-                ],
-              ),
-            ),
             ),
           ),
         ),
@@ -1813,6 +2195,237 @@ class _TurnBubble extends StatelessWidget {
             alpha: 0.7,
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The chat header's overflow menu entries.
+enum _ChatMenuAction { find, copyAsMarkdown, copyAsJson }
+
+/// A tool call waiting on the user's answer.
+class _PendingConfirm {
+  _PendingConfirm({required this.tool, required this.call});
+
+  final AiTool tool;
+  final AiToolCall call;
+  final answer = Completer<AiToolDecision>();
+}
+
+/// The cover photo a call carries, if it named one.
+///
+/// Tools that save something people look at -- a recipe, a jacket -- take an
+/// image URL the model found with `image_search`. Showing it beats printing
+/// the URL: the picture is most of what makes the proposal recognisable.
+String? _previewImage(AiToolCall call) {
+  for (final entry in call.args.entries) {
+    final key = entry.key.toLowerCase();
+    if (!key.contains('image') && !key.contains('photo')) continue;
+    final value = entry.value;
+    if (value is! String) continue;
+    final url = Uri.tryParse(value.trim());
+    if (url != null && (url.scheme == 'https' || url.scheme == 'http')) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+/// The proposed change, asked in the thread in a proposal-shaped card.
+class _ConfirmCard extends StatelessWidget {
+  const _ConfirmCard({
+    required this.pending,
+    required this.onAccept,
+    required this.onDecline,
+    this.onEdit,
+  });
+
+  final _PendingConfirm pending;
+  final VoidCallback onAccept;
+  final VoidCallback onDecline;
+  final VoidCallback? onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: theme.colorScheme.primary, width: 1.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              aiToolTitle(pending.tool.name),
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (pending.tool.description.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(pending.tool.description, style: theme.textTheme.bodySmall),
+            ],
+            if (_previewImage(pending.call) case final url?) ...[
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Image.network(
+                    url,
+                    fit: BoxFit.cover,
+                    // A cover photo is decoration. A broken link must not take
+                    // the card -- and the decision it is asking for -- with it.
+                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+            ],
+            if (pending.call.args.isNotEmpty) const SizedBox(height: 12),
+            for (final arg in pending.call.args.entries)
+              // The photo is shown, so its URL is not worth a row too.
+              if (arg.value != _previewImage(pending.call))
+                _ArgRow(name: arg.key, value: arg.value),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(onPressed: onDecline, child: const Text('Decline')),
+                if (onEdit != null) ...[
+                  const SizedBox(width: 4),
+                  TextButton(onPressed: onEdit, child: const Text('Edit')),
+                ],
+                const SizedBox(width: 8),
+                FilledButton(onPressed: onAccept, child: const Text('Accept')),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The assistant's avatar with a presence dot, Messenger-style.
+///
+/// The dot is the only place the header says whether a reply is being
+/// generated once the subtitle has collapsed away, so it carries the busy
+/// state rather than only decorating the row, and pulses while it does --
+/// a still amber dot is indistinguishable from a colour choice.
+class _AiPresenceAvatar extends StatefulWidget {
+  const _AiPresenceAvatar({
+    required this.busy,
+    required this.local,
+    this.avatar,
+    this.size = 34,
+    this.showDot = true,
+  });
+
+  /// Unscaled diameter. The real one tracks the platform text scale: at 200%
+  /// text a fixed 34dp circle reads as a bullet point next to the name it
+  /// belongs to. Capped at 1.3 -- past that the avatar starts pushing the
+  /// title out of the row it is meant to label.
+  final double size;
+
+  final bool showDot;
+
+  final bool busy;
+
+  /// On-device generation gets its own glyph: the same conversation runs very
+  /// differently on a phone model, and people ask which one answered. Ignored
+  /// when the host passes an [avatar] of its own.
+  final bool local;
+
+  final Widget? avatar;
+
+  @override
+  State<_AiPresenceAvatar> createState() => _AiPresenceAvatarState();
+}
+
+class _AiPresenceAvatarState extends State<_AiPresenceAvatar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.busy) _pulse.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(_AiPresenceAvatar old) {
+    super.didUpdateWidget(old);
+    if (widget.busy == old.busy) return;
+    if (widget.busy) {
+      _pulse.repeat(reverse: true);
+    } else {
+      // Back to a solid dot rather than wherever the fade happened to stop.
+      _pulse.stop();
+      _pulse.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.3);
+    final box = widget.size * scale;
+    final dot = box * 0.29;
+    return SizedBox(
+      width: box,
+      height: box,
+      child: Stack(
+        children: [
+          CircleAvatar(
+            radius: box * 0.44,
+            backgroundColor: scheme.primaryContainer,
+            child: ClipOval(
+              child:
+                  widget.avatar ??
+                  Icon(
+                    widget.local ? Icons.offline_bolt : Icons.auto_awesome,
+                    size: box * 0.47,
+                    color: scheme.onPrimaryContainer,
+                  ),
+            ),
+          ),
+          if (widget.showDot)
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: FadeTransition(
+                opacity: Tween<double>(begin: 1, end: 0.35).animate(_pulse),
+                child: Container(
+                  width: dot,
+                  height: dot,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: widget.busy
+                        ? scheme.tertiary
+                        : const Color(0xFF31A24C),
+                    // The ring keeps the dot readable against a light avatar in
+                    // either theme; without it the green sits on mint and reads
+                    // as part of the icon.
+                    border: Border.all(color: scheme.surface, width: 2),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

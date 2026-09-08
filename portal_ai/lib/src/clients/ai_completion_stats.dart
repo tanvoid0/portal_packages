@@ -22,12 +22,13 @@ class AiCompletionStats {
   /// model name is whatever answered last -- a run never switches backend
   /// mid-flight, so they agree in practice.
   AiCompletionStats merge(AiCompletionStats other) => AiCompletionStats(
-        model: other.model ?? model,
-        promptTokens: _add(promptTokens, other.promptTokens),
-        replyTokens: _add(replyTokens, other.replyTokens),
-      );
+    model: other.model ?? model,
+    promptTokens: _add(promptTokens, other.promptTokens),
+    replyTokens: _add(replyTokens, other.replyTokens),
+  );
 
-  static int? _add(int? a, int? b) => a == null && b == null ? null : (a ?? 0) + (b ?? 0);
+  static int? _add(int? a, int? b) =>
+      a == null && b == null ? null : (a ?? 0) + (b ?? 0);
 }
 
 /// Mixed into the clients whose backend reports usage.

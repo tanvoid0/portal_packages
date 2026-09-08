@@ -61,25 +61,25 @@ class AiBackendLabels {
   final String ollamaNotFound;
 
   String titleFor(AiBackendKind kind) => switch (kind) {
-        AiBackendKind.cloudGemini => cloudGeminiTitle,
-        AiBackendKind.ollama => ollamaTitle,
-        AiBackendKind.systemOnDevice => onDeviceTitle,
-        AiBackendKind.edgeGalleryDelegate => edgeGalleryTitle,
-      };
+    AiBackendKind.cloudGemini => cloudGeminiTitle,
+    AiBackendKind.ollama => ollamaTitle,
+    AiBackendKind.systemOnDevice => onDeviceTitle,
+    AiBackendKind.edgeGalleryDelegate => edgeGalleryTitle,
+  };
 
   String descriptionFor(AiBackendKind kind) => switch (kind) {
-        AiBackendKind.cloudGemini => cloudGeminiDescription,
-        AiBackendKind.ollama => ollamaDescription,
-        AiBackendKind.systemOnDevice => onDeviceDescription,
-        AiBackendKind.edgeGalleryDelegate => edgeGalleryDescription,
-      };
+    AiBackendKind.cloudGemini => cloudGeminiDescription,
+    AiBackendKind.ollama => ollamaDescription,
+    AiBackendKind.systemOnDevice => onDeviceDescription,
+    AiBackendKind.edgeGalleryDelegate => edgeGalleryDescription,
+  };
 
   /// One glyph per provider, so a row reads at a glance before the label
   /// does — cloud vs. this device vs. a separate app.
   IconData iconFor(AiBackendKind kind) => switch (kind) {
-        AiBackendKind.cloudGemini => Icons.cloud_outlined,
-        AiBackendKind.ollama => Icons.dns_outlined,
-        AiBackendKind.systemOnDevice => Icons.phone_iphone_outlined,
-        AiBackendKind.edgeGalleryDelegate => Icons.open_in_new_rounded,
-      };
+    AiBackendKind.cloudGemini => Icons.cloud_outlined,
+    AiBackendKind.ollama => Icons.dns_outlined,
+    AiBackendKind.systemOnDevice => Icons.phone_iphone_outlined,
+    AiBackendKind.edgeGalleryDelegate => Icons.open_in_new_rounded,
+  };
 }

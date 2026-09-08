@@ -39,7 +39,7 @@ class AiChatLabels {
     this.cancel = 'Cancel',
     this.save = 'Save',
     this.offline =
-        'No connection. The assistant needs one to answer -- try again once '
+        'No connection. The assistant needs one to answer — try again once '
         'you are back online.',
     this.youSaid = 'You said',
     this.assistantSaid = 'Assistant said',

@@ -8,8 +8,8 @@ class AiModelCatalog {
   AiModelCatalog({
     required GeminiModelCatalog gemini,
     AiBackendDiscovery? discovery,
-  })  : _gemini = gemini,
-        _discovery = discovery ?? AiBackendDiscovery(geminiCatalog: gemini);
+  }) : _gemini = gemini,
+       _discovery = discovery ?? AiBackendDiscovery(geminiCatalog: gemini);
 
   final GeminiModelCatalog _gemini;
   final AiBackendDiscovery _discovery;
@@ -40,7 +40,8 @@ class AiModelCatalog {
       case AiBackendKind.ollama:
       case AiBackendKind.systemOnDevice:
       case AiBackendKind.edgeGalleryDelegate:
-        final options = cachedOptions ??
+        final options =
+            cachedOptions ??
             await _discovery.discover(
               cloudEligible: cloudEligible,
               ollamaHost: ollamaHost,

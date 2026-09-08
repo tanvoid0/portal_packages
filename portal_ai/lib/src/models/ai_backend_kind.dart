@@ -18,11 +18,11 @@ enum AiBackendKind {
 
 extension AiBackendKindIds on AiBackendKind {
   String get id => switch (this) {
-        AiBackendKind.cloudGemini => 'cloud_gemini',
-        AiBackendKind.ollama => 'ollama',
-        AiBackendKind.systemOnDevice => 'system_on_device',
-        AiBackendKind.edgeGalleryDelegate => 'edge_gallery',
-      };
+    AiBackendKind.cloudGemini => 'cloud_gemini',
+    AiBackendKind.ollama => 'ollama',
+    AiBackendKind.systemOnDevice => 'system_on_device',
+    AiBackendKind.edgeGalleryDelegate => 'edge_gallery',
+  };
 
   static AiBackendKind? fromId(String? id) {
     if (id == null || id.isEmpty) return null;

@@ -24,7 +24,8 @@ AiTool imageSearchTool({
 }) {
   return AiTool(
     name: 'image_search',
-    description: 'Search for a real photo to use as a cover image, e.g. '
+    description:
+        'Search for a real photo to use as a cover image, e.g. '
         '"chicken alfredo" or "blue denim jacket". Returns a short list of '
         'photos with their URLs -- never invent an image URL yourself, and '
         'never assign one the user has not chosen.',
@@ -33,7 +34,8 @@ AiTool imageSearchTool({
       final query = call.argString('query');
       if (query == null) throw ArgumentError('query is required');
 
-      final path = '$unsplashBaseUrl/search?query='
+      final path =
+          '$unsplashBaseUrl/search?query='
           '${Uri.encodeQueryComponent(query)}&perPage=$_resultsPerSearch';
       final data = await get(path);
       final photos = data is Map ? data['photos'] : null;
@@ -41,13 +43,16 @@ AiTool imageSearchTool({
         return 'no photos found for "$query"';
       }
 
-      return photos.take(_resultsPerSearch).map((raw) {
-        final photo = Map<String, dynamic>.from(raw as Map);
-        final urls = Map<String, dynamic>.from(photo['urls'] as Map? ?? {});
-        final description = (photo['description'] as String?)?.trim();
-        return '${description?.isNotEmpty == true ? description : query}: '
-            '${urls['regular'] ?? ''}';
-      }).join('\n');
+      return photos
+          .take(_resultsPerSearch)
+          .map((raw) {
+            final photo = Map<String, dynamic>.from(raw as Map);
+            final urls = Map<String, dynamic>.from(photo['urls'] as Map? ?? {});
+            final description = (photo['description'] as String?)?.trim();
+            return '${description?.isNotEmpty == true ? description : query}: '
+                '${urls['regular'] ?? ''}';
+          })
+          .join('\n');
     },
   );
 }

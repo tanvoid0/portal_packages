@@ -71,8 +71,18 @@ void main() {
     await _ask(tester, 'about kettlebells');
     await _ask(tester, 'about porridge');
 
-    await tester.tap(find.byIcon(Icons.search));
+    // Find lives in the header's overflow menu, alongside the two exports.
+    await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Find in conversation'));
+    await tester.pumpAndSettle();
+
+    // The menu hands focus back to whatever had it -- the composer -- as it
+    // closes, so the field has to take it after that, or the query is typed
+    // into the prompt box instead.
+    final search = tester.widget<TextField>(find.byType(TextField).first);
+    expect(search.focusNode?.hasFocus, isTrue);
+
     await tester.enterText(find.byType(TextField).first, 'kettle');
     await tester.pumpAndSettle();
 

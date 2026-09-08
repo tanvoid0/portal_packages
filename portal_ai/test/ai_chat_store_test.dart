@@ -72,8 +72,9 @@ void main() {
     expect(store.listSummaries().single.turnCount, 2);
   });
 
-  testWidgets('the sheet keeps the thread and refines against it',
-      (tester) async {
+  testWidgets('the sheet keeps the thread and refines against it', (
+    tester,
+  ) async {
     final store = await freshStore();
     final client = _ScriptedClient([
       '{"tool": "list_items", "args": {}}',
@@ -144,7 +145,14 @@ void main() {
     // Deleting the open thread clears the sheet and empties the store.
     await tester.tap(find.byIcon(Icons.history));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.more_vert));
+    // Scoped to the sheet: the chat header now carries an overflow menu of
+    // its own, so a bare byIcon matches two.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AiChatHistoryList),
+        matching: find.byIcon(Icons.more_vert),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete').last);
     await tester.pumpAndSettle();
@@ -156,8 +164,9 @@ void main() {
     expect(find.text('milk and eggs'), findsNothing);
   });
 
-  testWidgets('a failed turn is kept, so a reload still shows the question',
-      (tester) async {
+  testWidgets('a failed turn is kept, so a reload still shows the question', (
+    tester,
+  ) async {
     final store = await freshStore();
 
     await tester.pumpWidget(

@@ -10,10 +10,7 @@ abstract final class GeminiEnvKeys {
 
 /// Gemini models and API key loaded from app environment (.env).
 class GeminiModelCatalog {
-  const GeminiModelCatalog({
-    required this.apiKey,
-    required this.models,
-  });
+  const GeminiModelCatalog({required this.apiKey, required this.models});
 
   final String apiKey;
   final List<String> models;

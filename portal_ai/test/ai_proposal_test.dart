@@ -13,8 +13,7 @@ class _DeadClient implements AiCompletionClient {
     required String userPrompt,
     AiSamplerConfig sampler = const AiSamplerConfig(),
     bool jsonMode = false,
-  }) async =>
-      throw const AiCompletionException('not used');
+  }) async => throw const AiCompletionException('not used');
 
   @override
   Stream<String> completeStream({
@@ -38,21 +37,21 @@ void main() {
   ];
 
   Future<void> pump(WidgetTester tester) => tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: AiAssistantPage(
-              runtime: PortalAiRuntime(
-                client: _DeadClient(),
+    MaterialApp(
+      home: Scaffold(
+        body: AiAssistantPage(
+          runtime: PortalAiRuntime(
+            client: _DeadClient(),
 
-                appDescription: 'A planner.',
-              ),
-              proposals: proposals,
-              onAcceptProposal: (p) => accepted.add(p.id),
-              onDiscardProposal: (p) => discarded.add(p.id),
-            ),
+            appDescription: 'A planner.',
           ),
+          proposals: proposals,
+          onAcceptProposal: (p) => accepted.add(p.id),
+          onDiscardProposal: (p) => discarded.add(p.id),
         ),
-      );
+      ),
+    ),
+  );
 
   setUp(() {
     accepted = <String>[];
@@ -99,8 +98,9 @@ void main() {
 
 /// The host-driven mode: no runtime, no agent, the app answers itself.
 void _hostDrivenTests() {
-  testWidgets('onSend takes over sending and turns render as bubbles',
-      (tester) async {
+  testWidgets('onSend takes over sending and turns render as bubbles', (
+    tester,
+  ) async {
     final sent = <String>[];
     var turns = <AiChatTurn>[];
 
@@ -137,8 +137,9 @@ void _hostDrivenTests() {
 }
 
 void _hostRewindTests() {
-  testWidgets('a host that owns the transcript gets edit and retry too',
-      (tester) async {
+  testWidgets('a host that owns the transcript gets edit and retry too', (
+    tester,
+  ) async {
     final rewound = <int>[];
     final turns = [
       AiChatTurn(role: 'user', content: 'plan my week', at: DateTime(2026, 9)),
@@ -168,8 +169,9 @@ void _hostRewindTests() {
     );
   });
 
-  testWidgets('without onRewind a host transcript stays read-only',
-      (tester) async {
+  testWidgets('without onRewind a host transcript stays read-only', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(

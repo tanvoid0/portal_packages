@@ -34,54 +34,56 @@ void main() {
       expect(catalog.defaultModel, kDefaultGeminiModel);
     });
 
-    test('a configured catalog builds a direct client, not the server one',
-        () async {
-      final catalog = GeminiModelCatalog.fromEnvironment({
-        GeminiEnvKeys.apiKey: 'test-key',
-        GeminiEnvKeys.models: 'gemini-2.0-flash,gemini-2.5-pro',
-      });
+    test(
+      'a configured catalog builds a direct client, not the server one',
+      () async {
+        final catalog = GeminiModelCatalog.fromEnvironment({
+          GeminiEnvKeys.apiKey: 'test-key',
+          GeminiEnvKeys.models: 'gemini-2.0-flash,gemini-2.5-pro',
+        });
 
-      final client = AiCompletionClientFactory(geminiCatalog: catalog).create(
-        kind: AiBackendKind.cloudGemini,
-        store: await emptyStore(),
-      );
+        final client = AiCompletionClientFactory(
+          geminiCatalog: catalog,
+        ).create(kind: AiBackendKind.cloudGemini, store: await emptyStore());
 
-      expect(client, isA<GeminiCompletionClient>());
-      expect(await client.isAvailable(), isTrue);
-    });
+        expect(client, isA<GeminiCompletionClient>());
+        expect(await client.isAvailable(), isTrue);
+      },
+    );
 
     test('no key falls back to the server-side pipeline', () async {
       final catalog = GeminiModelCatalog.fromEnvironment(const {});
 
-      final client = AiCompletionClientFactory(geminiCatalog: catalog).create(
-        kind: AiBackendKind.cloudGemini,
-        store: await emptyStore(),
-      );
+      final client = AiCompletionClientFactory(
+        geminiCatalog: catalog,
+      ).create(kind: AiBackendKind.cloudGemini, store: await emptyStore());
 
       expect(catalog.isConfigured, isFalse);
       expect(client, isA<CloudGeminiCompletionClient>());
     });
   });
 
-  test('unset Ollama host resolves to a reachable default per platform',
-      () async {
-    SharedPreferences.setMockInitialValues({});
-    final store = AiBackendStore(
-      prefs: await SharedPreferences.getInstance(),
-      keyPrefix: 'test_ai',
-    );
+  test(
+    'unset Ollama host resolves to a reachable default per platform',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final store = AiBackendStore(
+        prefs: await SharedPreferences.getInstance(),
+        keyPrefix: 'test_ai',
+      );
 
-    expect(store.ollamaHost, defaultOllamaBaseUrl);
+      expect(store.ollamaHost, defaultOllamaBaseUrl);
 
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    expect(
-      defaultOllamaBaseUrl,
-      kAndroidEmulatorOllamaBaseUrl,
-      reason: '127.0.0.1 on Android is the phone, not the Ollama host',
-    );
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      expect(
+        defaultOllamaBaseUrl,
+        kAndroidEmulatorOllamaBaseUrl,
+        reason: '127.0.0.1 on Android is the phone, not the Ollama host',
+      );
 
-    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
-    expect(defaultOllamaBaseUrl, kDefaultOllamaBaseUrl);
-  });
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      expect(defaultOllamaBaseUrl, kDefaultOllamaBaseUrl);
+    },
+  );
 }

@@ -14,24 +14,26 @@ void main() {
       store = AiBackendStore(prefs: prefs, keyPrefix: 'test');
     });
 
-    test('resolveSelectedKind falls back to first available inference backend',
-        () async {
-      final kind = await store.resolveSelectedKind(const [
-        AiBackendOption(
-          kind: AiBackendKind.cloudGemini,
-          available: false,
-          unavailableReason: 'Not signed in',
-        ),
-        AiBackendOption(
-          kind: AiBackendKind.ollama,
-          available: true,
-          models: ['llama3.2'],
-        ),
-      ]);
+    test(
+      'resolveSelectedKind falls back to first available inference backend',
+      () async {
+        final kind = await store.resolveSelectedKind(const [
+          AiBackendOption(
+            kind: AiBackendKind.cloudGemini,
+            available: false,
+            unavailableReason: 'Not signed in',
+          ),
+          AiBackendOption(
+            kind: AiBackendKind.ollama,
+            available: true,
+            models: ['llama3.2'],
+          ),
+        ]);
 
-      expect(kind, AiBackendKind.ollama);
-      expect(store.selectedKind, AiBackendKind.ollama);
-    });
+        expect(kind, AiBackendKind.ollama);
+        expect(store.selectedKind, AiBackendKind.ollama);
+      },
+    );
 
     test('keeps stored backend when still available', () async {
       await store.setSelectedKind(AiBackendKind.ollama);
