@@ -19,6 +19,7 @@ class PortalFilterChip extends StatelessWidget {
     this.selectedColor,
     this.onSelectedColor,
     this.unselectedColor,
+    this.onUnselectedColor,
     this.borderColor,
   });
 
@@ -40,6 +41,12 @@ class PortalFilterChip extends StatelessWidget {
   final Color? onSelectedColor;
 
   final Color? unselectedColor;
+
+  /// Label and glyph colour when not selected. Defaults to
+  /// `onSurfaceVariant`; set it where the unselected fill is tinted per
+  /// item rather than being the one neutral surface.
+  final Color? onUnselectedColor;
+
   final Color? borderColor;
 
   @override
@@ -52,45 +59,50 @@ class PortalFilterChip extends StatelessWidget {
         : (unselectedColor ?? portal.surfaceVariant);
     final ink = selected
         ? (onSelectedColor ?? portal.onPrimary)
-        : portal.onSurfaceVariant;
+        : (onUnselectedColor ?? portal.onSurfaceVariant);
     final radius = BorderRadius.circular(tokens.radii.full);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: radius,
-        onTap: onTap,
-        onLongPress: onLongPress,
-        child: AnimatedContainer(
-          duration: tokens.motion.fast,
-          curve: tokens.motion.standard,
-          constraints: BoxConstraints(minHeight: tokens.minTapTarget),
-          padding: EdgeInsets.symmetric(horizontal: tokens.spacing.md),
-          decoration: BoxDecoration(
-            color: fill,
-            borderRadius: radius,
-            border: Border.all(
-              color: selected
-                  ? fill
-                  : (borderColor ?? portal.outline),
-              width: tokens.borderWidth,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (leading != null) ...[
-                leading!,
-                SizedBox(width: tokens.spacing.xs),
-              ] else if (icon != null) ...[
-                Icon(icon, size: tokens.typeScale.md, color: ink),
-                SizedBox(width: tokens.spacing.xs),
-              ],
-              Text(
-                label,
-                style: tokens.textStyles.caption.copyWith(color: ink),
+    // Selection has to reach a screen reader too: an InkWell on its own
+    // announces as neither a button nor a selected one, so the state the
+    // fill and border carry visually would be invisible to TalkBack.
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: onTap,
+          onLongPress: onLongPress,
+          child: AnimatedContainer(
+            duration: tokens.motion.fast,
+            curve: tokens.motion.standard,
+            constraints: BoxConstraints(minHeight: tokens.minTapTarget),
+            padding: EdgeInsets.symmetric(horizontal: tokens.spacing.md),
+            decoration: BoxDecoration(
+              color: fill,
+              borderRadius: radius,
+              border: Border.all(
+                color: selected ? fill : (borderColor ?? portal.outline),
+                width: tokens.borderWidth,
               ),
-            ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (leading != null) ...[
+                  leading!,
+                  SizedBox(width: tokens.spacing.xs),
+                ] else if (icon != null) ...[
+                  Icon(icon, size: tokens.typeScale.md, color: ink),
+                  SizedBox(width: tokens.spacing.xs),
+                ],
+                Text(
+                  label,
+                  style: tokens.textStyles.caption.copyWith(color: ink),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ui_core/portal_ui_core.dart';
 
@@ -105,6 +106,34 @@ void main() {
     );
     await t.tap(find.text('Chest'));
     expect(taps, 1);
+  });
+
+  testWidgets('filter chip announces its selected state', (t) async {
+    final handle = t.ensureSemantics();
+
+    await t.pumpWidget(_host(Align(
+      child: PortalFilterChip(label: 'Chest', selected: true, onTap: () {}),
+    )));
+    expect(
+      t.getSemantics(find.text('Chest')),
+      matchesSemantics(
+        label: 'Chest',
+        isButton: true,
+        hasSelectedState: true,
+        isSelected: true,
+        hasTapAction: true,
+        hasFocusAction: true,
+        isFocusable: true,
+      ),
+    );
+
+    await t.pumpWidget(_host(Align(
+      child: PortalFilterChip(label: 'Chest', selected: false, onTap: () {}),
+    )));
+    expect(t.getSemantics(find.text('Chest')).hasFlag(SemanticsFlag.isSelected),
+        isFalse);
+
+    handle.dispose();
   });
 
   testWidgets('segmented tabs report the tapped index', (t) async {
