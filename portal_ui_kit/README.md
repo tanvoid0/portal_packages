@@ -1,6 +1,31 @@
 # Portal UI Kit
 
-**Shadcn-inspired Flutter UI primitives** with a twist: components are **not** imported from a monolithic widget package. [Mason](https://pub.dev/packages/mason_cli) **generates copy-paste Dart** into your app (`lib/ui` by default), so you can tailor every widget. Shared **design tokens and theming** live in the small **`portal_ui_core`** package (`PortalUiTheme`, `DesignTokens`, `buildPortalTheme`).
+**Shadcn-inspired Flutter UI primitives**, delivered two ways.
+
+**`portal_ui_core` is the default and the one apps actually use.** It is a real
+package: design tokens and theming (`PortalUiTheme`, `DesignTokens`,
+`buildPortalTheme`, `PortalThemeConfig`) *and* 15 ready-made widgets
+(`PortalButton`, `PortalCard`, `PortalFilterChip`, `PortalEmptyState`,
+`PortalSkeleton`, …). Add the path dependency, import it, compose. Brand goes in
+a per-app skin that wraps these — see `apps/portal_gym/lib/ui/gym_skin/`.
+
+**[Mason](https://pub.dev/packages/mason_cli) bricks are the escape hatch.**
+`bricks/` generates copy-paste Dart into an app's `lib/ui/` for components
+ui_core does not ship, when an app needs to own and edit the source. 39 bricks
+exist; only three (`portal_button`, `portal_card`, `portal_skeleton`) overlap a
+ui_core widget, and for those **prefer ui_core** — the brick and the widget have
+drifted into different implementations of the same class name, and having both
+in one app makes the import ambiguous.
+
+> Reality check: the bricks, the example gallery and the sync scripts were all
+> last touched in one commit on 2026-08-24 and have not moved since. Brick
+> adoption in the fleet is three files in `portal_task`, already hand-edited
+> past what the current brick source would regenerate — re-running `mason make`
+> there would clobber real work. Treat the brick path as unmaintained until
+> someone decides otherwise.
+
+See [`../../docs/UI_PATTERNS.md`](../../docs/UI_PATTERNS.md) for the rules that
+govern using any of this.
 
 ---
 
@@ -71,7 +96,7 @@ mason make portal_button -o path/to/your_app/lib/ui
 
 Repeat for other bricks (`portal_text_field`, `portal_card`, …). Full list: **[docs/COMPONENTS.md](docs/COMPONENTS.md)**.
 
-Import the generated files in your app and use the `Portal…` widgets. You may edit generated files freely; they are yours.
+Import the generated files and use the `Portal…` widgets. Generated files are yours to edit — which is also why a brick that overlaps a ui_core widget is a fork waiting to happen. Check `portal_ui_core` first.
 
 ---
 
