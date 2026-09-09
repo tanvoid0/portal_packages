@@ -14,7 +14,7 @@ class PortalStatCard extends StatelessWidget {
     required this.value,
     required this.label,
     this.icon,
-    this.accent,
+    this.accentColor,
     this.footer,
     this.onTap,
   });
@@ -24,7 +24,7 @@ class PortalStatCard extends StatelessWidget {
   final IconData? icon;
 
   /// Tints the glyph well. Defaults to the app's primary.
-  final Color? accent;
+  final Color? accentColor;
 
   /// Sparkline, delta, or any small trailing widget.
   final Widget? footer;
@@ -35,7 +35,7 @@ class PortalStatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
-    final tint = accent ?? portal.primary;
+    final tint = accentColor ?? portal.primary;
 
     return PortalCard(
       onTap: onTap,
