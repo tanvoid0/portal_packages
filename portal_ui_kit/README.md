@@ -27,7 +27,6 @@
 
 - **portal_ui_core**: semver; patch/minor releases are additive only. Breaking changes require a major version and an entry in [CHANGELOG.md](CHANGELOG.md).
 - **Mason bricks**: generated into your app’s `lib/ui/`; kit updates are opt-in via `mason make` or [tool/sync_app_widgets.ps1](tool/sync_app_widgets.ps1).
-- **portal_ui_compat** / **portal_ui**: legacy `PortalUiTokens` aliases for existing apps; new apps should use `portal_ui_core` directly.
 
 ## Use the kit in your app
 
