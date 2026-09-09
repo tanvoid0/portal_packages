@@ -37,6 +37,7 @@ export 'src/shapes/portal_diagonal_card_clipper.dart';
 export 'src/components/portal_bottom_nav_bar.dart';
 export 'src/components/portal_button.dart';
 export 'src/components/portal_card.dart';
+export 'src/components/portal_confirm_dialog.dart';
 export 'src/components/portal_empty_state.dart';
 export 'src/components/portal_filter_chip.dart';
 export 'src/components/portal_list_skeleton.dart';
