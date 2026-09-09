@@ -263,19 +263,14 @@ final List<ComponentEntry> kComponentCatalog = () {
       brickName: 'portal_snackbar',
       sourceFileName: 'portal_snackbar.dart',
       description: 'Opaque themed toast (ColorScheme fills). Neutral, success, and destructive.',
-  usageSnippet: '''showPortalToast(
+      usageSnippet: '''showPortalToast(
   context,
   'Published',
   description: 'Your changes are live.',
   variant: PortalToastVariant.success,
-);''',
-  context,
-  'Saved.',
-  description: 'Your changes are live.',
-  variant: PortalToastVariant.success,
   actionLabel: 'Undo',
   onAction: () {},
-)''',
+);''',
       preview: _p('portal_snackbar'),
     ),
     ComponentEntry(

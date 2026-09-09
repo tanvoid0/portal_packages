@@ -72,9 +72,9 @@ class UiKitShowcasePage extends StatelessWidget {
               ),
             ),
             SizedBox(height: t.spacing.md),
-            PortalStaggeredChild(
+            const PortalStaggeredChild(
               index: 4,
-              child: const Align(
+              child: Align(
                 alignment: Alignment.centerLeft,
                 child: BrowserFrame(
                   child: WebDashboardScreen(),

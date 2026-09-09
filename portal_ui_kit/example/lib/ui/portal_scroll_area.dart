@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:portal_ui_core/portal_ui_core.dart';
 
 /// Scrollable region with token-styled scrollbar (shadcn Scroll Area).
 class PortalScrollArea extends StatelessWidget {

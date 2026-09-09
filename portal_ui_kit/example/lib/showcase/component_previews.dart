@@ -723,9 +723,9 @@ class _SlidablePreview extends StatelessWidget {
               onPressed: () {},
             ),
           ],
-          child: ListTile(
-            title: const Text('Quarterly report'),
-            subtitle: const Text('Swipe left for actions'),
+          child: const ListTile(
+            title: Text('Quarterly report'),
+            subtitle: Text('Swipe left for actions'),
           ),
         ),
         SizedBox(height: t.spacing.sm),

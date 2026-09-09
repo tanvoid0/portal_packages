@@ -28,7 +28,7 @@ ThemeData _expressiveCustomize(PortalThemeBuildContext ctx, ThemeData theme) {
 void registerExperimentalThemes() {
   PortalVisualThemeRegistry.instance.ensureInitialized();
   PortalVisualThemeRegistry.instance.register(
-    PortalVisualTheme(
+    const PortalVisualTheme(
       id: 'expressive',
       label: 'Expressive',
       tokens: DesignTokens.expressive,
