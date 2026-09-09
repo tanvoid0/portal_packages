@@ -16,6 +16,7 @@ class PortalButton extends StatelessWidget {
     this.size = PortalButtonSize.md,
     this.leading,
     this.expand = false,
+    this.isLoading = false,
   });
 
   final String label;
@@ -24,6 +25,11 @@ class PortalButton extends StatelessWidget {
   final PortalButtonSize size;
   final Widget? leading;
   final bool expand;
+
+  /// Swaps [leading] for a spinner and refuses taps. Use it for a submit that
+  /// is in flight - a button left tappable during an async action is how you
+  /// get two of whatever it creates.
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -37,12 +43,22 @@ class PortalButton extends StatelessWidget {
     );
 
     final showLabel = label.isNotEmpty;
+    final leadingWidget = isLoading
+        ? SizedBox(
+            width: labelFontSize,
+            height: labelFontSize,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: style.foreground,
+            ),
+          )
+        : leading;
     final content = Row(
       mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (leading != null) ...[
-          leading!,
+        if (leadingWidget != null) ...[
+          leadingWidget,
           if (showLabel) SizedBox(width: tokens.spacing.sm),
         ],
         if (showLabel)
@@ -67,7 +83,7 @@ class PortalButton extends StatelessWidget {
       ),
     );
 
-    final effectiveOnPressed = onPressed;
+    final effectiveOnPressed = isLoading ? null : onPressed;
     if (effectiveOnPressed == null) {
       return _shell(
         border: style.border,

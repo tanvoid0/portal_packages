@@ -108,6 +108,29 @@ void main() {
     expect(taps, 1);
   });
 
+  testWidgets('a loading button shows a spinner and refuses taps', (t) async {
+    var taps = 0;
+    await t.pumpWidget(_host(Align(
+      child: PortalButton(
+        label: 'Save',
+        isLoading: true,
+        leading: const Icon(Icons.check),
+        onPressed: () => taps++,
+      ),
+    )));
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byIcon(Icons.check), findsNothing);
+    await t.tap(find.text('Save'));
+    expect(taps, 0);
+
+    await t.pumpWidget(_host(Align(
+      child: PortalButton(label: 'Save', onPressed: () => taps++),
+    )));
+    await t.tap(find.text('Save'));
+    expect(taps, 1);
+  });
+
   testWidgets('filter chip announces its selected state', (t) async {
     final handle = t.ensureSemantics();
 
