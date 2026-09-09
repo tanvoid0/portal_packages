@@ -34,12 +34,12 @@ class PortalBottomNavBar extends StatelessWidget {
     required this.selectedIndex,
     required this.onDestinationSelected,
     required this.destinations,
-    this.background,
+    this.backgroundColor,
     this.borderColor,
     this.markColor,
-    this.selectedWell,
+    this.selectedWellColor,
     this.selectedMarkColor,
-    this.shadow,
+    this.boxShadow,
     this.height = barHeight,
   });
 
@@ -47,7 +47,7 @@ class PortalBottomNavBar extends StatelessWidget {
   final ValueChanged<int> onDestinationSelected;
   final List<PortalNavDestination> destinations;
 
-  final Color? background;
+  final Color? backgroundColor;
   final Color? borderColor;
 
   /// Icon and label color. Unselected destinations render it at reduced
@@ -55,13 +55,13 @@ class PortalBottomNavBar extends StatelessWidget {
   final Color? markColor;
 
   /// The well behind the selected icon.
-  final Color? selectedWell;
+  final Color? selectedWellColor;
 
   /// Mark color when selected, if it must differ from [markColor] — e.g. an
   /// ink well needs a paper-colored mark.
   final Color? selectedMarkColor;
 
-  final List<BoxShadow>? shadow;
+  final List<BoxShadow>? boxShadow;
   final double height;
 
   static const double barHeight = 68;
@@ -87,10 +87,10 @@ class PortalBottomNavBar extends StatelessWidget {
     final brightness = Theme.of(context).brightness;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
-    final bg = background ?? portal.card;
+    final bg = backgroundColor ?? portal.card;
     final border = borderColor ?? portal.border;
     final mark = markColor ?? portal.onCard;
-    final well = selectedWell ?? portal.muted;
+    final well = selectedWellColor ?? portal.muted;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -107,7 +107,7 @@ class PortalBottomNavBar extends StatelessWidget {
           color: bg,
           borderRadius: BorderRadius.circular(tokens.radii.xl),
           border: Border.all(color: border),
-          boxShadow: shadow ?? tokens.elevation.medium(brightness),
+          boxShadow: boxShadow ?? tokens.elevation.medium(brightness),
         ),
         child: Row(
           children: [

@@ -13,7 +13,7 @@ class PortalSectionHeader extends StatelessWidget {
     required this.title,
     this.icon,
     this.trailing,
-    this.color,
+    this.foregroundColor,
   });
 
   final String title;
@@ -24,14 +24,14 @@ class PortalSectionHeader extends StatelessWidget {
   /// Right-aligned affordance — a "See all", a count, an action.
   final Widget? trailing;
 
-  /// Overrides icon and title color. Defaults to `onSurface`.
-  final Color? color;
+  /// Overrides icon and title colour. Defaults to `onSurface`.
+  final Color? foregroundColor;
 
   @override
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
-    final ink = color ?? portal.onSurface;
+    final ink = foregroundColor ?? portal.onSurface;
     final style = tokens.textStyles.subtitle.copyWith(color: ink);
 
     return Row(

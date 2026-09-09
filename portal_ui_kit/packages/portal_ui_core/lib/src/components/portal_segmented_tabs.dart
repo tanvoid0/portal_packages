@@ -12,7 +12,7 @@ class PortalSegmentedTabs extends StatelessWidget {
     required this.labels,
     required this.index,
     required this.onChanged,
-    this.accent,
+    this.accentColor,
   }) : assert(labels.length >= 2, 'A segmented control needs two segments');
 
   final List<String> labels;
@@ -20,13 +20,13 @@ class PortalSegmentedTabs extends StatelessWidget {
   final ValueChanged<int> onChanged;
 
   /// Selected segment tint. Defaults to the app's primary.
-  final Color? accent;
+  final Color? accentColor;
 
   @override
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
-    final tint = accent ?? portal.primary;
+    final tint = accentColor ?? portal.primary;
     final radius = BorderRadius.circular(tokens.radii.md);
 
     return Row(
