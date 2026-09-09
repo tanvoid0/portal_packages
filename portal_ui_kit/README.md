@@ -9,20 +9,28 @@ package: design tokens and theming (`PortalUiTheme`, `DesignTokens`,
 `PortalSkeleton`, …). Add the path dependency, import it, compose. Brand goes in
 a per-app skin that wraps these — see `apps/portal_gym/lib/ui/gym_skin/`.
 
-**[Mason](https://pub.dev/packages/mason_cli) bricks are the escape hatch.**
-`bricks/` generates copy-paste Dart into an app's `lib/ui/` for components
-ui_core does not ship, when an app needs to own and edit the source. 39 bricks
-exist; only three (`portal_button`, `portal_card`, `portal_skeleton`) overlap a
-ui_core widget, and for those **prefer ui_core** — the brick and the widget have
-drifted into different implementations of the same class name, and having both
-in one app makes the import ambiguous.
+**[Mason](https://pub.dev/packages/mason_cli) bricks are the scaffold**, not a
+second library. `bricks/` generates copy-paste Dart into an app's `lib/ui/` for
+the 37 components ui_core does not ship, when an app wants to own and edit the
+source.
 
-> Reality check: the bricks, the example gallery and the sync scripts were all
-> last touched in one commit on 2026-08-24 and have not moved since. Brick
-> adoption in the fleet is three files in `portal_task`, already hand-edited
-> past what the current brick source would regenerate — re-running `mason make`
-> there would clobber real work. Treat the brick path as unmaintained until
-> someone decides otherwise.
+Components travel one direction:
+
+```
+brick  →  your app's lib/ui/  →  portal_ui_core
+scaffold      tailor it          when a second app needs it
+```
+
+Never the other way, and never both at once. `portal_button`, `portal_card` and
+`portal_skeleton` used to exist as bricks *and* ui_core widgets — same class
+names, different implementations, ambiguous imports for any app holding both.
+Those three bricks are gone; ui_core owns them.
+
+> The bricks, the gallery and the sync scripts last moved together on
+> 2026-08-24. Real brick adoption is three files in `portal_task`, already
+> hand-edited past what the current source would regenerate — `mason make`
+> there would clobber real work. Scaffold from a brick by all means; do not
+> expect `mason` to be a live sync channel.
 
 See [`../../docs/UI_PATTERNS.md`](../../docs/UI_PATTERNS.md) for the rules that
 govern using any of this.

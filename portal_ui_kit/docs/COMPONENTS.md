@@ -1,6 +1,17 @@
 # Portal UI Kit — component reference
 
-This page is the **static companion** to the [example app](../example): same components, with a scannable list of bricks, generated filenames, and how customisation works.
+This page is the **static companion** to the [example app](../example): same
+components, with a scannable list of where each one comes from and how
+customisation works.
+
+Two sources, and the **Source** column says which applies:
+
+- **ships in `portal_ui_core`** — a real widget in the package. Import it and
+  compose; brand it through your app's skin. This is the default.
+- a **brick name** — Mason generates the source into your app's `lib/ui/`, for
+  components ui_core does not ship. If a generated component turns out to be
+  shared, promote it into `portal_ui_core` rather than leaving a copy in each
+  app. Components travel one direction: brick → app → ui_core, never back.
 
 ---
 
@@ -24,7 +35,7 @@ Bricks emit **plain Dart** into your app. After `mason make …`, you own the fi
 
 ### 3. Motion utilities (`portal_ui_core`)
 
-- **`PortalShimmer`** — themed shimmer sweep for loading placeholders; used by `portal_skeleton`.
+- **`PortalShimmer`** — themed shimmer sweep for loading placeholders; used by `PortalSkeleton`.
 - **`PortalStaggeredChild`** / **`wrapStaggeredList`** — list reveal animations via `flutter_animate`.
 - **`PortalPageTransitions`** — `sharedAxis` and `fadeThrough` routes via the official `animations` package.
 
@@ -60,16 +71,16 @@ Use your app’s output path instead of `lib/ui` if you prefer another folder.
 
 ## Actions
 
-| Component | Mason brick | Generated file | What you customize |
+| Component | Source | Class / file | What you customize |
 |-----------|-------------|----------------|--------------------|
-| Button | `portal_button` | `portal_button.dart` | `PortalButtonVariant`, `PortalButtonSize`, `leading`, `expand`, labels |
+| Button | **ships in `portal_ui_core`** | `PortalButton` | `PortalButtonVariant`, `PortalButtonSize`, `leading`, `expand`, labels |
 | Toggle | `portal_toggle` | `portal_toggle.dart` | `pressed`, `onPressed`, child (icon/text) |
 
 ---
 
 ## Form & input
 
-| Component | Mason brick | Generated file | What you customize |
+| Component | Source | Class / file | What you customize |
 |-----------|-------------|----------------|--------------------|
 | Text field | `portal_text_field` | `portal_text_field.dart` | Label, hint, validation, controllers |
 | Text area | `portal_text_area` | `portal_text_area.dart` | `minLines` / `maxLines`, label, hint |
@@ -85,12 +96,12 @@ Use your app’s output path instead of `lib/ui` if you prefer another folder.
 
 ## Feedback
 
-| Component | Mason brick | Generated file | What you customize |
+| Component | Source | Class / file | What you customize |
 |-----------|-------------|----------------|--------------------|
 | Alert | `portal_alert` | `portal_alert.dart` | Variant (e.g. destructive), title, description, actions |
 | Snack bar | `portal_snackbar` | `portal_snackbar.dart` | Opaque themed toast (`AppToast` + `PortalToastHost`); variants: neutral / success / destructive |
 | Progress | `portal_progress` | `portal_progress.dart` | Determinate value vs indeterminate |
-| Skeleton | `portal_skeleton` | `portal_skeleton.dart` | Width, height, shape (shimmer via `portal_ui_core`) |
+| Skeleton | **ships in `portal_ui_core`** | `PortalSkeleton` | Width, height, shape (shimmer via `portal_ui_core`) |
 | Spinner | `portal_spinner` | `portal_spinner.dart` | `PortalSpinnerStyle`, size, color — requires `flutter_spinkit` |
 | Slidable | `portal_slidable` | `portal_slidable.dart` | Start/end swipe actions — requires `flutter_slidable` |
 
@@ -98,9 +109,9 @@ Use your app’s output path instead of `lib/ui` if you prefer another folder.
 
 ## Layout
 
-| Component | Mason brick | Generated file | What you customize |
+| Component | Source | Class / file | What you customize |
 |-----------|-------------|----------------|--------------------|
-| Card | `portal_card` | `portal_card.dart` | `PortalCardVariant` (standard, glass, hero, asymmetric), `PortalCardElevation`, `heroAccent`, optional tap |
+| Card | **ships in `portal_ui_core`** | `PortalCard` | `PortalCardVariant` (standard, glass, hero, asymmetric), `PortalCardElevation`, `heroAccent`, optional tap |
 | Divider | `portal_divider` | `portal_divider.dart` | Spacing around rule |
 | Separator | `portal_separator` | `portal_separator.dart` | Horizontal vs vertical, length |
 | Aspect ratio | `portal_aspect_ratio` | `portal_aspect_ratio.dart` | `aspectRatio`, child |
@@ -112,7 +123,7 @@ Use your app’s output path instead of `lib/ui` if you prefer another folder.
 
 ## Overlay
 
-| Component | Mason brick | Generated file | What you customize |
+| Component | Source | Class / file | What you customize |
 |-----------|-------------|----------------|--------------------|
 | Alert dialog | `portal_dialog` | `portal_dialog.dart` | `showPortalAlertDialog` — title, message, confirm/cancel, destructive styling |
 | Sheet | `portal_sheet` | `portal_sheet.dart` | `showPortalSheet` content, sizing |
@@ -124,7 +135,7 @@ Use your app’s output path instead of `lib/ui` if you prefer another folder.
 
 ## Navigation
 
-| Component | Mason brick | Generated file | What you customize |
+| Component | Source | Class / file | What you customize |
 |-----------|-------------|----------------|--------------------|
 | Tabs | `portal_tabs` | `portal_tabs.dart` | Tab labels, tab view height, children |
 | Breadcrumb | `portal_breadcrumb` | `portal_breadcrumb.dart` | Items, taps |
@@ -134,7 +145,7 @@ Use your app’s output path instead of `lib/ui` if you prefer another folder.
 
 ## Display
 
-| Component | Mason brick | Generated file | What you customize |
+| Component | Source | Class / file | What you customize |
 |-----------|-------------|----------------|--------------------|
 | Badge | `portal_badge` | `portal_badge.dart` | `PortalBadgeVariant`, label |
 | Avatar | `portal_avatar` | `portal_avatar.dart` | Image, initials, `PortalAvatarSize` |

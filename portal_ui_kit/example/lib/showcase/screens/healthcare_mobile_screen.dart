@@ -4,7 +4,6 @@ import 'package:portal_ui_core/portal_ui_core.dart';
 import '../../ui/portal_aspect_ratio.dart';
 import '../../ui/portal_avatar.dart';
 import '../../ui/portal_badge.dart';
-import '../../ui/portal_card.dart';
 
 class HealthcareMobileScreen extends StatefulWidget {
   const HealthcareMobileScreen({super.key});

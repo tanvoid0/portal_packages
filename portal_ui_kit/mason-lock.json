@@ -1,1 +1,115 @@
-{"bricks":{"portal_accordion":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_accordion"},"portal_alert":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_alert"},"portal_aspect_ratio":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_aspect_ratio"},"portal_avatar":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_avatar"},"portal_badge":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_badge"},"portal_breadcrumb":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_breadcrumb"},"portal_button":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_button"},"portal_calendar":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_calendar"},"portal_card":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_card"},"portal_checkbox":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_checkbox"},"portal_collapsible":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_collapsible"},"portal_combobox":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_combobox"},"portal_command":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_command"},"portal_dialog":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_dialog"},"portal_divider":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_divider"},"portal_dropdown_menu":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_dropdown_menu"},"portal_form":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_form"},"portal_input_otp":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_input_otp"},"portal_label":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_label"},"portal_pagination":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_pagination"},"portal_popover":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_popover"},"portal_progress":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_progress"},"portal_radio_group":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_radio_group"},"portal_scroll_area":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_scroll_area"},"portal_select":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_select"},"portal_separator":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_separator"},"portal_sheet":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_sheet"},"portal_sidebar":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_sidebar"},"portal_skeleton":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_skeleton"},"portal_slidable":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_slidable"},"portal_slider":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_slider"},"portal_snackbar":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_snackbar"},"portal_spinner":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_spinner"},"portal_switch":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_switch"},"portal_table":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_table"},"portal_tabs":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_tabs"},"portal_text_area":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_text_area"},"portal_text_field":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_text_field"},"portal_toggle":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_toggle"},"portal_tooltip":{"path":"D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_tooltip"}}}
+{
+  "bricks": {
+    "portal_accordion": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_accordion"
+    },
+    "portal_alert": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_alert"
+    },
+    "portal_aspect_ratio": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_aspect_ratio"
+    },
+    "portal_avatar": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_avatar"
+    },
+    "portal_badge": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_badge"
+    },
+    "portal_breadcrumb": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_breadcrumb"
+    },
+    "portal_calendar": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_calendar"
+    },
+    "portal_checkbox": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_checkbox"
+    },
+    "portal_collapsible": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_collapsible"
+    },
+    "portal_combobox": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_combobox"
+    },
+    "portal_command": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_command"
+    },
+    "portal_dialog": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_dialog"
+    },
+    "portal_divider": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_divider"
+    },
+    "portal_dropdown_menu": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_dropdown_menu"
+    },
+    "portal_form": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_form"
+    },
+    "portal_input_otp": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_input_otp"
+    },
+    "portal_label": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_label"
+    },
+    "portal_pagination": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_pagination"
+    },
+    "portal_popover": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_popover"
+    },
+    "portal_progress": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_progress"
+    },
+    "portal_radio_group": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_radio_group"
+    },
+    "portal_scroll_area": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_scroll_area"
+    },
+    "portal_select": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_select"
+    },
+    "portal_separator": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_separator"
+    },
+    "portal_sheet": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_sheet"
+    },
+    "portal_sidebar": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_sidebar"
+    },
+    "portal_slidable": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_slidable"
+    },
+    "portal_slider": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_slider"
+    },
+    "portal_snackbar": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_snackbar"
+    },
+    "portal_spinner": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_spinner"
+    },
+    "portal_switch": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_switch"
+    },
+    "portal_table": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_table"
+    },
+    "portal_tabs": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_tabs"
+    },
+    "portal_text_area": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_text_area"
+    },
+    "portal_text_field": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_text_field"
+    },
+    "portal_toggle": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_toggle"
+    },
+    "portal_tooltip": {
+      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_tooltip"
+    }
+  }
+}

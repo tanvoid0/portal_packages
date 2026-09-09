@@ -2,8 +2,6 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$OutputDir,
   [string[]]$Bricks = @(
-    'portal_button',
-    'portal_card',
     'portal_text_field'
   )
 )

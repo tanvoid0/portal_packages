@@ -1,11 +1,15 @@
 # Register local bricks. Run `dart pub global activate mason_cli` then `mason get`.
+#
+# Bricks scaffold components portal_ui_core does NOT ship. If a generated
+# component turns out to be shared, promote it into portal_ui_core rather than
+# leaving copies in each app -- ui_core is where a component lives once more
+# than one app needs it.
+#
+# portal_button, portal_card and portal_skeleton were removed on 2026-09-09:
+# ui_core ships all three, and having both meant two classes with one name.
 bricks:
-  portal_button:
-    path: bricks/portal_button
   portal_text_field:
     path: bricks/portal_text_field
-  portal_card:
-    path: bricks/portal_card
   portal_badge:
     path: bricks/portal_badge
   portal_divider:
@@ -26,8 +30,6 @@ bricks:
     path: bricks/portal_radio_group
   portal_select:
     path: bricks/portal_select
-  portal_skeleton:
-    path: bricks/portal_skeleton
   portal_spinner:
     path: bricks/portal_spinner
   portal_slidable:

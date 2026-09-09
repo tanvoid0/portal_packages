@@ -4,7 +4,6 @@ import 'package:portal_ui_core/portal_ui_core.dart';
 import '../../ui/portal_alert.dart';
 import '../../ui/portal_badge.dart';
 import '../../ui/portal_breadcrumb.dart';
-import '../../ui/portal_card.dart';
 import '../../ui/portal_progress.dart';
 import '../../ui/portal_sidebar.dart';
 import '../../ui/portal_table.dart';

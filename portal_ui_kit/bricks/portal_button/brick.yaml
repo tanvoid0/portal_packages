@@ -1,6 +1,0 @@
-name: portal_button
-description: Portal UI button using PortalUiTheme.
-version: 0.1.0
-
-environment:
-  mason: ^0.1.0

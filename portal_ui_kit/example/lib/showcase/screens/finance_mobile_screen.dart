@@ -3,8 +3,6 @@ import 'package:portal_ui_core/portal_ui_core.dart';
 
 import '../../ui/portal_avatar.dart';
 import '../../ui/portal_badge.dart';
-import '../../ui/portal_button.dart';
-import '../../ui/portal_card.dart';
 import '../../ui/portal_toggle.dart';
 import 'showcase_sparkline.dart';
 

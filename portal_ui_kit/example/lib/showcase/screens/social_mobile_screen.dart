@@ -3,7 +3,6 @@ import 'package:portal_ui_core/portal_ui_core.dart';
 
 import '../../ui/portal_avatar.dart';
 import '../../ui/portal_badge.dart';
-import '../../ui/portal_card.dart';
 
 class SocialMobileScreen extends StatefulWidget {
   const SocialMobileScreen({super.key});
