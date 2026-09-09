@@ -41,7 +41,7 @@ govern using any of this.
 
 | Location | Role |
 |----------|------|
-| [`packages/portal_ui_core`](packages/portal_ui_core) | Theme factory, `PortalUiTheme` (`ThemeExtension`), spacing/radius/type presets |
+| [`packages/portal_ui_core`](../portal_ui_core) | Theme factory, `PortalUiTheme` (`ThemeExtension`), spacing/radius/type presets |
 | [`bricks/`](bricks/) | One Mason brick per component; each emits a single `.dart` file |
 | [`example/`](example) | **Interactive docs** — gallery with Preview, usage snippets, and full source per component |
 | [`docs/COMPONENTS.md`](docs/COMPONENTS.md) | **Readable reference** — all bricks, filenames, and how to customize theme vs generated widgets |
@@ -70,7 +70,7 @@ Add a path dependency on `portal_ui_core` (adjust the path to your layout):
 ```yaml
 dependencies:
   portal_ui_core:
-    path: ../portal_ui_kit/packages/portal_ui_core
+    path: ../portal_ui_core
 ```
 
 Wrap the app with `buildPortalTheme`:
@@ -91,7 +91,7 @@ MaterialApp(
 );
 ```
 
-Use **`colorScheme:`** on `buildPortalTheme` for brand colours. **`PortalUiPreset`** (`defaultPreset`, `compact`, `rounded`) switches spacing, radii, and type scale — see [`design_tokens.dart`](packages/portal_ui_core/lib/src/tokens/design_tokens.dart).
+Use **`colorScheme:`** on `buildPortalTheme` for brand colours. **`PortalUiPreset`** (`defaultPreset`, `compact`, `rounded`) switches spacing, radii, and type scale — see [`design_tokens.dart`](../portal_ui_core/lib/src/tokens/design_tokens.dart).
 
 ### 2. Components (generated into your repo)
 
