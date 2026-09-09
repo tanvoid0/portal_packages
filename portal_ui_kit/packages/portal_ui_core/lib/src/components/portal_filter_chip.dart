@@ -12,7 +12,7 @@ class PortalFilterChip extends StatelessWidget {
     super.key,
     required this.label,
     required this.selected,
-    required this.onTap,
+    this.onTap,
     this.icon,
     this.leading,
     this.onLongPress,
@@ -25,7 +25,9 @@ class PortalFilterChip extends StatelessWidget {
 
   final String label;
   final bool selected;
-  final VoidCallback onTap;
+  /// Null for a chip that only displays state -- a metadata label rendered as
+  /// a pill. It then takes no ink and does not announce as a button.
+  final VoidCallback? onTap;
 
   final IconData? icon;
 
@@ -66,7 +68,7 @@ class PortalFilterChip extends StatelessWidget {
     // announces as neither a button nor a selected one, so the state the
     // fill and border carry visually would be invisible to TalkBack.
     return Semantics(
-      button: true,
+      button: onTap != null,
       selected: selected,
       child: Material(
         color: Colors.transparent,
