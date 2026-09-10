@@ -214,7 +214,7 @@ packages:
   portal_ui_core:
     dependency: "direct main"
     description:
-      path: "../packages/portal_ui_core"
+      path: "../../portal_ui_core"
       relative: true
     source: path
     version: "0.1.0"
