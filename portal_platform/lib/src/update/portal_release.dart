@@ -23,6 +23,7 @@ class PortalRelease {
     required this.sha256,
     required this.sizeBytes,
     this.notes,
+    this.publishedAt,
   });
 
   /// Matches the `X-Portal-App` slug — `Portal Gym` → `portal-gym`.
@@ -37,6 +38,13 @@ class PortalRelease {
   final String sha256;
   final int sizeBytes;
   final String? notes;
+
+  /// When this build was published, from the entry's `published` field.
+  ///
+  /// Falls back to the manifest's own `generated` stamp for an entry written
+  /// before that field existed. Null when neither parses — display only,
+  /// nothing compares it.
+  final DateTime? publishedAt;
 
   /// `portal-gym` -> `Gym`. The manifest carries no label, and adding one
   /// would mean every client had to tolerate it being absent anyway.
@@ -70,6 +78,7 @@ class PortalRelease {
     String slug,
     Object? raw, {
     String? requiredHost,
+    DateTime? fallbackPublished,
   }) {
     if (raw is! Map) return null;
 
@@ -106,6 +115,7 @@ class PortalRelease {
       // Rendered in a dialog, so it is length-capped: an unbounded string from
       // the network should not be able to push the buttons off the screen.
       notes: _clamp(raw['notes'] as String?, 500),
+      publishedAt: _asDate(raw['published']) ?? fallbackPublished,
     );
   }
 
@@ -121,6 +131,11 @@ class PortalRelease {
     return null;
   }
 
+  static DateTime? _asDate(Object? v) {
+    if (v is! String || v.trim().isEmpty) return null;
+    return DateTime.tryParse(v.trim())?.toLocal();
+  }
+
   static Uri? _asUri(Object? v) {
     if (v is! String || v.trim().isEmpty) return null;
     return Uri.tryParse(v.trim());
@@ -129,7 +144,10 @@ class PortalRelease {
 
 /// The decoded `updates.json`.
 class PortalUpdateManifest {
-  const PortalUpdateManifest(this.releases);
+  const PortalUpdateManifest(this.releases, {this.generatedAt});
+
+  /// When the manifest itself was written, from its `generated` field.
+  final DateTime? generatedAt;
 
   /// Keyed by app slug. Entries that fail to parse are dropped, not thrown —
   /// one malformed app must not stop the other six from updating.
@@ -148,6 +166,7 @@ class PortalUpdateManifest {
     if (apps is! Map) return null;
 
     final host = requiredHost?.trim().toLowerCase();
+    final generatedAt = PortalRelease._asDate(decoded['generated']);
     final releases = <String, PortalRelease>{};
     apps.forEach((key, value) {
       if (key is! String) return;
@@ -157,10 +176,15 @@ class PortalUpdateManifest {
       // selected — but the sanitising belongs where the untrusted value
       // enters, not in an argument about why it cannot escape.
       if (!RegExp(r'^[a-z0-9-]{1,64}$').hasMatch(slug)) return;
-      final release = PortalRelease._tryParse(slug, value, requiredHost: host);
+      final release = PortalRelease._tryParse(
+        slug,
+        value,
+        requiredHost: host,
+        fallbackPublished: generatedAt,
+      );
       if (release != null) releases[slug] = release;
     });
-    return PortalUpdateManifest(releases);
+    return PortalUpdateManifest(releases, generatedAt: generatedAt);
   }
 
   /// Every published app except [excludeSlug], in display order.
@@ -173,6 +197,14 @@ class PortalUpdateManifest {
     return releases.values.where((r) => r.slug != skip).toList()
       ..sort((a, b) => a.displayName.compareTo(b.displayName));
   }
+
+  /// The published release for [slug], newer than the running build or not.
+  ///
+  /// [updateFor] answers "is there an update"; this answers "what is
+  /// published", which is what a version panel shows next to the installed
+  /// build even when the two match.
+  PortalRelease? latestFor(String slug) =>
+      releases[slug.trim().toLowerCase()];
 
   /// The release for [slug] when it is newer than [currentVersionCode].
   ///

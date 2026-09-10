@@ -63,31 +63,3 @@ class PortalAppVersionText extends StatelessWidget {
     );
   }
 }
-
-/// Material [ListTile] that shows a label and the host app version.
-class PortalAppVersionListTile extends StatelessWidget {
-  const PortalAppVersionListTile({
-    super.key,
-    required this.title,
-    this.includeBuildNumber = true,
-    this.dense = false,
-  });
-
-  final String title;
-  final bool includeBuildNumber;
-  final bool dense;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      dense: dense,
-      title: Text(title),
-      trailing: PortalAppVersionText(
-        includeBuildNumber: includeBuildNumber,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-      ),
-    );
-  }
-}

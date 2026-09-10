@@ -16,10 +16,26 @@ import 'portal_release.dart';
 enum PortalUpdateStatus { upToDate, updateAvailable, unsupported, failed }
 
 class PortalUpdateCheck {
-  const PortalUpdateCheck(this.status, {this.release, this.message});
+  const PortalUpdateCheck(
+    this.status, {
+    this.release,
+    this.latest,
+    this.checkedAt,
+    this.message,
+  });
 
   final PortalUpdateStatus status;
+
+  /// Set only when [status] is [PortalUpdateStatus.updateAvailable].
   final PortalRelease? release;
+
+  /// What the manifest publishes for this app, newer than the running build
+  /// or not. A version panel shows it either way; [release] answers the
+  /// narrower "is there something to install".
+  final PortalRelease? latest;
+
+  /// When this check read the manifest. Null when it never got that far.
+  final DateTime? checkedAt;
 
   /// Human-readable reason when [status] is [PortalUpdateStatus.failed].
   final String? message;
@@ -132,13 +148,17 @@ class PortalUpdateService {
       }
 
       final manifest = await fetchManifest();
+      final checkedAt = await _recordChecked();
+      final latest = manifest.latestFor(slug);
       final release = manifest.updateFor(slug, current);
-      return release == null
-          ? const PortalUpdateCheck(PortalUpdateStatus.upToDate)
-          : PortalUpdateCheck(
-              PortalUpdateStatus.updateAvailable,
-              release: release,
-            );
+      return PortalUpdateCheck(
+        release == null
+            ? PortalUpdateStatus.upToDate
+            : PortalUpdateStatus.updateAvailable,
+        release: release,
+        latest: latest,
+        checkedAt: checkedAt,
+      );
     } catch (e) {
       return PortalUpdateCheck(
         PortalUpdateStatus.failed,
@@ -263,6 +283,26 @@ class PortalUpdateService {
   /// as a single int rather than a set: only the newest offer matters, and a
   /// newer publish supersedes the refusal automatically.
   static const String _dismissedKey = 'portal_update_dismissed_version_code';
+
+  /// When the manifest was last read successfully, so the version panel can
+  /// say how fresh what it is showing is. Only a completed read counts — a
+  /// failed one checked nothing.
+  static const String _lastCheckedKey = 'portal_update_last_checked_ms';
+
+  Future<DateTime> _recordChecked() async {
+    final now = DateTime.now();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_lastCheckedKey, now.millisecondsSinceEpoch);
+    return now;
+  }
+
+  /// The last successful check, across launches. Null when there has not been
+  /// one on this install.
+  Future<DateTime?> lastCheckedAt() async {
+    final prefs = await SharedPreferences.getInstance();
+    final ms = prefs.getInt(_lastCheckedKey);
+    return ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
+  }
 
   Future<void> markDismissed(int versionCode) async {
     final prefs = await SharedPreferences.getInstance();

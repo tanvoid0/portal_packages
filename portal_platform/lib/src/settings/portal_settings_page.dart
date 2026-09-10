@@ -6,7 +6,6 @@ import '../auth/device_security/portal_device_security_settings_tile.dart';
 import '../session/session_controller.dart';
 import '../update/portal_update_service.dart';
 import '../update/portal_update_tile.dart';
-import '../widgets/portal_app_version.dart';
 import 'portal_apps_section.dart';
 import 'portal_change_password_page.dart';
 import 'portal_profile_tile.dart';
@@ -166,10 +165,7 @@ class PortalSettingsPage extends StatelessWidget {
 
         case PortalSettingsGroup.about:
           children.add(build(labels.about, [
-            if (updates != null)
-              PortalUpdateTile(service: updates, title: labels.appVersion)
-            else
-              PortalAppVersionListTile(title: labels.appVersion),
+            PortalUpdateTile(service: updates, title: labels.appVersion),
             if (Get.isRegistered<DeviceSecurityController>())
               const PortalDeviceSecuritySettingsTile(contentPadding: _padding),
             if (Get.isRegistered<SessionController>()) ...[

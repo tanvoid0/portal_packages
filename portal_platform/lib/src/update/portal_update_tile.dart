@@ -2,23 +2,35 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../widgets/portal_app_version.dart';
 import 'portal_release.dart';
 import 'portal_update_service.dart';
 
-/// Settings tile: shows the running version and checks for a sideload update.
+/// The app version panel: what is installed, what is published, and when that
+/// was last checked. Tapping it checks again and offers the update.
 ///
-/// Plain Material on purpose — `portal_platform` sits below the UI kit, the
-/// same reason [PortalAppVersionListTile] does not use it either.
+/// One widget for both cases on purpose. There used to be two — a plain
+/// version row when no update service was registered and a checkable one when
+/// there was — so the same fact appeared in two shapes depending on how the
+/// host app was wired. Passing no [service] now only drops the rows that need
+/// one.
+///
+/// Plain Material on purpose — `portal_platform` sits below the UI kit, so it
+/// cannot reach for ui_core's tokens. An app that wants its own styling
+/// composes [PortalAppVersionText] instead.
 class PortalUpdateTile extends StatefulWidget {
   const PortalUpdateTile({
     super.key,
-    required this.service,
+    this.service,
     this.title = 'App version',
   });
 
-  final PortalUpdateService service;
+  /// Null, or disabled, means no update checks: the panel still shows the
+  /// running build, and nothing is tappable.
+  final PortalUpdateService? service;
   final String title;
 
   @override
@@ -27,50 +39,186 @@ class PortalUpdateTile extends StatefulWidget {
 
 class _PortalUpdateTileState extends State<PortalUpdateTile> {
   bool _checking = false;
-  String? _subtitle;
+  PackageInfo? _info;
+  PortalUpdateCheck? _result;
+  DateTime? _lastChecked;
+
+  bool get _enabled => widget.service?.isEnabled ?? false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCached();
+  }
+
+  /// Package info and the stored last-check stamp. Deliberately no network:
+  /// opening settings should not spend a request, and the launch check has
+  /// already written the stamp this reads.
+  Future<void> _loadCached() async {
+    final info = await PortalAppVersion.load();
+    final checked = await widget.service?.lastCheckedAt();
+    if (!mounted) return;
+    setState(() {
+      _info = info;
+      _lastChecked = checked;
+    });
+  }
 
   Future<void> _check() async {
+    final service = widget.service;
+    if (service == null) return;
     setState(() {
       _checking = true;
-      _subtitle = null;
+      _result = null;
     });
-    final result = await widget.service.check();
+    final result = await service.check();
     if (!mounted) return;
-    setState(() => _checking = false);
+    setState(() {
+      _checking = false;
+      _result = result;
+      _lastChecked = result.checkedAt ?? _lastChecked;
+    });
 
-    switch (result.status) {
-      case PortalUpdateStatus.updateAvailable:
-        await showPortalUpdateDialog(context, widget.service, result.release!);
-      case PortalUpdateStatus.upToDate:
-        setState(() => _subtitle = 'Up to date');
-      case PortalUpdateStatus.unsupported:
-        setState(() => _subtitle = 'Updates are not available in this build');
-      case PortalUpdateStatus.failed:
-        setState(() => _subtitle = result.message);
+    if (result.status == PortalUpdateStatus.updateAvailable) {
+      await showPortalUpdateDialog(context, service, result.release!);
     }
+  }
+
+  /// The verdict, appended to the running version. Kept to two words: it
+  /// shares a line with the build number, and the reason a check went wrong
+  /// belongs in [_detail] where there is room to read it.
+  ///
+  /// Null before the first check of the session — naming a status for a check
+  /// that has not run would be inventing one.
+  String? get _status {
+    if (_checking) return 'checking…';
+    return switch (_result?.status) {
+      PortalUpdateStatus.updateAvailable => 'update available',
+      PortalUpdateStatus.upToDate => 'up to date',
+      _ => null,
+    };
   }
 
   @override
   Widget build(BuildContext context) {
-    final enabled = widget.service.isEnabled && !_checking;
+    final theme = Theme.of(context);
+    final failed = _result?.status == PortalUpdateStatus.failed;
+
     return ListTile(
       title: Text(widget.title),
-      subtitle: _subtitle == null ? null : Text(_subtitle!),
+      // Two dense lines rather than a labelled table. Everything here is
+      // short and self-describing — "1.3.0 (build 412)" needs no column
+      // headed Installed — and the table made a settings row five lines tall
+      // for four facts.
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _headline,
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            _detail,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: failed
+                  ? theme.colorScheme.error
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+            // A failure names a cause worth reading; everything else on this
+            // line is short by construction.
+            maxLines: failed ? 3 : 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+      isThreeLine: true,
       trailing: _checking
           ? const SizedBox(
               width: 20,
               height: 20,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : PortalAppVersionText(
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-      onTap: enabled ? _check : null,
+          : _enabled
+              ? IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'Check for updates',
+                  onPressed: _check,
+                )
+              : null,
+      onTap: _enabled && !_checking ? _check : null,
     );
   }
+
+  /// The running build, and the verdict on it when there is one.
+  String get _headline {
+    final status = _status;
+    return status == null ? _installedLabel : '$_installedLabel · $status';
+  }
+
+  /// What is published and when it was last looked for — or, when a check
+  /// could not run, why.
+  String get _detail {
+    if (!_enabled) return 'Updates are not available in this build';
+    final result = _result;
+    if (result?.status == PortalUpdateStatus.unsupported) {
+      return 'Updates are not available in this build';
+    }
+    if (result?.status == PortalUpdateStatus.failed) {
+      return result!.message ?? 'The update check did not complete';
+    }
+
+    final parts = <String>[
+      if (result?.latest case final latest?) 'Latest ${_releaseLabel(latest)}',
+      'checked ${portalFormatSince(_lastChecked).toLowerCase()}',
+    ];
+    return parts.join(' · ');
+  }
+
+  String get _installedLabel {
+    final info = _info;
+    if (info == null) return '…';
+    final version = info.version.isEmpty ? '—' : info.version;
+    return info.buildNumber.isEmpty
+        ? version
+        : '$version (build ${info.buildNumber})';
+  }
+
+  String _releaseLabel(PortalRelease release) {
+    final name = release.versionName.isEmpty
+        ? 'build ${release.versionCode}'
+        : release.versionName;
+    final at = release.publishedAt;
+    return at == null ? name : '$name, ${portalFormatDate(at)}';
+  }
 }
+
+/// `8 Sep 2026` in the device locale.
+///
+/// Date only: the hour a build was published, or a check last ran, is not
+/// something anyone acts on, and it doubles the width of every line it
+/// appears in.
+String portalFormatDate(DateTime at) =>
+    DateFormat.yMMMd().format(at.toLocal());
+
+/// `2 hours ago`, falling back to the absolute date once the gap stops being
+/// the useful way to read it.
+///
+/// Null reads as never checked rather than as an empty cell — a blank value
+/// there looks like a rendering bug, not a fact.
+String portalFormatSince(DateTime? at, {DateTime? now}) {
+  if (at == null) return 'Never';
+  final gap = (now ?? DateTime.now()).difference(at);
+  if (gap.isNegative || gap.inMinutes < 1) return 'Just now';
+  if (gap.inHours < 1) return _plural(gap.inMinutes, 'minute');
+  if (gap.inDays < 1) return _plural(gap.inHours, 'hour');
+  if (gap.inDays < 7) return _plural(gap.inDays, 'day');
+  return portalFormatDate(at);
+}
+
+String _plural(int n, String unit) => '$n ${n == 1 ? unit : '${unit}s'} ago';
 
 /// Offers [release], then downloads and installs it if the user accepts.
 ///

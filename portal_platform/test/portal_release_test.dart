@@ -230,4 +230,86 @@ void main() {
       expect(parseVersionCode('-1'), isNull);
     });
   });
+
+  group('publish metadata', () {
+    test('reads a per-app published stamp', () {
+      final parsed = PortalUpdateManifest.fromJson(manifest(apps: {
+        'portal-gym': {
+          'versionCode': 44,
+          'versionName': '1.0.0',
+          'apk': 'https://example.com/portal_gym.apk',
+          'sha256': _sha,
+          'size': 1,
+          'published': '2026-09-08T09:30:00Z',
+        },
+      }))!;
+      expect(
+        parsed.releases['portal-gym']!.publishedAt,
+        DateTime.utc(2026, 9, 8, 9, 30).toLocal(),
+      );
+    });
+
+    test('falls back to the manifest stamp, and is null without either', () {
+      // An entry published before the field existed still has a date worth
+      // showing; one with neither shows no date rather than a wrong one.
+      final withGenerated = PortalUpdateManifest.fromJson({
+        ...manifest(),
+        'generated': '2026-09-01T00:00:00Z',
+      })!;
+      expect(
+        withGenerated.releases['portal-gym']!.publishedAt,
+        DateTime.utc(2026, 9, 1).toLocal(),
+      );
+      expect(withGenerated.generatedAt, DateTime.utc(2026, 9, 1).toLocal());
+
+      final bare = PortalUpdateManifest.fromJson(manifest())!;
+      expect(bare.releases['portal-gym']!.publishedAt, isNull);
+      expect(bare.generatedAt, isNull);
+    });
+
+    test('latestFor answers even when the running build is current', () {
+      // The version panel shows what is published next to what is installed;
+      // updateFor deliberately says nothing once they match.
+      final parsed = PortalUpdateManifest.fromJson(manifest())!;
+      expect(parsed.updateFor('portal-gym', 44), isNull);
+      expect(parsed.latestFor(' Portal-Gym ')!.versionCode, 44);
+      expect(parsed.latestFor('portal-nope'), isNull);
+    });
+  });
+
+  group('portalFormatSince', () {
+    final now = DateTime(2026, 9, 10, 12);
+
+    test('reads a null stamp as never, not as blank', () {
+      expect(portalFormatSince(null), 'Never');
+    });
+
+    test('counts up through the units, then gives the date', () {
+      expect(portalFormatSince(now, now: now), 'Just now');
+      expect(
+        portalFormatSince(now.subtract(const Duration(minutes: 1)), now: now),
+        '1 minute ago',
+      );
+      expect(
+        portalFormatSince(now.subtract(const Duration(minutes: 90)), now: now),
+        '1 hour ago',
+      );
+      expect(
+        portalFormatSince(now.subtract(const Duration(days: 3)), now: now),
+        '3 days ago',
+      );
+      expect(
+        portalFormatSince(now.subtract(const Duration(days: 30)), now: now),
+        contains('2026'),
+      );
+    });
+
+    test('a clock that went backwards reads as just now, not a negative gap',
+        () {
+      expect(
+        portalFormatSince(now.add(const Duration(hours: 2)), now: now),
+        'Just now',
+      );
+    });
+  });
 }
