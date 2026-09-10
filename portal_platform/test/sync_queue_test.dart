@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_platform/portal_platform.dart';
 import 'package:portal_platform/src/sync/encrypted_sync_queue_codec.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _queueKey = 'portal_sync_queue';
 
@@ -21,15 +22,23 @@ void main() {
         createdAt: DateTime.now().subtract(age),
       );
 
+  // Reads the queue where it now lives: a row in the shared SQLite database,
+  // not a SharedPreferences string.
   Future<List<String>> storedEntityIds() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_queueKey);
-    if (raw == null) return [];
+    final raw = await PortalDatabase.kvGet(_queueKey);
+    if (raw == null || raw.isEmpty) return [];
     final ops = await EncryptedSyncQueueCodec.decryptOperations(raw);
     return ops.map((o) => o.entityId).toList();
   }
 
-  setUp(() {
+  setUpAll(() {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  });
+
+  setUp(() async {
+    await PortalDatabase.resetForTest();
+    PortalDatabase.overrideFilePath = inMemoryDatabasePath;
     SharedPreferences.setMockInitialValues({});
     FlutterSecureStorage.setMockInitialValues({});
   });
@@ -93,12 +102,16 @@ void main() {
 
     await expectLater(SyncQueue().enqueue(op('c')), throwsA(isA<Object>()));
 
+    // The read throws inside the transaction that was importing it, so the
+    // import rolls back and prefs is still the only copy — which is the point:
+    // nothing was destroyed, and the next read tries again.
     final prefs = await SharedPreferences.getInstance();
     expect(
       prefs.getString(_queueKey),
       corrupt,
       reason: 'pending operations must survive a failed read',
     );
+    expect(await PortalDatabase.kvGet(_queueKey), isNull);
   });
 
   test('a legacy plaintext queue is migrated in place, not dropped', () async {

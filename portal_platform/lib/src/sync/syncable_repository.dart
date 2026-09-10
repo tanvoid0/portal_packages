@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
 
 import '../services/api_client.dart';
+import '../storage/portal_database.dart';
 import '../storage/user_storage_scope.dart';
 import 'connectivity_service.dart';
 import 'sync_operation.dart';
@@ -64,7 +66,7 @@ bool isPermanentSyncFailure(Object error) {
 }
 
 /// Abstract **offline-first** repository for **simple** entities stored in
-/// [SharedPreferences].
+/// [PortalDatabase].
 ///
 /// **Experimental:** Portal Task and similar apps with rich local stores
 /// should use [EntitySyncOutbox] and batch `/sync` endpoints instead.
@@ -72,11 +74,12 @@ bool isPermanentSyncFailure(Object error) {
 /// `SyncableRepository` provides a Firebase-like data layer:
 ///
 ///  * **Reads** always attempt the server first when online, falling
-///    back to the local [SharedPreferences] cache when offline or on
+///    back to the local [PortalDatabase] cache when offline or on
 ///    network error.
-///  * **Writes** update the local cache **immediately** (so the UI
-///    reflects the change with zero latency), then push to the server.
-///    If the push fails the mutation is saved in [SyncQueue] and
+///  * **Writes** record the change locally **immediately** (so the UI
+///    reflects it with zero latency) as one transaction that updates the
+///    cache *and* queues the mutation, then push to the server. A push that
+///    succeeds drops the queued operation; one that fails leaves it to be
 ///    retried the next time [sync] runs.
 ///  * **Sync** is triggered automatically on app startup and whenever
 ///    [ConnectivityService] detects a reconnection, courtesy of
@@ -133,7 +136,9 @@ abstract class SyncableRepository<T> implements Syncable {
   /// `'cookbook'`).  Used as the key prefix in [SyncQueue].
   String get entityType;
 
-  /// [SharedPreferences] key under which the local cache is stored.
+  /// Key under which the local cache is stored -- the `store` column in
+  /// [PortalDatabase]'s `entities` table, and the [SharedPreferences] key the
+  /// rows are imported from on first read.
   ///
   /// Choose a key that is unique across the entire app to avoid
   /// collisions (e.g. `'portal_recipe_recipes'`).
@@ -276,10 +281,27 @@ abstract class SyncableRepository<T> implements Syncable {
     } else {
       all[idx] = entity;
     }
-    await writeCache(all);
 
-    final opType =
-        isCreate ? SyncOperationType.create : SyncOperationType.update;
+    // Cache and queue in one commit, *before* the push. Writing the cache
+    // first and queueing only on failure left a window -- a crash, a kill --
+    // where the edit was on disk with nothing to push it: it looked saved and
+    // would never reach the server. Queued-then-pushed costs one extra local
+    // write on the happy path and has no such window.
+    final queuedId = await syncQueue.enqueueWith(
+      SyncOperation(
+        entityType: entityType,
+        entityId: getId(entity),
+        type: isCreate ? SyncOperationType.create : SyncOperationType.update,
+        data: toWireJson(entity, isCreate: isCreate),
+      ),
+      alsoWrite: (txn) => _writeCacheIn(txn, all),
+      // An edit made while a create is still queued is still a create when it
+      // is finally sent, and [toWireJson] serialises the two differently.
+      dataFor: (effective) => toWireJson(
+        entity,
+        isCreate: effective == SyncOperationType.create,
+      ),
+    );
 
     if (connectivity.isOnline) {
       try {
@@ -291,18 +313,13 @@ abstract class SyncableRepository<T> implements Syncable {
             body: toWireJson(entity, isCreate: false),
           );
         }
+        await _dropQueued(queuedId);
         return;
       } catch (e) {
         debugPrint('[$entityType] API save failed, queueing: $e');
       }
     }
 
-    await syncQueue.enqueue(SyncOperation(
-      entityType: entityType,
-      entityId: getId(entity),
-      type: opType,
-      data: toWireJson(entity, isCreate: isCreate),
-    ));
     await _reportQueued();
   }
 
@@ -313,23 +330,38 @@ abstract class SyncableRepository<T> implements Syncable {
   Future<void> delete(String id) async {
     final all = await readCache();
     all.removeWhere((e) => getId(e) == id);
-    await writeCache(all);
+
+    final queuedId = await syncQueue.enqueueWith(
+      SyncOperation(
+        entityType: entityType,
+        entityId: id,
+        type: SyncOperationType.delete,
+      ),
+      alsoWrite: (txn) => _writeCacheIn(txn, all),
+    );
 
     if (connectivity.isOnline) {
       try {
         await api.delete('$apiBasePath/$id');
+        await _dropQueued(queuedId);
         return;
       } catch (e) {
         debugPrint('[$entityType] API delete failed, queueing: $e');
       }
     }
 
-    await syncQueue.enqueue(SyncOperation(
-      entityType: entityType,
-      entityId: id,
-      type: SyncOperationType.delete,
-    ));
     await _reportQueued();
+  }
+
+  /// Drop the operation a just-pushed write left queued.
+  ///
+  /// The id comes from [SyncQueue.enqueueWith] rather than from the operation
+  /// that was built here: dedup may have merged it into an existing pending
+  /// operation under that one's id, and removing the id that was never stored
+  /// would leave the merged one to be replayed.
+  Future<void> _dropQueued(String? queuedId) async {
+    if (queuedId == null) return;
+    await syncQueue.remove(queuedId);
   }
 
   /// Notify [SyncFeedback.onQueued] that a write is waiting to be pushed.
@@ -518,30 +550,70 @@ abstract class SyncableRepository<T> implements Syncable {
 
   // ─── Cache helpers ─────────────────────────────────────────────────
 
-  /// Read the full entity list from the local [SharedPreferences]
-  /// cache.  Returns an empty list if nothing is cached or the stored
-  /// JSON is corrupt.
+  /// Read the full entity list from the local [PortalDatabase] cache.
+  ///
+  /// Returns an empty list if nothing is cached; a row whose JSON will not
+  /// parse is skipped rather than taking the rest of the list with it, which
+  /// is the one thing the old whole-blob cache could not do.
   Future<List<T>> readCache() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(scopedCacheKey);
-    if (raw == null || raw.isEmpty) return [];
-    try {
-      final list = jsonDecode(raw) as List;
-      return list
-          .map((e) => fromJson(Map<String, dynamic>.from(e)))
-          .toList();
-    } catch (e) {
-      debugPrint('[$entityType] Cache read error: $e');
-      return [];
+    await _importCacheFromPrefs();
+    final payloads = await PortalDatabase.readPayloads(scopedCacheKey);
+    final items = <T>[];
+    for (final raw in payloads) {
+      try {
+        items.add(fromJson(Map<String, dynamic>.from(jsonDecode(raw) as Map)));
+      } catch (e) {
+        debugPrint('[$entityType] Cache read error, skipping a row: $e');
+      }
     }
+    return items;
   }
 
   /// Overwrite the local cache with [items].
-  Future<void> writeCache(List<T> items) async {
+  Future<void> writeCache(List<T> items) =>
+      PortalDatabase.transaction((txn) => _writeCacheIn(txn, items));
+
+  /// The body of [writeCache], for callers that already hold a transaction --
+  /// [save] and [delete] commit the cache and the queued mutation together.
+  Future<void> _writeCacheIn(DatabaseExecutor txn, List<T> items) async {
+    _cacheImported = true;
+    await PortalDatabase.kvPut(_cacheImportFlag, '1', txn: txn);
+    await PortalDatabase.writePayloads(txn, scopedCacheKey, [
+      for (final e in items)
+        (id: getId(e), payload: jsonEncode(toJson(e))),
+    ]);
+  }
+
+  String get _cacheImportFlag => 'imported:$scopedCacheKey';
+  bool _cacheImported = false;
+
+  /// One-shot import of a cache written by a build that kept it in
+  /// [SharedPreferences].
+  ///
+  /// Guarded by a stored flag, not by "the table is empty": an entity type
+  /// the user has legitimately emptied would otherwise have the stale prefs
+  /// blob restored over it on the next read. The prefs key is left in place
+  /// for one release; it is only ever a source.
+  Future<void> _importCacheFromPrefs() async {
+    if (_cacheImported) return;
+    if (await PortalDatabase.kvGet(_cacheImportFlag) != null) {
+      _cacheImported = true;
+      return;
+    }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      scopedCacheKey,
-      jsonEncode(items.map((e) => toJson(e)).toList()),
-    );
+    final raw = prefs.getString(scopedCacheKey);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final list = jsonDecode(raw) as List;
+        await writeCache([
+          for (final e in list) fromJson(Map<String, dynamic>.from(e)),
+        ]);
+        return;
+      } catch (e) {
+        debugPrint('[$entityType] Legacy cache import failed: $e');
+      }
+    }
+    _cacheImported = true;
+    await PortalDatabase.kvPut(_cacheImportFlag, '1');
   }
 }

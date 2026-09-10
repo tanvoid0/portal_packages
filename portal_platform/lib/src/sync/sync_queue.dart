@@ -3,8 +3,9 @@ import 'dart:async';
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
 
+import '../storage/portal_database.dart';
 import '../storage/user_storage_scope.dart';
 import 'encrypted_sync_queue_codec.dart';
 import 'sync_operation.dart';
@@ -12,9 +13,12 @@ import 'sync_operation.dart';
 /// Persistent, deduplicated queue of mutations waiting to be pushed to
 /// the server.
 ///
-/// All pending [SyncOperation]s are stored as a JSON array in
-/// [SharedPreferences] under the key `portal_sync_queue`, so they
-/// survive app restarts.
+/// All pending [SyncOperation]s are stored as one encrypted JSON array in
+/// [PortalDatabase]'s `kv` table under the key `portal_sync_queue`, so they
+/// survive app restarts. It lives in that database rather than in
+/// [SharedPreferences] so a mutation and the cache write it belongs to can be
+/// one commit -- see [enqueueWith]. A queue left in prefs by an older build is
+/// imported on first read.
 ///
 /// ## Deduplication
 ///
@@ -28,6 +32,11 @@ import 'sync_operation.dart';
 /// | update    | update    | update with latest data                  |
 /// | update    | delete    | replaced by delete                       |
 /// | *other*   | *any*     | replaced by incoming                     |
+///
+/// The create+update row applies only when the caller can re-serialise the
+/// payload for the surviving verb (see `dataFor` on [enqueueWith]). Without
+/// that, both operations are kept and replayed oldest-first — see
+/// [_mustNotMerge].
 ///
 /// ## Initialisation
 ///
@@ -52,9 +61,8 @@ class SyncQueue extends GetxService {
 
   /// Hard ceiling on pending operations.
   ///
-  /// The queue is one SharedPreferences string, encrypted and rewritten in
-  /// full on every mutation, so its cost is quadratic in a long offline
-  /// stretch. Dedup keeps it to one operation per entity, which bounds normal
+  /// The queue is one encrypted string, rewritten in full on every mutation,
+  /// so its cost is quadratic in a long offline stretch. Dedup keeps it to one operation per entity, which bounds normal
   /// use well below this; the cap only catches genuine runaway.
   static const int maxOperations = 500;
 
@@ -102,12 +110,13 @@ class SyncQueue extends GetxService {
   /// [Get.putAsync].
   Future<SyncQueue> init() async {
     try {
-      final ops = await _withLock(() async {
-        final loaded = await _load();
-        final kept = _prune(loaded);
-        if (kept.length != loaded.length) await _save(kept);
-        return kept;
-      });
+      final ops =
+          await _withLock(() => PortalDatabase.transaction((txn) async {
+                final loaded = await _load(txn);
+                final kept = _prune(loaded);
+                if (kept.length != loaded.length) await _save(kept, txn);
+                return kept;
+              }));
       pendingCount.value = ops.length;
     } catch (e) {
       // Startup must not fail on an unreadable queue. The badge count is
@@ -123,28 +132,79 @@ class SyncQueue extends GetxService {
   /// any existing pending operation for the same entity.
   ///
   /// See the class-level documentation for the full merge table.
-  Future<void> enqueue(SyncOperation op) => _withLock(() async {
-        final ops = await _load();
-        final idx = ops.indexWhere(
-          (o) => o.entityType == op.entityType && o.entityId == op.entityId,
-        );
+  Future<void> enqueue(SyncOperation op) => enqueueWith(op);
 
-        if (idx >= 0) {
-          final existing = ops[idx];
-          final merged = _merge(existing, op);
-          if (merged == null) {
-            ops.removeAt(idx);
-          } else {
-            ops[idx] = merged;
-          }
-        } else {
-          ops.add(op);
-        }
+  /// Enqueue [op] and, in the *same* transaction, run [alsoWrite].
+  ///
+  /// This is the reason the queue moved into [PortalDatabase]. A repository
+  /// writes its cache through [alsoWrite], so there is no instant where the
+  /// local copy of an edit exists with nothing queued to push it -- the state
+  /// that used to look saved and then silently never sync.
+  ///
+  /// Returns the id of the operation that now represents this entity: [op]'s
+  /// own, the id of the pending operation it merged into, or `null` when the
+  /// merge cancelled both out (a create then a delete) or eviction dropped it.
+  /// A caller that goes on to push the change immediately must remove *that*
+  /// id, not `op.id`, or it leaves a stale operation to be replayed.
+  ///
+  /// The lock is taken before the transaction is opened, never the other way
+  /// round: SQLite serialises write transactions, so a caller holding the
+  /// lock while waiting for one would deadlock against a caller holding a
+  /// transaction while waiting for the lock.
+  /// [dataFor] re-serialises the payload when dedup changes which verb will
+  /// actually be sent. Merging an update into a pending create keeps the
+  /// *create*, and a body serialised for an update is not a valid create body
+  /// — the server whitelists per verb and answers 400, which is a permanent
+  /// failure, which drops the operation and loses the entity. The queue knows
+  /// the effective verb; only the caller knows how to serialise for it.
+  Future<String?> enqueueWith(
+    SyncOperation op, {
+    Future<void> Function(DatabaseExecutor txn)? alsoWrite,
+    Map<String, dynamic>? Function(SyncOperationType effective)? dataFor,
+  }) async {
+    final result =
+        await _withLock(() => PortalDatabase.transaction((txn) async {
+              if (alsoWrite != null) await alsoWrite(txn);
 
-        final kept = _prune(ops);
-        await _save(kept);
-        pendingCount.value = kept.length;
-      });
+              final ops = await _load(txn);
+              final idx = ops.indexWhere(
+                (o) =>
+                    o.entityType == op.entityType && o.entityId == op.entityId,
+              );
+
+              String? effectiveId = op.id;
+              if (idx >= 0 && _mustNotMerge(ops[idx], op, dataFor)) {
+                // Two operations for one entity, replayed oldest-first.
+                ops.add(op);
+              } else if (idx >= 0) {
+                var merged = _merge(ops[idx], op);
+                if (merged == null) {
+                  ops.removeAt(idx);
+                  effectiveId = null;
+                } else {
+                  if (dataFor != null && merged.type != op.type) {
+                    merged = merged.copyWith(data: dataFor(merged.type));
+                  }
+                  ops[idx] = merged;
+                  effectiveId = merged.id;
+                }
+              } else {
+                ops.add(op);
+              }
+
+              final kept = _prune(ops);
+              await _save(kept, txn);
+              if (effectiveId != null &&
+                  !kept.any((o) => o.id == effectiveId)) {
+                effectiveId = null;
+              }
+              return (id: effectiveId, count: kept.length);
+            }));
+    // Outside the transaction: a rollback must not leave the badge claiming
+    // work that was never stored.
+    pendingCount.value = result.count;
+    return result.id;
+  }
 
   /// Return all pending operations for [entityType], sorted by
   /// [SyncOperation.createdAt] ascending (oldest first).
@@ -152,27 +212,33 @@ class SyncQueue extends GetxService {
   /// Takes the lock too: [_load] rewrites the entry when it migrates a
   /// legacy plaintext queue.
   Future<List<SyncOperation>> getByEntityType(String entityType) =>
-      _withLock(() async {
-        final ops = await _load();
-        return ops.where((o) => o.entityType == entityType).toList()
-          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-      });
+      _withLock(() => PortalDatabase.transaction((txn) async {
+            final ops = await _load(txn);
+            return ops.where((o) => o.entityType == entityType).toList()
+              ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          }));
 
   /// Remove a single completed operation by its [operationId].
-  Future<void> remove(String operationId) => _withLock(() async {
-        final ops = await _load();
-        ops.removeWhere((o) => o.id == operationId);
-        await _save(ops);
-        pendingCount.value = ops.length;
-      });
+  Future<void> remove(String operationId) async {
+    final count = await _withLock(() => PortalDatabase.transaction((txn) async {
+          final ops = await _load(txn);
+          ops.removeWhere((o) => o.id == operationId);
+          await _save(ops, txn);
+          return ops.length;
+        }));
+    pendingCount.value = count;
+  }
 
   /// Remove **all** pending operations for [entityType].
-  Future<void> clearEntityType(String entityType) => _withLock(() async {
-        final ops = await _load();
-        ops.removeWhere((o) => o.entityType == entityType);
-        await _save(ops);
-        pendingCount.value = ops.length;
-      });
+  Future<void> clearEntityType(String entityType) async {
+    final count = await _withLock(() => PortalDatabase.transaction((txn) async {
+          final ops = await _load(txn);
+          ops.removeWhere((o) => o.entityType == entityType);
+          await _save(ops, txn);
+          return ops.length;
+        }));
+    pendingCount.value = count;
+  }
 
   // ─── Eviction ───────────────────────────────────────────────────────
 
@@ -217,6 +283,35 @@ class SyncQueue extends GetxService {
 
   // ─── Deduplication ──────────────────────────────────────────────────
 
+  /// True when merging [incoming] into [existing] would produce an operation
+  /// that cannot be replayed correctly, so both must be kept.
+  ///
+  /// There is exactly one such case. Every other row of the merge table either
+  /// cancels the pair out or leaves a survivor whose type equals the incoming
+  /// operation's; only create-then-update keeps the *create* while taking the
+  /// update's payload. Two different replay models both break on that:
+  ///
+  ///  * [SyncableRepository] serialises per verb, so an update body is not a
+  ///    valid create body — the server whitelists per verb and 400s.
+  ///  * [EntitySyncOutbox] mutations carry their action *in the payload*, so
+  ///    the merged operation replays as an update for an id the server has
+  ///    never seen. Three of the four batch handlers upsert; the notes one
+  ///    rejects it and the note is lost.
+  ///
+  /// A caller that can re-serialise for the surviving verb passes `dataFor`
+  /// and the merge is safe. One that cannot — every outbox, and `delete`,
+  /// which has no entity left to serialise — gets both operations kept and
+  /// replayed in order instead. Ordering does the same job as merging: the
+  /// create lands, then the update applies to something that exists.
+  bool _mustNotMerge(
+    SyncOperation existing,
+    SyncOperation incoming,
+    Map<String, dynamic>? Function(SyncOperationType)? dataFor,
+  ) =>
+      dataFor == null &&
+      existing.type == SyncOperationType.create &&
+      incoming.type == SyncOperationType.update;
+
   SyncOperation? _merge(SyncOperation existing, SyncOperation incoming) {
     switch ((existing.type, incoming.type)) {
       case (SyncOperationType.create, SyncOperationType.update):
@@ -246,7 +341,7 @@ class SyncQueue extends GetxService {
   ///
   /// Ciphertext that will not authenticate is the exception, because it is
   /// not transient. The queue key lives in the Android keystore and the
-  /// queue itself in [SharedPreferences]; a restore, a reinstall or a
+  /// queue itself in [PortalDatabase]; a restore, a reinstall or a
   /// keystore invalidation takes the key and leaves the blob, and no key
   /// that can read it will ever exist again. Throwing then wedges the app
   /// for good: every write that has to queue -- which is every write the
@@ -255,14 +350,14 @@ class SyncQueue extends GetxService {
   /// unreadable blob is dropped once and the queue starts empty. The
   /// operations in it are lost, but they were already unrecoverable; the
   /// local database they came from is untouched.
-  Future<List<SyncOperation>> _load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_storageKey);
-    if (raw == null || raw.isEmpty) return [];
+  Future<List<SyncOperation>> _load(DatabaseExecutor txn) async {
+    final raw =
+        await PortalDatabase.kvGetOrImportFromPrefs(_storageKey, txn: txn);
+    if (raw.isEmpty) return [];
     try {
       final migrated = await EncryptedSyncQueueCodec.migrateIfNeeded(raw);
       if (migrated != raw) {
-        await prefs.setString(_storageKey, migrated);
+        await PortalDatabase.kvPut(_storageKey, migrated, txn: txn);
       }
       return await EncryptedSyncQueueCodec.decryptOperations(migrated);
     } on SecretBoxAuthenticationError {
@@ -270,14 +365,13 @@ class SyncQueue extends GetxService {
       // corruption may be partial, and a queue nobody has proved
       // unrecoverable is not ours to delete.
       debugPrint('[sync] dropping the stored queue: its key is gone');
-      await prefs.remove(_storageKey);
+      await PortalDatabase.kvPut(_storageKey, '', txn: txn);
       return [];
     }
   }
 
-  Future<void> _save(List<SyncOperation> ops) async {
-    final prefs = await SharedPreferences.getInstance();
+  Future<void> _save(List<SyncOperation> ops, DatabaseExecutor txn) async {
     final encrypted = await EncryptedSyncQueueCodec.encryptOperations(ops);
-    await prefs.setString(_storageKey, encrypted);
+    await PortalDatabase.kvPut(_storageKey, encrypted, txn: txn);
   }
 }
