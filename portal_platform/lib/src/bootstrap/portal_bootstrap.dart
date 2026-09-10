@@ -19,6 +19,25 @@ import '../update/portal_update_tile.dart';
 class PortalBootstrap {
   PortalBootstrap._();
 
+  static bool _isLoggedIn = false;
+
+  /// Whether [init] found a valid session. Same value [init] returned.
+  static bool get isLoggedIn => _isLoggedIn;
+
+  /// The route an app should open on: [AppConfig.routeLoggedIn] when [init]
+  /// found a session, [AppConfig.routeLoggedOut] otherwise.
+  ///
+  /// This is the fleet's one answer to "onboarding or home?". Deciding it
+  /// before the first route is built is the whole point — an app that instead
+  /// boots to onboarding and navigates away once it has checked shows the
+  /// onboarding screen to a signed-in user for a frame or two every launch.
+  /// [init] has already restored the session by the time it returns, so there
+  /// is nothing left to wait for here.
+  static String get startRoute {
+    final config = Get.find<AppConfig>();
+    return _isLoggedIn ? config.routeLoggedIn : config.routeLoggedOut;
+  }
+
   /// Loads `.env`, initializes [ApiClient], [DeepLinkService], [SessionController],
   /// and stores [config]. Returns whether the user has a valid session.
   static Future<bool> init({
@@ -69,6 +88,7 @@ class PortalBootstrap {
       await Get.find<SessionController>().reloadFromStorage();
     }
 
+    _isLoggedIn = isLoggedIn;
     return isLoggedIn;
   }
 
