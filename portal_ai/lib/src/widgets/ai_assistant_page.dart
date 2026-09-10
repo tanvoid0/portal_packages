@@ -2369,14 +2369,18 @@ class _AiPresenceAvatar extends StatefulWidget {
 
 class _AiPresenceAvatarState extends State<_AiPresenceAvatar>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _pulse = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 700),
-  );
+  // Built here rather than as a lazy `late final`: an avatar that is neither
+  // busy nor showing a dot touches _pulse for the first time in dispose(),
+  // and creating a ticker against a deactivated element throws.
+  late final AnimationController _pulse;
 
   @override
   void initState() {
     super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
     if (widget.busy) _pulse.repeat(reverse: true);
   }
 

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ui_core/portal_ui_core.dart';
 
@@ -153,8 +152,18 @@ void main() {
     await t.pumpWidget(_host(Align(
       child: PortalFilterChip(label: 'Chest', selected: false, onTap: () {}),
     )));
-    expect(t.getSemantics(find.text('Chest')).hasFlag(SemanticsFlag.isSelected),
-        isFalse);
+    expect(
+      t.getSemantics(find.text('Chest')),
+      matchesSemantics(
+        label: 'Chest',
+        isButton: true,
+        hasSelectedState: true,
+        isSelected: false,
+        hasTapAction: true,
+        hasFocusAction: true,
+        isFocusable: true,
+      ),
+    );
 
     handle.dispose();
   });
