@@ -33,6 +33,19 @@ class PortalSettingsLabels {
     this.deleteAccountFailed = 'Could not delete your account.',
     this.notSignedIn = 'Not signed in',
     this.appVersion = 'App version',
+    this.changePassword = 'Change password',
+    this.changePasswordIntro =
+        'Your Portal account password, the same one every Portal app signs '
+            'in with.',
+    this.changePasswordSubmit = 'Update password',
+    this.currentPassword = 'Current password',
+    this.newPassword = 'New password',
+    this.confirmPassword = 'Confirm new password',
+    this.currentPasswordMissing = 'Enter your current password',
+    this.newPasswordTooShort = 'Use at least 8 characters',
+    this.passwordsDoNotMatch = 'Passwords do not match',
+    this.showPassword = 'Show password',
+    this.hidePassword = 'Hide password',
     this.serverTitle = 'Server',
     this.serverOnline = 'Online',
     this.serverUnreachable = 'Unreachable',
@@ -98,6 +111,17 @@ class PortalSettingsLabels {
   final String deleteAccountFailed;
   final String notSignedIn;
   final String appVersion;
+  final String changePassword;
+  final String changePasswordIntro;
+  final String changePasswordSubmit;
+  final String currentPassword;
+  final String newPassword;
+  final String confirmPassword;
+  final String currentPasswordMissing;
+  final String newPasswordTooShort;
+  final String passwordsDoNotMatch;
+  final String showPassword;
+  final String hidePassword;
 
   // Status rows.
   final String serverTitle;

@@ -8,6 +8,7 @@ import '../update/portal_update_service.dart';
 import '../update/portal_update_tile.dart';
 import '../widgets/portal_app_version.dart';
 import 'portal_apps_section.dart';
+import 'portal_change_password_page.dart';
 import 'portal_profile_tile.dart';
 import 'portal_settings_labels.dart';
 import 'portal_status_tile.dart';
@@ -58,6 +59,7 @@ class PortalSettingsPage extends StatelessWidget {
     this.order = PortalSettingsGroup.values,
     this.sectionBuilder,
     this.backgroundColor,
+    this.onChangePassword,
   });
 
   final PortalSettingsLabels labels;
@@ -87,6 +89,11 @@ class PortalSettingsPage extends StatelessWidget {
   final Widget Function(String title, List<Widget> children)? sectionBuilder;
 
   final Color? backgroundColor;
+
+  /// Replaces the change-password write. Only an app holding key material
+  /// wrapped by the old password needs it; see [PortalChangePasswordForm].
+  final Future<void> Function(String currentPassword, String newPassword)?
+      onChangePassword;
 
   static const _padding = EdgeInsets.symmetric(horizontal: 16);
 
@@ -166,6 +173,10 @@ class PortalSettingsPage extends StatelessWidget {
             if (Get.isRegistered<DeviceSecurityController>())
               const PortalDeviceSecuritySettingsTile(contentPadding: _padding),
             if (Get.isRegistered<SessionController>()) ...[
+              _ChangePasswordTile(
+                labels: labels,
+                onSubmit: onChangePassword,
+              ),
               _SignOutTile(labels: labels),
               _DeleteAccountTile(labels: labels),
             ],
@@ -406,5 +417,37 @@ class _PalettePicker extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Opens [PortalChangePasswordPage]. Hidden while signed out — there is no
+/// account to change the password of.
+class _ChangePasswordTile extends StatelessWidget {
+  const _ChangePasswordTile({required this.labels, this.onSubmit});
+
+  final PortalSettingsLabels labels;
+  final Future<void> Function(String currentPassword, String newPassword)?
+      onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    final session = Get.find<SessionController>();
+    return Obx(() {
+      if (session.user.value == null) return const SizedBox.shrink();
+      return ListTile(
+        contentPadding: PortalSettingsPage._padding,
+        leading: const Icon(Icons.password_outlined),
+        title: Text(labels.changePassword),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PortalChangePasswordPage(
+              labels: labels,
+              onSubmit: onSubmit,
+            ),
+          ),
+        ),
+      );
+    });
   }
 }
