@@ -381,7 +381,7 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
                 contentPadding: padding,
                 leading: CircleAvatar(
                   backgroundColor: cs.surfaceContainerHighest,
-                  child: Icon(portalAppIconFor(app.slug), color: cs.onSurfaceVariant),
+                  child: portalAppAvatar(app, cs.onSurfaceVariant),
                 ),
                 title: Text(app.displayName),
                 subtitle: Column(
@@ -462,6 +462,27 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
     );
   }
 
+}
+
+/// The app's own published launcher icon, falling back to the glyph.
+///
+/// Three ways to end up on [portalAppIconFor], all of them the same picture:
+/// a manifest written before icons were published, a URL that failed the
+/// https/same-host check in [PortalRelease], or a fetch that failed on the
+/// device. A row therefore never renders an empty circle.
+Widget portalAppAvatar(PortalRelease release, Color color) {
+  final fallback = Icon(portalAppIconFor(release.slug), color: color);
+  final url = release.iconUrl;
+  if (url == null) return fallback;
+  return ClipOval(
+    child: Image.network(
+      url.toString(),
+      width: 40,
+      height: 40,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => fallback,
+    ),
+  );
 }
 
 /// Best-effort icon per app. An unknown slug still lists and still installs.

@@ -24,6 +24,7 @@ class PortalRelease {
     required this.sizeBytes,
     this.notes,
     this.publishedAt,
+    this.iconUrl,
   });
 
   /// Matches the `X-Portal-App` slug — `Portal Gym` → `portal-gym`.
@@ -45,6 +46,14 @@ class PortalRelease {
   /// before that field existed. Null when neither parses — display only,
   /// nothing compares it.
   final DateTime? publishedAt;
+
+  /// The app's launcher icon, published beside the APK.
+  ///
+  /// Optional: manifests written before this field existed have none, and a
+  /// caller falls back to its own glyph rather than showing a gap. Held to the
+  /// same https + same-host rule as [apkUrl], but a URL that fails it only
+  /// nulls the icon — an entry stays installable.
+  final Uri? iconUrl;
 
   /// `portal-gym` -> `Gym`. The manifest carries no label, and adding one
   /// would mean every client had to tolerate it being absent anyway.
@@ -105,6 +114,11 @@ class PortalRelease {
     final sha = (raw['sha256'] as String?)?.trim().toLowerCase() ?? '';
     if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(sha)) return null;
 
+    final icon = _asUri(raw['icon']);
+    final iconOk = icon != null &&
+        icon.scheme == 'https' &&
+        (requiredHost == null || icon.host.toLowerCase() == requiredHost);
+
     return PortalRelease(
       slug: slug,
       versionCode: versionCode,
@@ -116,6 +130,7 @@ class PortalRelease {
       // the network should not be able to push the buttons off the screen.
       notes: _clamp(raw['notes'] as String?, 500),
       publishedAt: _asDate(raw['published']) ?? fallbackPublished,
+      iconUrl: iconOk ? icon : null,
     );
   }
 

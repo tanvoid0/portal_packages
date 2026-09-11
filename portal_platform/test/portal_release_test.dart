@@ -110,6 +110,46 @@ void main() {
       expect(m.releases.keys, ['portal-gym']);
     });
 
+    test('reads an icon on the manifest host', () {
+      final m = PortalUpdateManifest.fromJson(
+        manifest(apps: {
+          'portal-gym': {
+            'versionCode': 44,
+            'apk': 'https://github.com/o/r/releases/download/v1/g.apk',
+            'sha256': _sha,
+            'icon': 'https://github.com/o/r/releases/download/v1/portal_gym.png',
+          },
+        }),
+        requiredHost: 'github.com',
+      )!;
+      expect(
+        m.releases['portal-gym']!.iconUrl.toString(),
+        'https://github.com/o/r/releases/download/v1/portal_gym.png',
+      );
+    });
+
+    test('an absent, off-host or plain-http icon nulls without dropping the entry', () {
+      for (final icon in <Object?>[
+        null,
+        'https://elsewhere.example/g.png',
+        'http://github.com/o/r/releases/download/v1/g.png',
+      ]) {
+        final m = PortalUpdateManifest.fromJson(
+          manifest(apps: {
+            'portal-gym': {
+              'versionCode': 44,
+              'apk': 'https://github.com/o/r/releases/download/v1/g.apk',
+              'sha256': _sha,
+              if (icon != null) 'icon': icon,
+            },
+          }),
+          requiredHost: 'github.com',
+        )!;
+        expect(m.releases['portal-gym'], isNotNull, reason: 'icon: $icon');
+        expect(m.releases['portal-gym']!.iconUrl, isNull, reason: 'icon: $icon');
+      }
+    });
+
     test('drops a slug that could escape a file path', () {
       // The slug reaches a filename in the temp directory.
       final m = PortalUpdateManifest.fromJson(manifest(apps: {
