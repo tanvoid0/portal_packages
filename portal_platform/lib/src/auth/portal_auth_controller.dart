@@ -152,19 +152,29 @@ class PortalAuthController extends GetxController {
     }
   }
 
-  /// Maps native Google Sign-In failures to actionable copy (e.g. ApiException 10).
+  /// Maps a native Google Sign-In failure to something a person can act on.
+  ///
+  /// `e.message`, not `e.details`, is where google_sign_in 6.x puts the GMS
+  /// text ("com.google.android.gms.common.api.ApiException: 10: "), and
+  /// showing it raw is what this used to do. The developer detail — which
+  /// OAuth client is missing — goes to the log, not the screen.
   static String _googleSignInPlatformErrorMessage(PlatformException e) {
-    final details = e.details?.toString() ?? '';
-    // Android: com.google.android.gms.common.api.ApiException: 10 (DEVELOPER_ERROR)
-    if (details.contains('ApiException: 10') ||
-        details.contains('DEVELOPER_ERROR')) {
-      return 'Google Sign-In is misconfigured in Google Cloud. Create an '
-          'Android OAuth client for this app package name with the SHA-1 '
-          'of the keystore that signed this build (see docs/GOOGLE_SIGN_IN.md).';
+    final raw = '${e.code} ${e.message ?? ''} ${e.details ?? ''}';
+    developer.log(
+      'Google sign-in platform error: $raw',
+      name: 'PortalAuthController',
+    );
+    if (e.code == 'sign_in_canceled') return '';
+    if (e.code == 'network_error') {
+      return 'No internet connection. Check your connection and try again.';
     }
-    return e.message?.trim().isNotEmpty == true
-        ? e.message!.trim()
-        : 'Google sign-in failed. Please try again.';
+    // Android ApiException 10 (DEVELOPER_ERROR): no OAuth client for this
+    // package name + signing key. A user cannot fix it; email still works.
+    if (raw.contains('ApiException: 10') || raw.contains('DEVELOPER_ERROR')) {
+      return 'Google sign-in is not available in this build. '
+          'Sign in with your email and password instead.';
+    }
+    return 'Google sign-in failed. Please try again.';
   }
 
   Future<void> signInWithGoogle() async {
