@@ -10,15 +10,26 @@ import 'models/portal_notification_models.dart';
 
 typedef NotificationTapCallback = void Function(String? payload);
 
+/// A quick-action button tapped while the app was, or is now, in the
+/// foreground. Buttons with `opensApp: false` never reach this — see
+/// [PortalNotificationsConfig.onBackgroundResponse].
+typedef NotificationButtonCallback = void Function(
+  String buttonId,
+  String? payload,
+);
+
 /// Cross-platform wrapper around [FlutterLocalNotificationsPlugin].
 class PortalLocalNotifications {
   PortalLocalNotifications(
     this.config, {
     NotificationTapCallback? onNotificationTap,
-  }) : _onNotificationTap = onNotificationTap;
+    NotificationButtonCallback? onButtonTap,
+  })  : _onNotificationTap = onNotificationTap,
+        _onButtonTap = onButtonTap;
 
   final PortalNotificationsConfig config;
   final NotificationTapCallback? _onNotificationTap;
+  final NotificationButtonCallback? _onButtonTap;
 
   final _plugin = FlutterLocalNotificationsPlugin();
   var _initialized = false;
@@ -37,12 +48,31 @@ class PortalLocalNotifications {
     }
 
     final android = AndroidInitializationSettings(config.androidIcon);
-    const ios = DarwinInitializationSettings();
+    final ios = DarwinInitializationSettings(
+      notificationCategories: [
+        for (final set in config.buttonSets)
+          DarwinNotificationCategory(
+            _categoryId(set),
+            actions: [
+              for (final b in set)
+                DarwinNotificationAction.plain(
+                  b.id,
+                  b.label,
+                  options: {
+                    if (b.opensApp) DarwinNotificationActionOption.foreground,
+                  },
+                ),
+            ],
+          ),
+      ],
+    );
+    // A tap that cold-starts the app is replayed through this same callback
+    // by the plugin's initialize on both platforms — do not also poll
+    // getNotificationAppLaunchDetails, it fires the handler twice (measured).
     await _plugin.initialize(
       InitializationSettings(android: android, iOS: ios),
-      onDidReceiveNotificationResponse: (response) {
-        _onNotificationTap?.call(response.payload);
-      },
+      onDidReceiveNotificationResponse: _dispatch,
+      onDidReceiveBackgroundNotificationResponse: config.onBackgroundResponse,
     );
 
     await _createAndroidChannel();
@@ -111,18 +141,30 @@ class PortalLocalNotifications {
     }
   }
 
+  void _dispatch(NotificationResponse response) {
+    final actionId = response.actionId;
+    if (response.notificationResponseType ==
+            NotificationResponseType.selectedNotificationAction &&
+        actionId != null) {
+      _onButtonTap?.call(actionId, response.payload);
+      return;
+    }
+    _onNotificationTap?.call(response.payload);
+  }
+
   Future<void> showNow({
     required int notificationId,
     required String title,
     required String body,
     String? payload,
+    PortalNotificationOptions options = const PortalNotificationOptions(),
   }) async {
     await _ensureInitialized();
     await _plugin.show(
       notificationId,
       title,
       body,
-      _notificationDetails(),
+      _notificationDetails(body, options),
       payload: payload,
     );
   }
@@ -141,10 +183,17 @@ class PortalLocalNotifications {
       request.title,
       request.body,
       scheduled,
-      _notificationDetails(),
+      _notificationDetails(request.body, request.options),
       androidScheduleMode: scheduleMode,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: switch (request.options.repeat) {
+        PortalNotificationRepeat.none => null,
+        PortalNotificationRepeat.daily => DateTimeComponents.time,
+        PortalNotificationRepeat.weekly => DateTimeComponents.dayOfWeekAndTime,
+        PortalNotificationRepeat.monthly =>
+          DateTimeComponents.dayOfMonthAndTime,
+      },
       payload: request.payload,
     );
 
@@ -200,16 +249,44 @@ class PortalLocalNotifications {
     return _plugin.cancelAll();
   }
 
-  NotificationDetails _notificationDetails() {
+  NotificationDetails _notificationDetails(
+    String body,
+    PortalNotificationOptions o,
+  ) {
     return NotificationDetails(
       android: AndroidNotificationDetails(
         config.channelId,
         config.channelName,
         channelDescription: config.channelDescription,
+        // Long bodies expand instead of truncating to one line.
+        styleInformation: BigTextStyleInformation(body),
+        subText: o.subtitle,
+        silent: o.silent,
+        playSound: !o.silent,
+        ongoing: o.ongoing,
+        autoCancel: !o.ongoing,
+        actions: [
+          for (final b in o.buttons)
+            AndroidNotificationAction(
+              b.id,
+              b.label,
+              showsUserInterface: b.opensApp,
+              cancelNotification: b.dismisses,
+            ),
+        ],
       ),
-      iOS: const DarwinNotificationDetails(),
+      iOS: DarwinNotificationDetails(
+        subtitle: o.subtitle,
+        presentSound: !o.silent,
+        categoryIdentifier: o.buttons.isEmpty ? null : _categoryId(o.buttons),
+      ),
     );
   }
+
+  /// iOS category id for a button set — derived, so intents and config agree
+  /// without a shared registry. Order-sensitive on purpose.
+  static String _categoryId(List<PortalNotificationButton> buttons) =>
+      'portal.${buttons.map((b) => b.id).join('.')}';
 
   Future<void> _ensureInitialized() async {
     if (!_initialized) {

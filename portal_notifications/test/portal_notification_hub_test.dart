@@ -20,6 +20,7 @@ class _FakeLocal extends PortalLocalNotifications {
     required String title,
     required String body,
     String? payload,
+    PortalNotificationOptions options = const PortalNotificationOptions(),
   }) async {
     shown.add({
       'notificationId': notificationId,
@@ -138,5 +139,37 @@ void main() {
       hasLength(1),
     );
     expect(hub.entries.single.intentId, 'server-2');
+  });
+
+  test('button tap resolves intent and action from the stored entry', () async {
+    final local = _FakeLocal();
+    final presses = <(String, String?, PortalNotificationAction?)>[];
+    final hub = PortalNotificationHub(
+      local: local,
+      store: PortalNotificationStore(storageKey: 'test_button_entries'),
+      onButton: (id, intentId, action) => presses.add((id, intentId, action)),
+    );
+    await hub.init();
+
+    await hub.applyIntent(
+      PortalNotificationIntent(
+        id: 'bill-1',
+        source: PortalNotificationSource.app,
+        kind: PortalNotificationKind.immediate,
+        groupKey: 'bills',
+        title: 'Rent due',
+        body: 'Tomorrow',
+        action: PortalNotificationActions.openRouteAction(route: '/bills'),
+        options: const PortalNotificationOptions(
+          buttons: [PortalNotificationButton(id: 'paid', label: 'Mark paid')],
+        ),
+      ),
+    );
+
+    hub.handleButton('paid', local.shown.single['payload'] as String?);
+
+    expect(presses.single.$1, 'paid');
+    expect(presses.single.$2, 'bill-1');
+    expect(presses.single.$3?.type, PortalNotificationActions.openRoute);
   });
 }

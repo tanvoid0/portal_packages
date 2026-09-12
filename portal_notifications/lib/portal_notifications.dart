@@ -1,3 +1,8 @@
+// Only the type a background button handler receives; everything else stays
+// behind the wrapper.
+export 'package:flutter_local_notifications/flutter_local_notifications.dart'
+    show NotificationResponse;
+
 export 'src/config/portal_notifications_config.dart';
 export 'src/models/portal_notification_models.dart';
 export 'src/portal_local_notifications.dart';

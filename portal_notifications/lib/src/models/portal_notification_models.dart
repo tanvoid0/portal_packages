@@ -79,6 +79,7 @@ class PortalNotificationIntent {
     required this.body,
     this.fireAt,
     this.action,
+    this.options = const PortalNotificationOptions(),
   });
 
   /// Stable id for dedup/sync (server-provided or app-generated).
@@ -92,6 +93,7 @@ class PortalNotificationIntent {
   /// Required for [PortalNotificationKind.scheduledEvent]; optional for action.
   final DateTime? fireAt;
   final PortalNotificationAction? action;
+  final PortalNotificationOptions options;
 
   bool get isImmediate =>
       kind == PortalNotificationKind.immediate ||
@@ -229,6 +231,7 @@ class ScheduleNotificationRequest {
     required this.body,
     required this.fireAt,
     this.payload,
+    this.options = const PortalNotificationOptions(),
   });
 
   final int notificationId;
@@ -237,4 +240,56 @@ class ScheduleNotificationRequest {
   final String body;
   final DateTime fireAt;
   final String? payload;
+  final PortalNotificationOptions options;
+}
+
+/// A quick-action button rendered on the OS notification.
+///
+/// [opensApp] true: tapping brings the app to the foreground and the hub's
+/// `onButton` fires. false: handled in a background isolate by
+/// [PortalNotificationsConfig.onBackgroundResponse]; the app never opens.
+class PortalNotificationButton {
+  const PortalNotificationButton({
+    required this.id,
+    required this.label,
+    this.opensApp = true,
+    this.dismisses = true,
+  });
+
+  final String id;
+  final String label;
+  final bool opensApp;
+
+  /// Remove the notification once the button is tapped.
+  final bool dismisses;
+}
+
+/// OS-level repeat for a scheduled notification. The first delivery is
+/// `fireAt`; later ones match its time (daily), weekday+time (weekly) or
+/// day-of-month+time (monthly).
+enum PortalNotificationRepeat { none, daily, weekly, monthly }
+
+/// Presentation knobs shared by every notification the package shows.
+class PortalNotificationOptions {
+  const PortalNotificationOptions({
+    this.buttons = const [],
+    this.repeat = PortalNotificationRepeat.none,
+    this.subtitle,
+    this.silent = false,
+    this.ongoing = false,
+  });
+
+  /// Up to three on Android; the same set must be listed in
+  /// [PortalNotificationsConfig.buttonSets] for iOS to render it.
+  final List<PortalNotificationButton> buttons;
+  final PortalNotificationRepeat repeat;
+
+  /// Android `subText` / iOS `subtitle` — a small line under the title.
+  final String? subtitle;
+
+  /// No sound, no heads-up.
+  final bool silent;
+
+  /// Cannot be swiped away (progress, live timers). Tap-to-dismiss is off too.
+  final bool ongoing;
 }
