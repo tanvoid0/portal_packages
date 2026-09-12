@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:local_auth_android/local_auth_android.dart';
@@ -54,7 +54,11 @@ class DeviceSecurityService {
           biometricOnly: false,
         ),
       );
-    } on PlatformException {
+    } on PlatformException catch (e) {
+      // `no_fragment_activity` here means the host app's MainActivity is a
+      // FlutterActivity — local_auth needs FlutterFragmentActivity. Swallowed
+      // to `false` for the caller; logged so it is not a mystery.
+      debugPrint('DeviceSecurityService.authenticate: ${e.code} ${e.message}');
       return false;
     } on MissingPluginException {
       return false;
