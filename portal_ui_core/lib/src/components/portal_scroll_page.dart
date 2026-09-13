@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/portal_ui_theme.dart';
+import 'portal_app_bar.dart';
 
 /// Standard scrolling page: sliver app bar, gutter-aligned content, bottom
 /// clearance for the floating nav, optional pull-to-refresh.
@@ -14,8 +15,10 @@ class PortalScrollPage extends StatelessWidget {
     super.key,
     required this.children,
     this.title,
+    this.subtitle,
     this.appBar,
-    this.actions,
+    this.actions = const [],
+    this.trailing,
     this.onRefresh,
     this.padding,
     this.backgroundColor,
@@ -26,14 +29,19 @@ class PortalScrollPage extends StatelessWidget {
   /// Content slivers' children, laid out in a list under the app bar.
   final List<Widget> children;
 
-  /// Title for the default sliver app bar. Ignored when [appBar] is given.
+  /// Title for the default [PortalSliverAppBar]. Ignored when [appBar] is given.
   final String? title;
+  final String? subtitle;
 
   /// A custom sliver app bar. Supply this when the app dresses its own —
   /// it must be a sliver.
   final Widget? appBar;
 
-  final List<Widget>? actions;
+  /// Actions for the default bar; overflow past two into the action sheet.
+  final List<PortalAction> actions;
+
+  /// Non-action widgets in the bar (search, sync dot). See [PortalAppBar].
+  final List<Widget>? trailing;
 
   /// Enables pull-to-refresh. Omit for a page that has nothing to refetch.
   final Future<void> Function()? onRefresh;
@@ -55,10 +63,11 @@ class PortalScrollPage extends StatelessWidget {
     final bar = appBar ??
         (title == null
             ? null
-            : SliverAppBar(
-                pinned: true,
-                title: Text(title!),
+            : PortalSliverAppBar(
+                title: title!,
+                subtitle: subtitle,
                 actions: actions,
+                trailing: trailing,
               ));
 
     final scroll = CustomScrollView(

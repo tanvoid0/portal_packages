@@ -196,6 +196,56 @@ void main() {
     expect(find.text('row'), findsOneWidget);
   });
 
+  testWidgets('app bar keeps two actions inline and overflows the third',
+      (t) async {
+    PortalAction action(String label, VoidCallback? f) =>
+        PortalAction(icon: Icons.star, label: label, onPressed: f);
+
+    // Two fit: both inline, no More button.
+    await t.pumpWidget(_host(Scaffold(
+      appBar: PortalAppBar(
+        title: 'Recipes',
+        subtitle: 'Cookbook',
+        actions: [action('Share', () {}), action('Edit', () {})],
+      ),
+    )));
+    expect(find.byTooltip('Share'), findsOneWidget);
+    expect(find.byTooltip('Edit'), findsOneWidget);
+    expect(find.byTooltip('More'), findsNothing);
+    expect(find.text('Cookbook'), findsOneWidget);
+
+    // Three: first stays, the rest move to the sheet, disabled stays disabled.
+    var deleted = false;
+    await t.pumpWidget(_host(Scaffold(
+      appBar: PortalAppBar(
+        title: 'Recipes',
+        actions: [
+          action('Share', () {}),
+          action('Edit', null),
+          PortalAction(
+            icon: Icons.delete,
+            label: 'Delete',
+            destructive: true,
+            onPressed: () => deleted = true,
+          ),
+        ],
+      ),
+    )));
+    expect(find.byTooltip('Share'), findsOneWidget);
+    expect(find.byTooltip('Edit'), findsNothing);
+    expect(find.byTooltip('More'), findsOneWidget);
+
+    await t.tap(find.byTooltip('More'));
+    await t.pumpAndSettle();
+    expect(find.text('Edit'), findsOneWidget);
+    expect(t.widget<ListTile>(find.widgetWithText(ListTile, 'Edit')).enabled,
+        isFalse);
+    await t.tap(find.text('Delete'));
+    await t.pumpAndSettle();
+    expect(deleted, isTrue);
+    expect(find.byType(ListTile), findsNothing, reason: 'sheet closed');
+  });
+
   testWidgets('list skeleton survives an unbounded sliver when shrinkWrap is set',
       (t) async {
     // How every recipe list uses it. Without shrinkWrap the ListView gets

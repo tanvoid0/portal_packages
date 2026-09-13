@@ -34,6 +34,7 @@ export 'src/tokens/design_tokens.dart';
 export 'src/tokens/portal_radii_utils.dart';
 export 'src/shapes/portal_wave_header_clipper.dart';
 export 'src/shapes/portal_diagonal_card_clipper.dart';
+export 'src/components/portal_app_bar.dart';
 export 'src/components/portal_bottom_nav_bar.dart';
 export 'src/components/portal_button.dart';
 export 'src/components/portal_card.dart';
