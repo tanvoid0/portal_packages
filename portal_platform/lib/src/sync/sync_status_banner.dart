@@ -77,7 +77,7 @@ class _Strip extends StatelessWidget {
   String get _label {
     if (!online) {
       return pending == 0
-          ? "You're offline — showing saved recipes"
+          ? "You're offline — showing saved data"
           : "You're offline — ${_changes(pending)} waiting to sync";
     }
     return syncing
