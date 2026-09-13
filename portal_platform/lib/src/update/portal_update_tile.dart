@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -276,49 +275,25 @@ Future<bool> showPortalUpdateDialog(
   }
   if (!context.mounted) return false;
 
-  final progress = ValueNotifier<double>(-1);
-  // Not awaited: this dialog stays up until the download finishes and the
-  // `finally` below pops it. barrierDismissible is false, so it cannot close
-  // on its own and leave that pop to dismiss the wrong route.
-  unawaited(
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Downloading'),
-        content: ValueListenableBuilder<double>(
-          valueListenable: progress,
-          builder: (context, value, _) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              LinearProgressIndicator(value: value < 0 ? null : value),
-              const SizedBox(height: 12),
-              Text(value < 0 ? '' : '${(value * 100).round()}%'),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-
   String? error;
-  File? apk;
   try {
-    apk = await service.download(release, onProgress: (p) => progress.value = p);
-    await service.install(apk);
+    await service.install(release);
   } on PortalUpdateException catch (e) {
     error = e.message;
   } catch (e) {
     error = 'Update failed: $e';
-  } finally {
-    progress.dispose();
-    if (context.mounted) Navigator.of(context).pop();
   }
 
-  if (error != null && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
-    return false;
-  }
+  if (!context.mounted) return error == null;
+  // The browser has the download now; the install sheet appears when the
+  // user opens it, so the one thing left to say is where to look.
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        error ?? 'Downloading in your browser. Open it when it finishes to install.',
+      ),
+    ),
+  );
   return error == null;
 }
 

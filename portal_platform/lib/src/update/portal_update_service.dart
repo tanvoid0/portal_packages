@@ -1,11 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:cryptography/cryptography.dart';
 import 'package:http/http.dart' as http;
-import 'package:android_package_installer/android_package_installer.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/api_client.dart';
 import '../widgets/portal_app_version.dart';
@@ -167,114 +165,25 @@ class PortalUpdateService {
     }
   }
 
-  /// Downloads [release] to a temporary file, verifying its SHA-256.
+  /// Hands [release] to the browser, which downloads the APK and, once the
+  /// user taps the finished download, opens Android's install sheet.
   ///
-  /// [onProgress] receives 0.0–1.0, or -1 while the total size is unknown.
-  /// Throws [PortalUpdateException] on a bad transfer.
-  Future<File> download(
-    PortalRelease release, {
-    void Function(double progress)? onProgress,
-  }) async {
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/${release.slug}-${release.versionCode}.apk');
-    // A previous half-finished attempt would otherwise be appended to and
-    // then fail its hash for a reason nobody could diagnose.
-    if (await file.exists()) await file.delete();
-
-    final request = http.Request('GET', release.apkUrl);
-    final response = await _client.send(request);
-    if (response.statusCode != 200) {
-      throw PortalUpdateException(
-        'Download failed with HTTP ${response.statusCode}.',
-      );
+  /// The app used to download and install the APK itself through the
+  /// PackageInstaller session API. That needs REQUEST_INSTALL_PACKAGES, and
+  /// on 2026-09-13 Play Protect began rejecting every sideloaded Portal build
+  /// that held it -- "this app can install potentially harmful apps" -- with
+  /// no way to allow it. Without the permission no in-app route works, so
+  /// the browser (which has it) does the installing. The in-app SHA-256 check
+  /// went with the download; the release host is https and the manifest
+  /// still carries the digest for anyone who wants to check by hand.
+  Future<void> install(PortalRelease release) async {
+    final opened = await launchUrl(
+      release.apkUrl,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened) {
+      throw const PortalUpdateException('No browser could open the download.');
     }
-
-    final expectedBytes = response.contentLength ?? release.sizeBytes;
-    final out = file.openWrite();
-    var received = 0;
-
-    try {
-      await for (final chunk in response.stream) {
-        out.add(chunk);
-        received += chunk.length;
-        onProgress?.call(expectedBytes > 0 ? received / expectedBytes : -1);
-      }
-      await out.flush();
-    } finally {
-      await out.close();
-    }
-
-    // Hashed by reading the file back, not by digesting the chunks on their
-    // way past. Those are not the same check: a short or failed write leaves a
-    // truncated APK on disk that a stream digest still calls valid, and the
-    // installer then rejects it with nothing more useful than "App not
-    // installed". Streamed off disk, so a large APK is never held in memory.
-    final onDisk = await file.length();
-    if (release.sizeBytes > 0 && onDisk != release.sizeBytes) {
-      await file.delete();
-      throw PortalUpdateException(
-        'The download is $onDisk bytes but should be ${release.sizeBytes}. '
-        'It was discarded.',
-      );
-    }
-
-    final hashSink = Sha256().newHashSink();
-    await for (final chunk in file.openRead()) {
-      hashSink.add(chunk);
-    }
-    hashSink.close();
-    final digest = await hashSink.hash();
-    final actual = _hex(digest.bytes);
-
-    // A release with no usable checksum never survives parsing, so this is a
-    // real comparison every time rather than one that quietly skips itself.
-    if (actual != release.sha256) {
-      await file.delete();
-      throw const PortalUpdateException(
-        'The download did not match its checksum and was discarded.',
-      );
-    }
-    return file;
-  }
-
-  /// Hands [apk] to Android's package installer and waits for its verdict.
-  ///
-  /// Android shows its own confirmation, and the first time will send the user
-  /// to "Install unknown apps" for this app. Nothing installs silently.
-  ///
-  /// Goes through the PackageInstaller *session* API. An `ACTION_VIEW` intent
-  /// with the apk mime type is the older, more obvious route, and on current
-  /// Android it opens the installer and then fails the commit with nothing but
-  /// "App not installed" — which is indistinguishable from a corrupt download.
-  ///
-  /// The status arrives on the host activity's `onNewIntent`, so each app's
-  /// launcher activity must declare the plugin's intent filter (see the app
-  /// manifests). Without it this call never completes.
-  Future<void> install(File apk) async {
-    final code = await AndroidPackageInstaller.installApk(apkFilePath: apk.path);
-    if (code == null) {
-      throw const PortalUpdateException('The installer did not respond.');
-    }
-    final status = PackageInstallerStatus.byCode(code);
-    if (status == PackageInstallerStatus.success) return;
-
-    throw PortalUpdateException(switch (status) {
-      PackageInstallerStatus.failureAborted =>
-        'Installation was cancelled.',
-      PackageInstallerStatus.failureBlocked =>
-        'Android blocked the install. Check Play Protect and that this app is '
-            'allowed to install unknown apps.',
-      PackageInstallerStatus.failureConflict =>
-        'A conflicting copy of this app is already installed. Uninstall it, '
-            'then try again.',
-      PackageInstallerStatus.failureIncompatible =>
-        'That build is not compatible with this device.',
-      PackageInstallerStatus.failureStorage =>
-        'Not enough storage to install the update.',
-      PackageInstallerStatus.failureInvalid =>
-        'The downloaded package was rejected as invalid.',
-      _ => 'The install did not complete (${status.name}).',
-    });
   }
 
   /// Version the user said "Not now" to, so the launch check stays quiet.
@@ -313,9 +222,6 @@ class PortalUpdateService {
     final prefs = await SharedPreferences.getInstance();
     return (prefs.getInt(_dismissedKey) ?? -1) >= versionCode;
   }
-
-  static String _hex(List<int> bytes) =>
-      bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 
   void dispose() => _client.close();
 }

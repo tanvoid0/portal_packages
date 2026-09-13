@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -213,18 +214,8 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
     await _probeInstalled();
   }
 
-  /// Downloads every app that is not installed, then hands them to Android's
-  /// installer one after another.
-  ///
-  /// Two phases on purpose. Downloading is the slow, unattended part and the
-  /// part that can fail on its own terms — a bad checksum, a dead network — so
-  /// it finishes before the user is asked to do anything. They then sit through
-  /// the confirmations back to back instead of waiting out a download between
-  /// each one.
-  ///
-  /// Serial in both phases. Android's PackageInstaller reports its verdict
-  /// through the host activity's onNewIntent, so two sessions in flight would
-  /// have no way to tell which answer belonged to which app.
+  /// Hands every app that is not installed to the browser, one download
+  /// after another. The install sheets come when the user opens each one.
   Future<void> _runInstallAll(List<PortalRelease> pending) async {
     setState(() => _batching = true);
     try {
@@ -236,74 +227,16 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
 
   Future<void> _installAll(List<PortalRelease> pending) async {
     final labels = widget.labels;
-    final status = ValueNotifier<String>('');
-    final progress = ValueNotifier<double>(-1);
-
-    unawaited(
-      showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: Text(labels.installAll),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ValueListenableBuilder<String>(
-                valueListenable: status,
-                builder: (context, value, _) => Text(value),
-              ),
-              const SizedBox(height: 12),
-              ValueListenableBuilder<double>(
-                valueListenable: progress,
-                builder: (context, value, _) =>
-                    LinearProgressIndicator(value: value < 0 ? null : value),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    // Kept in order so the install prompts arrive in the order the list showed.
-    final downloaded = <PortalRelease, File>{};
     final failed = <String>[];
-
-    for (var i = 0; i < pending.length; i++) {
-      final release = pending[i];
-      status.value =
-          '${labels.downloading} ${i + 1}/${pending.length} — ${release.displayName}';
-      progress.value = -1;
+    var opened = 0;
+    for (final release in pending) {
       try {
-        downloaded[release] = await widget.service.download(
-          release,
-          onProgress: (p) => progress.value = p,
-        );
+        await widget.service.install(release);
+        opened++;
       } catch (e) {
-        // One bad download must not cost the user the other four. Its name is
-        // carried to the summary rather than thrown away.
+        // One refused hand-off must not cost the user the other four. Its
+        // name is carried to the summary rather than thrown away.
         failed.add(release.displayName);
-      }
-    }
-
-    if (mounted) Navigator.of(context).pop();
-    status.dispose();
-    progress.dispose();
-
-    var installed = 0;
-    for (final entry in downloaded.entries) {
-      try {
-        await widget.service.install(entry.value);
-        installed++;
-      } catch (e) {
-        // Includes the user declining a prompt, which is a normal answer and
-        // not worth interrupting the remaining ones over.
-        failed.add(entry.key.displayName);
-      } finally {
-        // ~65 MB each. Leaving five of them in the cache directory because the
-        // install already read the bytes would be a rude way to save a line.
-        try {
-          if (await entry.value.exists()) await entry.value.delete();
-        } catch (_) {}
       }
     }
 
@@ -311,8 +244,8 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
     if (!mounted) return;
 
     final summary = failed.isEmpty
-        ? '${labels.installAllDone} ($installed)'
-        : '${labels.installAllDone} ($installed) — '
+        ? '${labels.installAllDone} ($opened)'
+        : '${labels.installAllDone} ($opened) — '
             '${labels.installAllFailed}: ${failed.join(', ')}';
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(summary)));
   }
