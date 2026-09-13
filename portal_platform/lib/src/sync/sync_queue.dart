@@ -219,6 +219,11 @@ class SyncQueue extends GetxService {
           }));
 
   /// Remove a single completed operation by its [operationId].
+  /// Whether [operationId] is still queued.
+  Future<bool> contains(String operationId) =>
+      _withLock(() => PortalDatabase.transaction((txn) async =>
+          (await _load(txn)).any((o) => o.id == operationId)));
+
   Future<void> remove(String operationId) async {
     final count = await _withLock(() => PortalDatabase.transaction((txn) async {
           final ops = await _load(txn);

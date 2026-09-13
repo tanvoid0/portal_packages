@@ -169,6 +169,16 @@ abstract class SyncableRepository<T> implements Syncable {
   Map<String, dynamic> toWireJson(T entity, {required bool isCreate}) =>
       toJson(entity);
 
+  /// The server's last-modified stamp for [entity], if the model keeps one.
+  ///
+  /// Override to opt this type into newest-wins: when a refresh finds an
+  /// entity with a queued local write, the server copy wins — and the queued
+  /// write is dropped — only if this stamp is later than the moment the
+  /// device wrote its copy. Null (the default) keeps the pending copy
+  /// unconditionally, which is the honest rule when there is nothing to
+  /// compare against. See docs/PORTAL_WEB_PORTING.md §8.2.
+  DateTime? updatedAt(T entity) => null;
+
   /// Query parameters applied to every **collection** read (`getAll` and the
   /// pull half of [sync]), for repositories that own only a slice of a shared
   /// endpoint — e.g. `{'source': 'recipe'}` on a shared shopping list.
@@ -207,7 +217,7 @@ abstract class SyncableRepository<T> implements Syncable {
         final pendingOps = await syncQueue.getByEntityType(entityType);
         final merged = pendingOps.isEmpty
             ? serverList
-            : _mergeWithPending(serverList, await readCache(), pendingOps);
+            : await _mergeWithPending(serverList, pendingOps);
         await writeCache(merged);
         _lastReadError = null;
         return merged;
@@ -412,6 +422,10 @@ abstract class SyncableRepository<T> implements Syncable {
     var pushed = 0;
     var rejected = 0;
     for (final op in ops) {
+      // A concurrent refresh may have dropped this op in favour of a newer
+      // server copy since the snapshot above; pushing it anyway would clobber
+      // exactly the write the merge chose to keep.
+      if (!await syncQueue.contains(op.id)) continue;
       try {
         switch (op.type) {
           case SyncOperationType.create:
@@ -487,13 +501,7 @@ abstract class SyncableRepository<T> implements Syncable {
   /// Fetch the full entity list from the server and merge it into the
   /// local cache.
   ///
-  /// Merge strategy:
-  ///  * Entities with **no** pending local operations → overwritten by
-  ///    the server version (last-write-wins).
-  ///  * Entities with **pending** operations → the local version is
-  ///    kept to avoid clobbering un-pushed changes.
-  ///  * Locally-created entities that don't exist on the server yet →
-  ///    preserved until their create operation succeeds.
+  /// Merge strategy: see [_mergeWithPending].
   Future<void> _pullFromServer() async {
     try {
       final data = await api.get(apiBasePath, queryParams: listQueryParams);
@@ -507,33 +515,70 @@ abstract class SyncableRepository<T> implements Syncable {
         return;
       }
 
-      await writeCache(
-        _mergeWithPending(serverList, await readCache(), pendingOps),
-      );
+      await writeCache(await _mergeWithPending(serverList, pendingOps));
     } catch (e) {
       debugPrint('[$entityType] Pull from server failed: $e');
     }
   }
 
-  /// Merge a freshly-fetched [serverList] with [localCache], keeping the
-  /// local version of any entity with a pending [SyncOperation] — used by
-  /// both [getAll] and [_pullFromServer] so a server refresh can never
-  /// clobber a write that hasn't synced yet.
-  List<T> _mergeWithPending(
+  /// Merge a freshly-fetched [serverList] with the local cache — used by
+  /// both [getAll] and [_pullFromServer] so a server refresh cannot clobber
+  /// a write that has not synced yet.
+  ///
+  ///  * No pending operation → the server copy.
+  ///  * Pending delete → the entity is gone locally and stays gone; it does
+  ///    not resurrect from the server list while the delete waits.
+  ///  * Pending create/update → the local copy, **unless** [updatedAt] says
+  ///    the server copy was modified after this device wrote its own, in
+  ///    which case the server copy wins and the queued operations for that
+  ///    id are dropped (replaying them would clobber the newer write).
+  ///    Without a stamp on either side the local copy wins, as before.
+  ///  * Locally-created entities the server does not have yet → kept until
+  ///    their create succeeds.
+  ///
+  /// Device clock against server clock is the comparison; the doc accepts
+  /// that. A pending delete is only ever kept, never dropped, because a
+  /// deleted row has no local stamp left to compare.
+  Future<List<T>> _mergeWithPending(
     List<T> serverList,
-    List<T> localCache,
     List<SyncOperation> pendingOps,
-  ) {
-    final pendingIds = pendingOps.map((o) => o.entityId).toSet();
+  ) async {
+    final localCache = await readCache();
+    final localWrittenAt = await PortalDatabase.readUpdatedAt(scopedCacheKey);
+    final opsById = <String, List<SyncOperation>>{};
+    for (final op in pendingOps) {
+      opsById.putIfAbsent(op.entityId, () => []).add(op);
+    }
     final serverMap = {for (final e in serverList) getId(e): e};
     final merged = <T>[];
 
     for (final entry in serverMap.entries) {
-      if (pendingIds.contains(entry.key)) {
-        final local = localCache.where((e) => getId(e) == entry.key);
-        merged.add(local.isNotEmpty ? local.first : entry.value);
-      } else {
+      final ops = opsById[entry.key];
+      if (ops == null) {
         merged.add(entry.value);
+        continue;
+      }
+      if (ops.any((o) => o.type == SyncOperationType.delete)) continue;
+
+      final local = localCache.where((e) => getId(e) == entry.key);
+      if (local.isEmpty) {
+        merged.add(entry.value);
+        continue;
+      }
+      final serverStamp = updatedAt(entry.value);
+      final localStamp = localWrittenAt[entry.key];
+      if (serverStamp != null &&
+          localStamp != null &&
+          serverStamp.millisecondsSinceEpoch > localStamp &&
+          await _stillQueuedAsSeen(ops)) {
+        debugPrint('[$entityType] ${entry.key}: server copy is newer, '
+            'dropping ${ops.length} queued op(s)');
+        for (final op in ops) {
+          await syncQueue.remove(op.id);
+        }
+        merged.add(entry.value);
+      } else {
+        merged.add(local.first);
       }
     }
 
@@ -546,6 +591,26 @@ abstract class SyncableRepository<T> implements Syncable {
     }
 
     return merged;
+  }
+
+  /// True when every op in [seen] is still queued with the payload the merge
+  /// based its decision on. A `save` that lands between reading the stamps
+  /// and dropping the ops merges into the *same* op id with a newer payload
+  /// (see `SyncQueue._merge`), and the stamp we compared is then stale — so
+  /// the drop is refused and the local copy wins, as it would have before.
+  // ponytail: a re-read, not a lock — the window is two SQLite awaits wide;
+  // take the merge under SyncQueue's lock if a real race ever shows up.
+  Future<bool> _stillQueuedAsSeen(List<SyncOperation> seen) async {
+    final live = {
+      for (final o in await syncQueue.getByEntityType(entityType)) o.id: o,
+    };
+    for (final op in seen) {
+      final now = live[op.id];
+      if (now == null || jsonEncode(now.data) != jsonEncode(op.data)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   // ─── Cache helpers ─────────────────────────────────────────────────

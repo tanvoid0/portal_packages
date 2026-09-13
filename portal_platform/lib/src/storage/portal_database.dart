@@ -130,6 +130,22 @@ abstract final class PortalDatabase {
     return [for (final r in rows) r['payload'] as String];
   }
 
+  /// `entity_id` → `updated_at` (device epoch ms) for every row in [store]:
+  /// when this device last wrote a *different* payload for that entity. The
+  /// newest-wins merge compares it against the server's own stamp.
+  static Future<Map<String, int>> readUpdatedAt(String store) async {
+    final db = await instance;
+    final rows = await db.query(
+      'entities',
+      columns: ['entity_id', 'updated_at'],
+      where: 'store = ?',
+      whereArgs: [store],
+    );
+    return {
+      for (final r in rows) r['entity_id'] as String: r['updated_at'] as int,
+    };
+  }
+
   /// Replace the contents of [store] with [rows], in order.
   ///
   /// Mark-and-sweep rather than delete-all-then-insert: a row whose payload
