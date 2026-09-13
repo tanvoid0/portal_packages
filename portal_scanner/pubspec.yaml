@@ -1,0 +1,19 @@
+name: portal_scanner
+description: Native document scanner (ML Kit on Android, VisionKit on iOS) returning PDF or JPEG bytes for Portal apps.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ">=3.8.1 <4.0.0"
+  flutter: ">=3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Wraps the platform scanners; edge detection, crop, filters and page review
+  # are all native UI. Falls back to a bundled scanner on Android devices
+  # without Play services.
+  cunning_document_scanner: ^3.0.2
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
