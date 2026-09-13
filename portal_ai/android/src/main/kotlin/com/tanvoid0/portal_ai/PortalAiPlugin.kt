@@ -1,9 +1,14 @@
 package com.tanvoid0.portal_ai
 
+import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import io.flutter.plugin.common.PluginRegistry
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -15,10 +20,16 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class PortalAiPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
+class PortalAiPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware,
+    PluginRegistry.RequestPermissionsResultListener {
     private lateinit var channel: MethodChannel
     private lateinit var streamChannel: EventChannel
+    private lateinit var listenChannel: EventChannel
     private lateinit var context: Context
+    private lateinit var voice: Voice
+
+    private var activityBinding: ActivityPluginBinding? = null
+    private var pendingMicrophone: MethodChannel.Result? = null
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val systemAi = SystemAi()
@@ -29,6 +40,16 @@ class PortalAiPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         channel.setMethodCallHandler(this)
         streamChannel = EventChannel(binding.binaryMessenger, "portal_ai/generate_stream")
         streamChannel.setStreamHandler(GenerateStreamHandler(systemAi))
+        voice = Voice(context)
+        listenChannel = EventChannel(binding.binaryMessenger, "portal_ai/listen")
+        listenChannel.setStreamHandler(object : EventChannel.StreamHandler {
+            override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                val sink = events ?: return
+                voice.listen(sink, (arguments as? Map<*, *>)?.get("locale") as? String)
+            }
+
+            override fun onCancel(arguments: Any?) = voice.stopListening()
+        })
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -69,8 +90,78 @@ class PortalAiPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                     }
                 }
             }
+            "describeVoice" -> scope.launch {
+                result.success(voice.describe())
+            }
+            "requestMicrophone" -> requestMicrophone(result)
+            "speak" -> {
+                val text = call.argument<String>("text")
+                if (text.isNullOrBlank()) {
+                    result.error("INVALID", "text required", null)
+                    return
+                }
+                val flush = call.argument<Boolean>("flush") ?: true
+                scope.launch {
+                    try {
+                        result.success(voice.speak(text, flush))
+                    } catch (e: Throwable) {
+                        result.error("SPEAK_FAILED", e.message, null)
+                    }
+                }
+            }
+            "setVoiceRate" -> {
+                voice.setRate(call.argument<Double>("rate") ?: 1.0)
+                result.success(null)
+            }
+            "stopSpeaking" -> {
+                voice.stopSpeaking()
+                result.success(null)
+            }
             else -> result.notImplemented()
         }
+    }
+
+    /** True once the microphone is granted; false when denied or with no activity to ask from. */
+    private fun requestMicrophone(result: MethodChannel.Result) {
+        val granted = context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            result.success(true)
+            return
+        }
+        val activity: Activity? = activityBinding?.activity
+        if (activity == null || pendingMicrophone != null) {
+            result.success(false)
+            return
+        }
+        pendingMicrophone = result
+        activity.requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), MICROPHONE_REQUEST)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ): Boolean {
+        if (requestCode != MICROPHONE_REQUEST) return false
+        pendingMicrophone?.success(grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED)
+        pendingMicrophone = null
+        return true
+    }
+
+    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+        activityBinding = binding
+        binding.addRequestPermissionsResultListener(this)
+    }
+
+    override fun onDetachedFromActivityForConfigChanges() = onDetachedFromActivity()
+
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) =
+        onAttachedToActivity(binding)
+
+    override fun onDetachedFromActivity() {
+        activityBinding?.removeRequestPermissionsResultListener(this)
+        activityBinding = null
     }
 
     private fun isPackageInstalled(packageName: String): Boolean {
@@ -95,8 +186,14 @@ class PortalAiPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
         streamChannel.setStreamHandler(null)
+        listenChannel.setStreamHandler(null)
         systemAi.close()
+        voice.close()
         scope.cancel()
+    }
+
+    private companion object {
+        const val MICROPHONE_REQUEST = 0x50a1
     }
 }
 

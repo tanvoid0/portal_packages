@@ -25,6 +25,12 @@ class AiChatLabels {
     this.moreIdeas = 'More ideas',
     this.shuffle = 'Shuffle',
     this.attach = 'Attach a photo',
+    this.speak = 'Speak',
+    this.stopListening = 'Stop listening',
+    this.listening = 'Listening…',
+    this.speaking = 'Speaking…',
+    this.captionsOn = 'Show captions',
+    this.captionsOff = 'Hide captions',
     this.consentBlocked = 'Accept the notice above to start',
     this.searchHint = 'Search chats',
     this.today = 'Today',
@@ -99,6 +105,15 @@ class AiChatLabels {
   final String shuffle;
 
   final String attach;
+
+  /// The microphone, drawn only when the device can hear and talk back
+  /// without a server. [listening] replaces the hint while it hears.
+  final String speak;
+  final String stopListening;
+  final String listening;
+  final String speaking;
+  final String captionsOn;
+  final String captionsOff;
 
   /// Composer hint while the consent card is still unanswered.
   final String consentBlocked;

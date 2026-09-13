@@ -1,9 +1,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.tanvoid0.portal_ai">
+    <!-- Voice conversation: the on-device recognizer records; asked for at first tap. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Required on API 30+ for isPackageInstalled(Edge Gallery). -->
     <queries>
         <package android:name="com.google.ai.edge.gallery" />
         <!-- AICore hosts the on-device model ML Kit GenAI talks to. -->
         <package android:name="com.google.android.aicore" />
+        <!-- Speech services are found by intent; without these entries API 30+
+             hides them and voice reports itself unavailable. -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
     </queries>
 </manifest>

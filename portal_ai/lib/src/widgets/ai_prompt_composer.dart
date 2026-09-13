@@ -21,12 +21,16 @@ class AiPromptComposer extends StatelessWidget {
     this.busy = false,
     this.onStop,
     this.onAttach,
+    this.onMic,
+    this.listening = false,
     this.maxLength,
     this.hintText = '',
     this.submitLabel,
     this.minChars = 1,
     this.stopLabel = 'Stop',
     this.attachLabel = 'Attach a photo',
+    this.micLabel = 'Speak',
+    this.micStopLabel = 'Stop listening',
     this.bordered = false,
   });
 
@@ -50,6 +54,13 @@ class AiPromptComposer extends StatelessWidget {
   /// Adds an attachment button to the footer. Null draws none.
   final VoidCallback? onAttach;
 
+  /// Toggles a voice conversation. Null draws no microphone -- the page
+  /// leaves it null unless the device can hear and speak on its own.
+  final VoidCallback? onMic;
+
+  /// The voice conversation is on: the microphone draws selected.
+  final bool listening;
+
   /// Caps the field and shows `n/max` in the footer.
   final int? maxLength;
 
@@ -63,6 +74,8 @@ class AiPromptComposer extends StatelessWidget {
 
   final String stopLabel;
   final String attachLabel;
+  final String micLabel;
+  final String micStopLabel;
 
   /// Wraps the field in the accent-bordered card portal_task's landing uses.
   /// The assistant page's own outlined field is the default.
@@ -106,7 +119,14 @@ class AiPromptComposer extends StatelessWidget {
         border: bordered ? InputBorder.none : const OutlineInputBorder(),
         isDense: bordered,
         // With a footer there is a submit button down there already.
-        suffixIcon: showFooter ? null : _live(_submitButton),
+        suffixIcon: showFooter
+            ? null
+            : onMic == null
+            ? _live(_submitButton)
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [_micButton(), _live(_submitButton)],
+              ),
       ),
     );
 
@@ -128,6 +148,7 @@ class AiPromptComposer extends StatelessWidget {
                   ),
                 ),
               const Spacer(),
+              if (onMic != null) _micButton(),
               if (onAttach case final attach?)
                 IconButton(
                   tooltip: attachLabel,
@@ -157,6 +178,16 @@ class AiPromptComposer extends StatelessWidget {
   Widget _live(Widget Function(BuildContext) build) => ListenableBuilder(
     listenable: controller,
     builder: (context, _) => build(context),
+  );
+
+  /// Selected while the conversation is on, so a screen reader hears the
+  /// state and not just the icon.
+  Widget _micButton() => IconButton(
+    tooltip: listening ? micStopLabel : micLabel,
+    onPressed: enabled && !busy ? onMic : null,
+    isSelected: listening,
+    icon: Icon(listening ? Icons.mic : Icons.mic_none),
+    visualDensity: VisualDensity.compact,
   );
 
   Widget _submitButton(BuildContext context) {

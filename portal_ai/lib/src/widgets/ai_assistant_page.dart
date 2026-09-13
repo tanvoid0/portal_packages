@@ -8,10 +8,12 @@ import '../chat/ai_chat_export.dart';
 import '../chat/ai_chat_session.dart';
 import '../chat/ai_error_message.dart';
 import '../chat/ai_proposal.dart';
+import '../chat/ai_voice_session.dart';
 import '../chat/ai_suggestion.dart';
 import '../clients/ai_completion_client.dart';
 import '../documents/ai_document_client.dart';
 import '../documents/ai_document_import.dart';
+import '../platform/portal_ai_voice.dart';
 import '../runtime/portal_ai_runtime.dart';
 import '../tools/ai_agent.dart';
 import '../tools/ai_tool.dart';
@@ -19,6 +21,7 @@ import 'ai_chat_history_list.dart';
 import 'ai_chat_labels.dart';
 import 'ai_consent.dart';
 import 'ai_suggestion_cards.dart';
+import 'ai_voice_page.dart';
 import 'ai_item_list.dart';
 import 'ai_markdown.dart';
 import 'ai_prompt_composer.dart';
@@ -457,12 +460,22 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     }
   }
 
+  /// What the device can do without a server; [AiVoiceCapability.none]
+  /// until the probe answers, so no microphone is drawn for a frame it then
+  /// takes back.
+  AiVoiceCapability _voice = AiVoiceCapability.none;
+
+  /// The voice conversation, while one is open on its own page.
+  AiVoiceSession? _voiceSession;
+  bool get _voiceMode => _voiceSession?.active ?? false;
+
   @override
   void initState() {
     super.initState();
     _scroll.addListener(_watchScroll);
     _reloadSessions();
     _syncRotation();
+    unawaited(_probeVoice());
     final initial = widget.initialPrompt?.trim();
     if (initial == null || initial.isEmpty) return;
     _input.text = initial;
@@ -713,6 +726,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     // A page torn down mid-question leaves the agent awaiting an answer that
     // can never arrive, so it is refused on the way out.
     _answerConfirm(false);
+    _voiceSession?.dispose();
     _rotation?.cancel();
     _scroll.removeListener(_watchScroll);
     _inputFocus.dispose();
@@ -766,6 +780,53 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       _running = false;
     });
     widget.onCancel?.call();
+  }
+
+  Future<void> _probeVoice() async {
+    final voice = await PortalAiVoice.describe();
+    if (mounted && voice.isAvailable) setState(() => _voice = voice);
+  }
+
+  /// Opens the voice conversation on its own page. Denied microphone is a
+  /// decision, not an error: the field stays a text field.
+  Future<void> _openVoice() async {
+    if (_voiceMode) return;
+    final session = _voiceSession ??= AiVoiceSession(
+      ask: _voiceAsk,
+      interrupt: _stop,
+    );
+    if (!await session.start() || !mounted) return;
+    setState(() {});
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => AiVoicePage(session: session, labels: widget.labels),
+      ),
+    );
+    session.stop();
+    if (mounted) setState(() {});
+  }
+
+  /// One spoken question through the ordinary send path. Resolves with the
+  /// reply it produced, or null when nothing new came back.
+  Future<String?> _voiceAsk(String text) async {
+    if (_busy) _stop();
+    _input.text = text;
+    final before = _latestReply;
+    await _send();
+    if (!mounted) return null;
+    final reply = _latestReply;
+    if (reply == null || reply == before || _error != null || _cancelled) {
+      return null;
+    }
+    return reply;
+  }
+
+  /// The newest assistant reply in whichever transcript this page shows.
+  String? get _latestReply {
+    if (_reply case final reply?) return reply;
+    final last = _visibleTurns.lastOrNull;
+    return last != null && last.isAssistant ? last.content : null;
   }
 
   bool get _busy => _running || widget.busy;
@@ -915,6 +976,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         onReply: (delta) {
           if (!mounted || _cancelled) return;
           setState(() => _streamingReply = (_streamingReply ?? '') + delta);
+          _voiceSession?.onReplyDelta(delta);
           _followNewest(force: false);
         },
       );
@@ -974,7 +1036,8 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         });
         // Straight back to typing: the keyboard staying up is the difference
         // between a conversation and a form you fill in one field at a time.
-        _inputFocus.requestFocus();
+        // Not in a voice conversation, where the next question is spoken.
+        if (!_voiceMode) _inputFocus.requestFocus();
       }
     }
   }
@@ -1730,8 +1793,12 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                 ? _pickAttachment
                 : widget.onAttach,
             maxLength: widget.maxPromptLength,
+            onMic: _voice.isAvailable ? _openVoice : null,
+            listening: _voiceMode,
             stopLabel: widget.labels.stop,
             attachLabel: widget.labels.attach,
+            micLabel: widget.labels.speak,
+            micStopLabel: widget.labels.stopListening,
             hintText: _gated
                 ? widget.labels.consentBlocked
                 : (_busy && _pendingConfirm == null)
