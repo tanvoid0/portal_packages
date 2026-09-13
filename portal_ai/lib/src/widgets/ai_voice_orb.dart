@@ -134,11 +134,20 @@ class _AiVoiceOrbState extends State<AiVoiceOrb>
     final dark = theme.brightness == Brightness.dark;
     // In light mode every hue is inked a little toward black, or the halo
     // vanishes into the paper.
-    Color ink(Color c) => dark ? c : Color.lerp(c, Colors.black, 0.18)!;
-    // The partners lean far harder toward their own hue than the mode's: a
-    // monochrome orb read as a flat disc, not glass.
-    final cool = ink(Color.lerp(accent, const Color(0xFF3FE0FF), 0.72)!);
-    final warm = ink(Color.lerp(accent, const Color(0xFFFF6BD1), 0.72)!);
+    Color ink(Color c) => dark ? c : Color.lerp(c, scheme.onSurface, 0.18)!;
+    // The partners are the accent's triad, so the orb follows the app's
+    // theme and the hues still sit far apart: a monochrome orb read as a
+    // flat disc, not glass. The saturation floor keeps a muted accent from
+    // rotating into three greys.
+    final hsl = HSLColor.fromColor(accent);
+    Color partner(double turn) => hsl
+        .withHue((hsl.hue + turn) % 360)
+        .withSaturation(math.max(hsl.saturation, 0.6))
+        .toColor();
+    final cool = ink(partner(120));
+    final warm = ink(partner(-120));
+    // The specular highlight is the light end of the scheme in either mode.
+    final glare = dark ? scheme.onSurface : scheme.surface;
 
     final typed = still
         ? widget.label
@@ -166,6 +175,7 @@ class _AiVoiceOrbState extends State<AiVoiceOrb>
                   cool: cool,
                   warm: warm,
                   paper: scheme.surface,
+                  glare: glare,
                 ),
               ),
             ),
@@ -191,6 +201,7 @@ class _OrbPainter extends CustomPainter {
     required this.cool,
     required this.warm,
     required this.paper,
+    required this.glare,
   });
 
   final double time;
@@ -200,6 +211,7 @@ class _OrbPainter extends CustomPainter {
   final Color cool;
   final Color warm;
   final Color paper;
+  final Color glare;
 
   static const _points = 100;
 
@@ -285,11 +297,11 @@ class _OrbPainter extends CustomPainter {
       final v2 = 0.5 + 0.5 * math.sin(k + 2.0944);
       final v3 = 0.5 + 0.5 * math.sin(k + 4.1888);
       final sum = v1 + v2 + v3;
-      return Color.fromARGB(
-        255,
-        ((warm.r * v1 + cool.r * v2 + accent.r * v3) / sum * 255).round(),
-        ((warm.g * v1 + cool.g * v2 + accent.g * v3) / sum * 255).round(),
-        ((warm.b * v1 + cool.b * v2 + accent.b * v3) / sum * 255).round(),
+      return Color.from(
+        alpha: 1,
+        red: (warm.r * v1 + cool.r * v2 + accent.r * v3) / sum,
+        green: (warm.g * v1 + cool.g * v2 + accent.g * v3) / sum,
+        blue: (warm.b * v1 + cool.b * v2 + accent.b * v3) / sum,
       );
     }
 
@@ -312,8 +324,8 @@ class _OrbPainter extends CustomPainter {
           center: const Alignment(-0.35, -0.4),
           radius: 0.9,
           colors: [
-            Colors.white.withValues(alpha: 0.35),
-            Colors.white.withValues(alpha: 0),
+            glare.withValues(alpha: 0.35),
+            glare.withValues(alpha: 0),
             paper.withValues(alpha: 0.25),
           ],
           stops: const [0, 0.55, 1],
