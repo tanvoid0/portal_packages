@@ -1,4 +1,4 @@
-## 0.1.2
+## 0.1.3
 
-- Example app and screenshots.
+- README: backend selection order and the server contract, with an llmwire example.
 

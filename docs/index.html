@@ -102,7 +102,7 @@ PortalCard(
 );</code></pre>
     </div>
     <div>
-      <p style="margin:0 0 8px;color:var(--muted)">Give the assistant your tools; it picks the backend.</p>
+      <p style="margin:0 0 8px;color:var(--muted)">Give the assistant your tools; it picks the backend. <code>post</code> is optional — without it the runtime uses the device's own model, an Ollama on the LAN, or the user's key.</p>
 <pre><code>import 'package:portal_ai/portal_ai.dart';
 
 final ai = PortalAiRuntime.create(
@@ -130,6 +130,27 @@ final result = await ai.ask(
     <img src="https://raw.githubusercontent.com/tanvoid0/portal_packages/main/portal_ai/doc/screenshots/assistant_thinking.png" alt="portal_ai assistant page with the thought process expanded">
   </div>
   <p style="color:var(--muted);margin:6px 0 0">Both are the packages' own <code>example/</code> apps. No backend behind the assistant — the conversation is canned.</p>
+</section>
+
+<section>
+  <h2>Bring a server, or don't</h2>
+  <p style="color:var(--muted);margin:0 0 12px">Nothing in <code>portal_ai</code> needs a backend: on-device Gemini Nano, a LAN Ollama and a user-supplied key all run from the app. Hand it a <code>post</code> callback and cloud requests go through your API instead, which is where the key, the model choice and the per-user quota belong in production. The contract is two routes, and <a href="https://www.npmjs.com/package/llmwire">llmwire</a> — same author, zero-dependency TypeScript client for every major provider — serves them in a few lines each.</p>
+  <div class="two">
+<pre><code>POST /ai/complete
+  { systemPrompt, prompt, jsonMode, temperature, feature }
+  → { text, model?, usage? }
+
+POST /ai/complete/stream            server-sent events
+  data: {"text":"delta"} … data: [DONE]</code></pre>
+<pre><code>import { aiFactory } from 'llmwire';
+
+app.post('/ai/complete', async (req, res) => {
+  const out = await aiFactory.process(req.body);
+  res.json({ text: out.data, model: out.modelUsed,
+             usage: out.usage });
+});</code></pre>
+  </div>
+  <p style="color:var(--muted);margin:10px 0 0">Full contract and the streaming route in the <a href="https://pub.dev/packages/portal_ai#backends--with-or-without-a-server">portal_ai README</a>.</p>
 </section>
 
 <section id="api">
