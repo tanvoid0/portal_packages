@@ -74,19 +74,82 @@ class AiDocumentClient {
   /// [instruction] says what to pull out and in what shape — that prompt is
   /// the whole app-specific part, which is why it lives with the caller and
   /// not here. Throws [AiCompletionException] if the reply is not JSON.
+  ///
+  /// Long documents go through the model in pieces: the server caps a prompt
+  /// at 16k characters and a bank statement's text is routinely three times
+  /// that. The text is cut at line breaks, each piece is read on its own, and
+  /// the replies are merged with [mergeJson] — a list of rows in every piece
+  /// becomes one list.
   Future<dynamic> extractJson({
     required AiCompletionClient client,
     required List<int> bytes,
     required String filename,
     required String instruction,
+    int maxChunkChars = maxPromptChars,
   }) async {
     final document = await extractText(bytes: bytes, filename: filename);
-    final reply = await client.complete(
-      systemPrompt: instruction,
-      userPrompt: document.text,
-      jsonMode: true,
-    );
-    return decodeJsonReply(reply);
+    final results = <dynamic>[];
+    for (final chunk in splitText(document.text, maxChunkChars)) {
+      final reply = await client.complete(
+        systemPrompt: instruction,
+        userPrompt: chunk,
+        jsonMode: true,
+      );
+      results.add(decodeJsonReply(reply));
+    }
+    return mergeJson(results);
+  }
+
+  /// The server's `AiCompleteDto.prompt` limit, with room for the line the
+  /// split lands on.
+  static const int maxPromptChars = 15000;
+
+  /// Cuts [text] into pieces of at most [max] characters, breaking at the
+  /// last newline before the limit so a statement line is never torn in two.
+  /// A single line longer than [max] is cut mid-line rather than dropped.
+  static List<String> splitText(String text, int max) {
+    if (text.length <= max) return <String>[text];
+    final chunks = <String>[];
+    var start = 0;
+    while (start < text.length) {
+      var end = start + max;
+      if (end >= text.length) {
+        end = text.length;
+      } else {
+        final cut = text.lastIndexOf('\n', end);
+        if (cut > start) end = cut + 1;
+      }
+      chunks.add(text.substring(start, end));
+      start = end;
+    }
+    return chunks;
+  }
+
+  /// Folds per-chunk replies into the shape one reply would have had: lists
+  /// concatenate, maps merge key by key (list values concatenate, scalars keep
+  /// the first non-null value seen), a lone reply comes back untouched.
+  static dynamic mergeJson(List<dynamic> parts) {
+    if (parts.length == 1) return parts.single;
+    if (parts.every((p) => p is List)) {
+      return parts.expand((p) => p as List).toList();
+    }
+    final merged = <String, dynamic>{};
+    for (final part in parts) {
+      if (part is! Map) continue;
+      for (final entry in part.entries) {
+        final key = entry.key as String;
+        final existing = merged[key];
+        if (entry.value is List) {
+          merged[key] = <dynamic>[
+            ...?(existing as List?),
+            ...entry.value as List,
+          ];
+        } else {
+          merged[key] ??= entry.value;
+        }
+      }
+    }
+    return merged;
   }
 
   /// Parses a model's JSON reply, tolerating the ```json fence some models

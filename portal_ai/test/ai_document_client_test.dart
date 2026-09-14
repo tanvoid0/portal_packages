@@ -29,6 +29,23 @@ class _FakeCompletionClient implements AiCompletionClient {
   }) => Stream<String>.value(reply);
 }
 
+class _CountingClient extends _FakeCompletionClient {
+  _CountingClient(this.prompts) : super('');
+
+  final List<String> prompts;
+
+  @override
+  Future<String> complete({
+    required String systemPrompt,
+    required String userPrompt,
+    AiSamplerConfig sampler = const AiSamplerConfig(),
+    bool jsonMode = false,
+  }) async {
+    prompts.add(userPrompt);
+    return '{"currency":"GBP","transactions":[{"n":${prompts.length}}]}';
+  }
+}
+
 void main() {
   AiDocumentClient clientReturning(
     dynamic response, {
@@ -91,6 +108,40 @@ void main() {
 
     expect(model.seenPrompt, 'pay in 4');
     expect(result, <String, dynamic>{'instalments': 4});
+  });
+
+  test('extractJson reads a long document in pieces and merges the rows', () async {
+    final prompts = <String>[];
+    final model = _CountingClient(prompts);
+    final text = List.generate(40, (i) => 'line $i').join('\n');
+    final result = await clientReturning(<String, dynamic>{'text': text})
+        .extractJson(
+          client: model,
+          bytes: <int>[1],
+          filename: 'statement.pdf',
+          instruction: 'Return JSON',
+          maxChunkChars: 60,
+        );
+
+    expect(prompts.length, greaterThan(1));
+    expect(prompts.join(), text);
+    for (final p in prompts) {
+      expect(p.length, lessThanOrEqualTo(60));
+      expect(p.endsWith('\n') || p == prompts.last, isTrue);
+    }
+    final rows = (result as Map)['transactions'] as List;
+    expect(rows.length, prompts.length);
+    expect(result['currency'], 'GBP');
+  });
+
+  test('mergeJson concatenates bare lists', () {
+    expect(
+      AiDocumentClient.mergeJson(<dynamic>[
+        <dynamic>[1],
+        <dynamic>[2, 3],
+      ]),
+      <dynamic>[1, 2, 3],
+    );
   });
 
   test('decodeJsonReply strips a code fence', () {
