@@ -5,6 +5,14 @@ Finds what is available on the device (Gemini Nano via AICore, a local Ollama
 on the LAN, a cloud key, or a server-side completion endpoint), picks one, and
 gives apps a single chat/tool interface on top.
 
+<p>
+<img src="https://raw.githubusercontent.com/tanvoid0/portal_packages/main/portal_ai/doc/screenshots/assistant.png" width="220" alt="Assistant page: markdown reply with a table, a proposal card and the composer">
+<img src="https://raw.githubusercontent.com/tanvoid0/portal_packages/main/portal_ai/doc/screenshots/assistant_thinking.png" width="220" alt="Same reply with the thought process expanded">
+</p>
+
+`example/` drives the page with a canned conversation — no model needed to
+see the widgets.
+
 - `AiBackendDiscovery` — probe backends, ranked by preference and availability.
 - `PortalAiRuntime` — one entry point; apps supply prompts/tools, runtime picks the client.
 - `AiChatSession` / `AiChatStore` — persisted multi-turn threads.
