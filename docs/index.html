@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>portal_packages — shared Flutter packages for the Portal apps</title>
+<meta name="description" content="Seven Flutter packages extracted from the Portal apps: AI assistant runtime, offline-first platform layer, design system, crypto, notifications, document scanner and model codegen.">
+<style>
+  :root {
+    --bg: #fafaf9; --fg: #1c1917; --muted: #6b6560; --line: #e7e5e4;
+    --card: #ffffff; --accent: #4f5aa3; --accent-fg: #ffffff; --code: #f4f3f1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e0e10; --fg: #ececec; --muted: #9a9a9a; --line: #27272a;
+      --card: #17171a; --accent: #8fd3e0; --accent-fg: #0e0e10; --code: #1d1d21;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
+  pre { background: var(--code); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px; overflow-x: auto; margin: 0; }
+  code:not(pre code) { background: var(--code); padding: 1px 5px; border-radius: 5px; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+  header { border-bottom: 1px solid var(--line); }
+  header .wrap { display: flex; align-items: center; justify-content: space-between;
+    height: 56px; gap: 16px; }
+  header .brand { font-weight: 700; letter-spacing: -.01em; color: var(--fg); }
+  header nav a { margin-left: 18px; color: var(--muted); font-size: .95em; }
+  header nav a:hover { color: var(--fg); }
+  .hero { padding: 64px 0 40px; }
+  .hero h1 { font-size: 2.4em; line-height: 1.1; margin: 0 0 12px; letter-spacing: -.02em; }
+  .hero p { font-size: 1.15em; color: var(--muted); max-width: 640px; margin: 0; }
+  .badges { margin-top: 18px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .badge { font-size: .8em; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); }
+  section { padding: 28px 0; }
+  h2 { font-size: 1.35em; margin: 0 0 14px; letter-spacing: -.01em; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 8px; }
+  .card h3 { margin: 0; font-size: 1.05em; }
+  .card p { margin: 0; color: var(--muted); font-size: .95em; flex: 1; }
+  .card .links { display: flex; gap: 14px; font-size: .9em; }
+  .shots { display: flex; gap: 12px; overflow-x: auto; padding: 4px 0 8px; }
+  .shots img { height: 420px; width: auto; border-radius: 18px; border: 1px solid var(--line); background: var(--card); flex: none; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 720px) { .two { grid-template-columns: 1fr; } }
+  footer { border-top: 1px solid var(--line); padding: 28px 0 48px; color: var(--muted); font-size: .9em; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="brand" href="./">portal_packages</a>
+    <nav>
+      <a href="https://github.com/tanvoid0/portal_packages">GitHub</a>
+      <a href="https://pub.dev/packages?q=portal_">pub.dev</a>
+      <a href="#api">API reference</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<div class="hero">
+  <h1>The Flutter layer under the Portal apps.</h1>
+  <p>Seven packages, extracted rather than designed: an AI assistant runtime that finds whatever model is nearby, an offline-first platform layer, a token-driven design system, and the small things every app ends up needing.</p>
+  <div class="badges">
+    <span class="badge">Flutter ≥ 3.0</span>
+    <span class="badge">Dart ≥ 3.8</span>
+    <span class="badge">Android · iOS</span>
+    <span class="badge">MIT</span>
+  </div>
+</div>
+
+<section>
+  <h2>Install</h2>
+  <pre><code>flutter pub add portal_ui_core portal_ai</code></pre>
+  <p style="color:var(--muted);margin:10px 0 0">Each package stands alone — take the ones you need. <code>portal_platform</code> pulls in <code>portal_crypto</code> and <code>portal_ui_core</code>.</p>
+</section>
+
+<section>
+  <h2>Use</h2>
+  <div class="two">
+    <div>
+      <p style="margin:0 0 8px;color:var(--muted)">Theme an app from tokens, then compose from the kit.</p>
+<pre><code>import 'package:portal_ui_core/portal_ui_core.dart';
+
+MaterialApp(
+  theme: buildPortalTheme(brightness: Brightness.light),
+  darkTheme: buildPortalTheme(brightness: Brightness.dark),
+);
+
+// in a widget
+final tokens = PortalUiTheme.of(context).tokens;
+PortalCard(
+  child: PortalStatCard(value: '12.4k', label: 'Steps'),
+);</code></pre>
+    </div>
+    <div>
+      <p style="margin:0 0 8px;color:var(--muted)">Give the assistant your tools; it picks the backend.</p>
+<pre><code>import 'package:portal_ai/portal_ai.dart';
+
+final ai = PortalAiRuntime.create(
+  post: apiClient.post,
+  env: dotenv.env,
+  feature: 'gym-assistant',
+  appDescription: 'Workouts, routines and exercise logs.',
+  tools: gymAiTools(),
+);
+
+final result = await ai.ask(
+  'How did my week go?',
+  onReply: (delta) => stdout.write(delta),
+);</code></pre>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>What it looks like</h2>
+  <div class="shots">
+    <img src="https://raw.githubusercontent.com/tanvoid0/portal_packages/main/portal_ui_core/doc/screenshots/light.png" alt="portal_ui_core gallery, light theme">
+    <img src="https://raw.githubusercontent.com/tanvoid0/portal_packages/main/portal_ui_core/doc/screenshots/dark_states.png" alt="portal_ui_core gallery, dark theme: chips, tabs, skeleton, empty state">
+    <img src="https://raw.githubusercontent.com/tanvoid0/portal_packages/main/portal_ai/doc/screenshots/assistant.png" alt="portal_ai assistant page with a markdown reply and a proposal card">
+    <img src="https://raw.githubusercontent.com/tanvoid0/portal_packages/main/portal_ai/doc/screenshots/assistant_thinking.png" alt="portal_ai assistant page with the thought process expanded">
+  </div>
+  <p style="color:var(--muted);margin:6px 0 0">Both are the packages' own <code>example/</code> apps. No backend behind the assistant — the conversation is canned.</p>
+</section>
+
+<section id="api">
+  <h2>Packages</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>portal_ai</h3>
+      <p>Backend discovery — Gemini Nano on-device, Ollama on the LAN, a cloud key, or your server — plus a shared chat runtime, tool calling, proposals and the assistant UI.</p>
+      <div class="links"><a href="api/portal_ai/">API</a><a href="https://pub.dev/packages/portal_ai">pub.dev</a><a href="https://github.com/tanvoid0/portal_packages/tree/main/portal_ai">source</a></div>
+    </div>
+    <div class="card">
+      <h3>portal_platform</h3>
+      <p>Auth, session, API client, config, deep links, in-app updates, Sentry, and an offline-first sync layer with a replayed mutation queue. Opinionated, GetX-based.</p>
+      <div class="links"><a href="api/portal_platform/">API</a><a href="https://pub.dev/packages/portal_platform">pub.dev</a><a href="https://github.com/tanvoid0/portal_packages/tree/main/portal_platform">source</a></div>
+    </div>
+    <div class="card">
+      <h3>portal_ui_core</h3>
+      <p>Design tokens (spacing, radii, type, motion, elevation), a <code>PortalUiTheme</code> extension, theme presets and the component kit.</p>
+      <div class="links"><a href="api/portal_ui_core/">API</a><a href="https://pub.dev/packages/portal_ui_core">pub.dev</a><a href="https://github.com/tanvoid0/portal_packages/tree/main/portal_ui_core">source</a></div>
+    </div>
+    <div class="card">
+      <h3>portal_crypto</h3>
+      <p>AES-GCM, key derivation and wrapping, and a versioned vault blob format. Pure Dart.</p>
+      <div class="links"><a href="api/portal_crypto/">API</a><a href="https://pub.dev/packages/portal_crypto">pub.dev</a><a href="https://github.com/tanvoid0/portal_packages/tree/main/portal_crypto">source</a></div>
+    </div>
+    <div class="card">
+      <h3>portal_notifications</h3>
+      <p>Local and scheduled notifications with action buttons, repeats and a persisted pending list. No Firebase.</p>
+      <div class="links"><a href="api/portal_notifications/">API</a><a href="https://pub.dev/packages/portal_notifications">pub.dev</a><a href="https://github.com/tanvoid0/portal_packages/tree/main/portal_notifications">source</a></div>
+    </div>
+    <div class="card">
+      <h3>portal_scanner</h3>
+      <p>Native document scanner — ML Kit on Android, VisionKit on iOS — returning PDF or JPEG bytes.</p>
+      <div class="links"><a href="api/portal_scanner/">API</a><a href="https://pub.dev/packages/portal_scanner">pub.dev</a><a href="https://github.com/tanvoid0/portal_packages/tree/main/portal_scanner">source</a></div>
+    </div>
+    <div class="card">
+      <h3>portal_core</h3>
+      <p>Annotation-driven model codegen (JSON, copyWith) with a local cache and repository base.</p>
+      <div class="links"><a href="api/portal_core/">API</a><a href="https://pub.dev/packages/portal_core">pub.dev</a><a href="https://github.com/tanvoid0/portal_packages/tree/main/portal_core">source</a></div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">MIT · <a href="https://github.com/tanvoid0/portal_packages">tanvoid0/portal_packages</a> · API reference generated by <code>dart doc</code>.</div>
+</footer>
+
+</body>
+</html>
