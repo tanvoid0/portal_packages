@@ -19,6 +19,7 @@ class AiBackendSelector extends StatelessWidget {
     this.cloudEligible = true,
     this.trailingBuilder,
     this.onRescan,
+    this.hasServer = false,
   });
 
   final AiBackendStore store;
@@ -28,6 +29,7 @@ class AiBackendSelector extends StatelessWidget {
   final bool cloudEligible;
   final Widget? Function(AiBackendOption option)? trailingBuilder;
   final VoidCallback? onRescan;
+  final bool hasServer;
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +42,7 @@ class AiBackendSelector extends StatelessWidget {
       showModelConfig: false,
       trailingBuilder: trailingBuilder,
       onRescan: onRescan,
+      hasServer: hasServer,
     );
   }
 }

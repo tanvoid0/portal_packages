@@ -1,24 +1,19 @@
 import '../chat/ai_chat_session.dart';
 import '../clients/ai_completion_client.dart';
 import '../clients/ai_completion_client_factory.dart';
+import '../clients/fallback_completion_client.dart';
 import '../clients/ollama_completion_client.dart';
+import '../clients/openai_compatible_completion_client.dart';
 import '../clients/server_completion_client.dart';
 import '../models/ai_backend_kind.dart';
+import '../models/ai_dev_env_keys.dart';
+import '../models/ai_routing_mode.dart';
 import '../models/ai_sampler_config.dart';
 import '../models/ai_backend_option.dart';
 import '../prefs/ai_backend_store.dart';
 import '../tools/ai_agent.dart';
 import '../tools/ai_tool.dart';
 import '../tools/web_search_tool.dart';
-
-/// Env keys that point the assistant at a local model during development.
-abstract final class AiDevEnvKeys {
-  /// Set to an Ollama model (e.g. `gemma4`) to bypass the server while testing.
-  static const ollamaModel = 'AI_OLLAMA_MODEL';
-
-  /// Optional Ollama host override.
-  static const ollamaHost = 'AI_OLLAMA_HOST';
-}
 
 /// One-call AI wiring for a Portal app: completion client plus the
 /// tool-calling agent.
@@ -47,8 +42,14 @@ class PortalAiRuntime {
     this._store,
     this._clientFactory,
     this._serverClient,
+    Map<String, String> env = const {},
+    String? configurationHint,
     // ignore: prefer_initializing_formals
-  }) : _client = client;
+  }) : _client = client,
+       // ignore: prefer_initializing_formals
+       _env = env,
+       // ignore: prefer_initializing_formals
+       _configurationHint = configurationHint;
 
   /// Builds the runtime from app config.
   ///
@@ -78,6 +79,7 @@ class PortalAiRuntime {
     final factory = clientFactory ?? AiCompletionClientFactory();
 
     AiCompletionClient? client;
+    String? hint;
 
     // A dev override in .env still wins, so a checkout can be pointed at a
     // local model without touching anyone's saved settings.
@@ -90,9 +92,15 @@ class PortalAiRuntime {
         model: ollamaModel,
       );
     } else {
-      client = _clientForStored(store, factory, server);
+      final resolved = _clientForStored(store, factory, server, env);
+      client = resolved.client;
+      hint = resolved.hint;
     }
 
+    // Only genuinely nothing to build reaches here -- routing degrades to
+    // the server with a hint (see `_clientForStored`) rather than a null
+    // client, precisely so a bad stored choice never throws out of `create`,
+    // which apps call unguarded at boot.
     if (client == null) {
       throw ArgumentError(
         'PortalAiRuntime needs either a server transport, an AI backend '
@@ -116,38 +124,87 @@ class PortalAiRuntime {
       store: store,
       clientFactory: factory,
       serverClient: server,
+      env: env,
+      configurationHint: hint,
     );
   }
 
-  /// The client for whatever the user picked in AI settings, falling back to
-  /// the server. Cloud stays on the server transport whenever there is one:
-  /// the server holds the key, the model choice and the quota.
-  static AiCompletionClient? _clientForStored(
+  /// The client for whatever the user picked in AI settings, weighed against
+  /// [AiBackendStore.routingMode]. Cloud stays on the server transport
+  /// whenever there is one: the server holds the key, the model choice and
+  /// the quota, and it is what "no local backend chosen" means below.
+  static ({AiCompletionClient? client, String? hint}) _clientForStored(
     AiBackendStore? store,
     AiCompletionClientFactory factory,
     ServerCompletionClient? server,
+    Map<String, String> env,
   ) {
     final kind = store?.selectedKind;
     if (store == null || kind == null || kind == AiBackendKind.cloudGemini) {
-      return server;
+      return (client: server, hint: null);
     }
+
+    AiCompletionClient? local;
     try {
-      return factory.create(kind: kind, store: store);
+      local = factory.create(kind: kind, store: store, env: env);
     } on AiCompletionException {
       // Selected but not usable yet (no Ollama model picked, Edge Gallery
-      // chosen as a delegate). The server is a working assistant; a thrown
-      // exception at startup is not.
-      return server;
+      // chosen as a delegate, OpenAI-compatible with no base URL).
+      local = null;
     }
+
+    if (server == null) {
+      // No server transport: the stored backend or nothing, same as before
+      // routing existed -- there is nothing to route between.
+      return (client: local, hint: null);
+    }
+
+    return switch (store.routingMode) {
+      AiRoutingMode.serverOnly => (client: server, hint: null),
+      // A server exists, so "nothing to build" is never true here even when
+      // local-only has nothing usable -- degrade to the server (carrying a
+      // hint the settings row / first reply can show) rather than throwing
+      // out of `create()`. That throw is reachable from prefs sync landing
+      // an unbuildable choice (e.g. `openai_compatible` with no base URL)
+      // made on another device, which the app never gets a chance to guard.
+      AiRoutingMode.localOnly => local == null
+          ? (
+              client: server,
+              hint:
+                  'AI routing is set to local-only but no local backend is '
+                  'configured, so the server is answering instead. Pick a '
+                  'backend in AI settings, or switch routing to include the '
+                  'server.',
+            )
+          : (client: local, hint: null),
+      // A local backend not being usable yet is not an error here -- the
+      // server is a working assistant on its own, same as before fallback
+      // routing existed.
+      AiRoutingMode.serverFirst => local == null
+          ? (client: server, hint: null)
+          : (
+              client: FallbackCompletionClient(primary: server, fallback: local),
+              hint: null,
+            ),
+    };
   }
 
   AiCompletionClient _client;
   final AiBackendStore? _store;
   final AiCompletionClientFactory? _clientFactory;
   final ServerCompletionClient? _serverClient;
+  final Map<String, String> _env;
+  String? _configurationHint;
 
   /// The client the assistant is talking to right now.
   AiCompletionClient get client => _client;
+
+  /// Set when [_clientForStored] had to degrade rather than build exactly
+  /// what routing asked for -- today, only local-only with no usable local
+  /// backend, which answers on the server instead. Null the rest of the
+  /// time. A settings row or the first reply can surface this; nothing here
+  /// shows it on its own.
+  String? get configurationHint => _configurationHint;
 
   /// Where the provider and model choice is kept, for a UI that wants to
   /// offer the switch itself. Null for a runtime built without one, which is
@@ -162,8 +219,23 @@ class PortalAiRuntime {
   /// the stored kind names a provider that never runs, and disagrees with the
   /// assistant row in Settings, which reports what answered.
   AiBackendKind get activeBackendKind {
-    if (_client is ServerCompletionClient) return AiBackendKind.cloudGemini;
-    if (_client is OllamaCompletionClient) return AiBackendKind.ollama;
+    final client = _client;
+    if (client is FallbackCompletionClient) {
+      return _kindOfClient(
+        client.lastAnsweredBy == AiAnsweredBy.fallback
+            ? client.fallback
+            : client.primary,
+      );
+    }
+    return _kindOfClient(client);
+  }
+
+  AiBackendKind _kindOfClient(AiCompletionClient client) {
+    if (client is ServerCompletionClient) return AiBackendKind.cloudGemini;
+    if (client is OllamaCompletionClient) return AiBackendKind.ollama;
+    if (client is OpenAiCompatibleCompletionClient) {
+      return AiBackendKind.openAiCompatible;
+    }
     return _store?.selectedKind ?? AiBackendKind.cloudGemini;
   }
 
@@ -179,32 +251,47 @@ class PortalAiRuntime {
       AiBackendKind.ollama => 'Ollama',
       AiBackendKind.systemOnDevice => 'On-device',
       AiBackendKind.edgeGalleryDelegate => 'Edge Gallery',
+      AiBackendKind.openAiCompatible => 'OpenAI-compatible',
     };
   }
 
-  /// True when generation happens on this device rather than on the server.
-  bool get usesLocalModel => _client is! ServerCompletionClient;
+  /// True when generation happens on this device or another machine rather
+  /// than the Portal server -- including a [FallbackCompletionClient] whose
+  /// most recent call actually landed on its local side.
+  bool get usesLocalModel => activeBackendKind != AiBackendKind.cloudGemini;
 
   /// Re-points the assistant after the user changes provider in settings, so
   /// the change takes effect without an app restart.
   ///
   /// Only text generation moves. Tools run in Dart either way, so the actions
   /// the assistant can take are the same on-device as on the server.
+  ///
+  /// Routes through [_clientForStored] -- the same resolution `create` uses
+  /// at boot -- rather than building [option]'s client directly, so a switch
+  /// made here still respects [AiBackendStore.routingMode] (server-first
+  /// wraps it in a [FallbackCompletionClient] same as it would have at boot).
   void applyBackend(AiBackendOption option) {
+    if (!option.supportsInAppInference) return;
+    _rebuildFromStore();
+  }
+
+  /// Re-resolves the client from the store as it stands right now.
+  ///
+  /// [applyBackend] calls this after a specific pick; the AI settings
+  /// screen's routing control calls it (via the same `onChanged` the app
+  /// already wires to [applyBackend]) after a routing-mode change alone --
+  /// nothing about the selected backend moved, but server-first vs.
+  /// local-only vs. server-only changes what [_clientForStored] builds.
+  void _rebuildFromStore() {
     final store = _store;
     final factory = _clientFactory;
     if (store == null || factory == null) return;
-    if (option.kind == AiBackendKind.cloudGemini && _serverClient != null) {
-      _client = _serverClient;
-      return;
-    }
-    if (!option.supportsInAppInference) return;
-    try {
-      _client = factory.create(kind: option.kind, store: store, option: option);
-    } on AiCompletionException {
-      // Leave the working client in place rather than breaking the assistant
-      // on a half-configured provider.
-    }
+    final resolved = _clientForStored(store, factory, _serverClient, _env);
+    final client = resolved.client;
+    // A null result (nothing buildable) leaves the previous working client
+    // in place, same spirit as swallowing AiCompletionException used to.
+    if (client != null) _client = client;
+    _configurationHint = resolved.hint;
   }
 
   final String appDescription;

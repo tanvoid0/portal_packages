@@ -33,6 +33,8 @@ class AiModelCatalog {
     List<AiBackendOption>? cachedOptions,
     bool cloudEligible = true,
     String ollamaHost = kDefaultOllamaBaseUrl,
+    String openAiBaseUrl = '',
+    String openAiModel = '',
   }) async {
     switch (kind) {
       case AiBackendKind.cloudGemini:
@@ -40,11 +42,14 @@ class AiModelCatalog {
       case AiBackendKind.ollama:
       case AiBackendKind.systemOnDevice:
       case AiBackendKind.edgeGalleryDelegate:
+      case AiBackendKind.openAiCompatible:
         final options =
             cachedOptions ??
             await _discovery.discover(
               cloudEligible: cloudEligible,
               ollamaHost: ollamaHost,
+              openAiBaseUrl: openAiBaseUrl,
+              openAiModel: openAiModel,
             );
         return _modelsFromOptions(options, kind);
     }
@@ -55,10 +60,14 @@ class AiModelCatalog {
     AiBackendKind kind, {
     bool cloudEligible = true,
     String ollamaHost = kDefaultOllamaBaseUrl,
+    String openAiBaseUrl = '',
+    String openAiModel = '',
   }) async {
     final options = await _discovery.discover(
       cloudEligible: cloudEligible,
       ollamaHost: ollamaHost,
+      openAiBaseUrl: openAiBaseUrl,
+      openAiModel: openAiModel,
     );
     return _firstWhereOrNull(options, (o) => o.kind == kind);
   }

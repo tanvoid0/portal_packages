@@ -134,7 +134,7 @@ final result = await ai.ask(
 
 <section>
   <h2>Bring a server, or don't</h2>
-  <p style="color:var(--muted);margin:0 0 12px">Nothing in <code>portal_ai</code> needs a backend: on-device Gemini Nano, a LAN Ollama and a user-supplied key all run from the app. Hand it a <code>post</code> callback and cloud requests go through your API instead, which is where the key, the model choice and the per-user quota belong in production. The contract is two routes, and <a href="https://www.npmjs.com/package/llmwire">llmwire</a> — same author, zero-dependency TypeScript client for every major provider — serves them in a few lines each.</p>
+  <p style="color:var(--muted);margin:0 0 12px">Nothing in <code>portal_ai</code> needs a backend: on-device Gemini Nano, a LAN Ollama, or any OpenAI-compatible API (OpenAI, Groq, OpenRouter, DeepSeek, Mistral, xAI, Together, LM Studio…) with the user's own key or one the app ships in <code>.env</code> — all from the app. Hand it a <code>post</code> callback and the server becomes the primary: keys, model choice and per-user quota stay there, and when the phone is offline or the server is down the runtime falls back to the local backend on its own (<code>AiRoutingMode.serverFirst</code>; <code>localOnly</code> never touches the server). The contract is two routes, and <a href="https://www.npmjs.com/package/llmwire">llmwire</a> — same author, zero-dependency TypeScript client for every major provider — serves them in a few lines each.</p>
   <div class="two">
 <pre><code>POST /ai/complete
   { systemPrompt, prompt, jsonMode, temperature, feature }

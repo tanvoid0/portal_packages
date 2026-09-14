@@ -29,16 +29,90 @@ void main() {
   });
 
   test('a stored local provider is what the assistant starts on', () async {
+    // Routing defaults to server-first, which would wrap this in a
+    // FallbackCompletionClient (covered in fallback_completion_client_test.dart
+    // and the "routing" group below) -- local-only isolates the older claim
+    // this test makes: a stored provider is read and built at all.
     final runtime = PortalAiRuntime.create(
       post: noPost,
       store: await storeWith({
         'test_selected_backend_id': AiBackendKind.ollama.id,
         'test_ollama_model': 'gemma4',
+        'test_routing_mode': AiRoutingMode.localOnly.id,
       }),
     );
 
     expect(runtime.client, isA<OllamaCompletionClient>());
     expect(runtime.usesLocalModel, isTrue);
+  });
+
+  group('routing', () {
+    test(
+      'server-first wraps a configured local backend rather than replacing it',
+      () async {
+        final runtime = PortalAiRuntime.create(
+          post: noPost,
+          store: await storeWith({
+            'test_selected_backend_id': AiBackendKind.ollama.id,
+            'test_ollama_model': 'gemma4',
+          }),
+        );
+
+        expect(runtime.client, isA<FallbackCompletionClient>());
+        expect(
+          (runtime.client as FallbackCompletionClient).fallback,
+          isA<OllamaCompletionClient>(),
+        );
+        expect(
+          (runtime.client as FallbackCompletionClient).primary,
+          isA<ServerCompletionClient>(),
+        );
+      },
+    );
+
+    test('server-only ignores a configured local backend', () async {
+      final runtime = PortalAiRuntime.create(
+        post: noPost,
+        store: await storeWith({
+          'test_selected_backend_id': AiBackendKind.ollama.id,
+          'test_ollama_model': 'gemma4',
+          'test_routing_mode': AiRoutingMode.serverOnly.id,
+        }),
+      );
+
+      expect(runtime.client, isA<ServerCompletionClient>());
+    });
+
+    test(
+      'local-only with nothing usable degrades to the server, carrying a hint',
+      () async {
+        // A server exists, so this is never "nothing to build" -- it must
+        // not throw out of create() the way it used to, since apps call
+        // create() unguarded at boot and this is reachable from prefs sync
+        // landing an unbuildable choice made on another device.
+        final store = await storeWith({
+          'test_selected_backend_id': AiBackendKind.ollama.id,
+          'test_routing_mode': AiRoutingMode.localOnly.id,
+        });
+
+        final runtime = PortalAiRuntime.create(post: noPost, store: store);
+
+        expect(runtime.client, isA<ServerCompletionClient>());
+        expect(runtime.configurationHint, contains('routing'));
+      },
+    );
+
+    test('local-only with nothing configured at all is a wiring error', () async {
+      // No server and nothing local: genuinely nothing to build.
+      final store = await storeWith({
+        'test_routing_mode': AiRoutingMode.localOnly.id,
+      });
+
+      expect(
+        () => PortalAiRuntime.create(store: store),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
   });
 
   test('a half-configured provider falls back rather than throwing', () async {
@@ -77,7 +151,15 @@ void main() {
   test(
     'switching provider in settings re-points the running assistant',
     () async {
-      final store = await storeWith({});
+      // applyBackend routes through the same store-wide resolution create()
+      // uses, so with the default server-first routing and a server
+      // transport present, picking a local backend wraps it rather than
+      // replacing the server outright -- covered by the routing group above.
+      // Local-only isolates this test's actual claim: a switch in settings
+      // reaches the running assistant at all.
+      final store = await storeWith({
+        'test_routing_mode': AiRoutingMode.localOnly.id,
+      });
       final runtime = PortalAiRuntime.create(post: noPost, store: store);
       expect(runtime.usesLocalModel, isFalse);
 
@@ -90,10 +172,36 @@ void main() {
       );
       expect(runtime.client, isA<SystemAiCompletionClient>());
 
+      // applyBackend rebuilds from the store as a whole (routing included),
+      // so -- same as the real caller, AiSettingsSection's `_select` --
+      // the store is what has to move, not just the option passed in.
+      await store.setSelectedKind(AiBackendKind.cloudGemini);
       runtime.applyBackend(
         const AiBackendOption(kind: AiBackendKind.cloudGemini, available: true),
       );
       expect(runtime.usesLocalModel, isFalse);
+    },
+  );
+
+  test(
+    'applyBackend respects server-first routing, not just the stored kind',
+    () async {
+      final store = await storeWith({});
+      final runtime = PortalAiRuntime.create(post: noPost, store: store);
+
+      await store.setSelectedKind(AiBackendKind.systemOnDevice);
+      runtime.applyBackend(
+        const AiBackendOption(
+          kind: AiBackendKind.systemOnDevice,
+          available: true,
+        ),
+      );
+
+      expect(runtime.client, isA<FallbackCompletionClient>());
+      expect(
+        (runtime.client as FallbackCompletionClient).fallback,
+        isA<SystemAiCompletionClient>(),
+      );
     },
   );
 

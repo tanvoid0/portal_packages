@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../clients/openai_compatible_completion_client.dart';
 import '../discovery/ai_backend_discovery.dart';
 import '../discovery/ollama_lan_scan.dart';
 import '../models/ai_backend_kind.dart';
 import '../models/ai_backend_labels.dart';
 import '../models/ai_backend_option.dart';
 import '../models/ai_backend_option_models.dart';
+import '../models/ai_routing_mode.dart';
 import '../platform/edge_gallery_launcher.dart';
 import '../platform/portal_ai_platform.dart';
 import '../prefs/ai_backend_store.dart';
@@ -29,6 +31,7 @@ class AiSettingsSection extends StatefulWidget {
     this.showModelConfig = true,
     this.trailingBuilder,
     this.onRescan,
+    this.hasServer = false,
   });
 
   final AiBackendStore store;
@@ -45,16 +48,31 @@ class AiSettingsSection extends StatefulWidget {
   /// asks for.
   final bool showModelConfig;
 
+  /// Whether this app has a Portal server transport at all. The routing
+  /// control (server vs. local, or both) is meaningless without one -- there
+  /// is nothing to route between -- so it stays hidden until the host says a
+  /// server exists.
+  final bool hasServer;
+
   final Widget? Function(AiBackendOption option)? trailingBuilder;
   final VoidCallback? onRescan;
 
   /// Opens shared preferences and builds the store, for an app that has no
   /// [AiBackendStore] of its own to hand in.
-  static Future<AiBackendStore> openStore(String keyPrefix) async =>
-      AiBackendStore(
-        prefs: await SharedPreferences.getInstance(),
-        keyPrefix: keyPrefix,
-      );
+  ///
+  /// Warms the secure-storage-backed API key here too: this is the store an
+  /// app hands straight to `PortalAiRuntime.create` at boot, and that read is
+  /// sync-only (see [AiBackendStore.openAiApiKey]) -- without this, the
+  /// runtime built before AI settings is ever opened sends an empty key and
+  /// gets a 401 from a provider the user already configured.
+  static Future<AiBackendStore> openStore(String keyPrefix) async {
+    final store = AiBackendStore(
+      prefs: await SharedPreferences.getInstance(),
+      keyPrefix: keyPrefix,
+    );
+    await store.loadOpenAiApiKey();
+    return store;
+  }
 
   @override
   State<AiSettingsSection> createState() => _AiSettingsSectionState();
@@ -88,6 +106,8 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     final options = await _discovery.discover(
       cloudEligible: widget.cloudEligible,
       ollamaHost: widget.store.ollamaHost,
+      openAiBaseUrl: widget.store.openAiBaseUrl,
+      openAiModel: widget.store.modelFor(AiBackendKind.openAiCompatible) ?? '',
     );
     final kind = await widget.store.resolveSelectedKind(options);
     if (!mounted) return;
@@ -239,6 +259,27 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
             const SizedBox(height: 8),
             ...delegates.map(_tile),
           ],
+          if (widget.hasServer && widget.showModelConfig) ...[
+            const SizedBox(height: 16),
+            Text(labels.routingTitle, style: titleStyle),
+            const SizedBox(height: 8),
+            _RoutingModeControl(
+              labels: labels,
+              mode: widget.store.routingMode,
+              onChanged: (mode) async {
+                await widget.store.setRoutingMode(mode);
+                if (!mounted) return;
+                setState(() {});
+                // Nothing about the selected backend moved, but routing mode
+                // alone changes what the runtime should be running --
+                // `applyBackend` re-resolves from the store as a whole
+                // (routing mode included), not just from this option, so
+                // re-firing it here is the same path a backend switch takes.
+                final opt = _selectedOption;
+                if (opt != null) widget.onChanged?.call(opt);
+              },
+            ),
+          ],
           const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerLeft,
@@ -314,6 +355,30 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
             ),
           ),
       ]);
+    }
+
+    // Free-typed base URL and model rather than a dropdown from a probe --
+    // there is no daemon to ask, only what the user (or a preset) fills in.
+    if (option.kind == AiBackendKind.openAiCompatible &&
+        (selected || !option.available)) {
+      widgets.add(
+        _OpenAiCompatibleFields(
+          // No key tied to a store value: unlike Ollama's host, nothing
+          // outside this widget ever changes the base URL, so remounting on
+          // it only ever meant losing whatever the user had not submitted
+          // yet in the *other* fields (model, key) when the preset dropdown
+          // wrote a new base URL.
+          store: widget.store,
+          labels: labels,
+          onSubmitted: () async {
+            await _scan();
+            if (!mounted) return;
+            final opt = _selectedOption;
+            if (opt != null) widget.onChanged?.call(opt);
+          },
+        ),
+      );
+      return widgets;
     }
 
     if (!selected || !option.supportsInAppInference) return widgets;
@@ -575,6 +640,294 @@ class _OllamaHostFieldState extends State<_OllamaHostField> {
         ),
         onSubmitted: widget.onSubmitted,
       ),
+    );
+  }
+}
+
+/// Server vs. local backend, when there is a choice to make.
+class _RoutingModeControl extends StatelessWidget {
+  const _RoutingModeControl({
+    required this.labels,
+    required this.mode,
+    required this.onChanged,
+  });
+
+  final AiBackendLabels labels;
+  final AiRoutingMode mode;
+  final ValueChanged<AiRoutingMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SegmentedButton<AiRoutingMode>(
+          segments: [
+            for (final m in AiRoutingMode.values)
+              ButtonSegment(value: m, label: Text(labels.routingLabelFor(m))),
+          ],
+          selected: {mode},
+          onSelectionChanged: (selection) => onChanged(selection.first),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          labels.routingDescriptionFor(mode),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
+}
+
+/// Preset, base URL, model and API key for [AiBackendKind.openAiCompatible],
+/// plus a Test button that probes the values as they currently stand.
+class _OpenAiCompatibleFields extends StatefulWidget {
+  const _OpenAiCompatibleFields({
+    required this.store,
+    required this.labels,
+    required this.onSubmitted,
+  });
+
+  final AiBackendStore store;
+  final AiBackendLabels labels;
+  final VoidCallback onSubmitted;
+
+  @override
+  State<_OpenAiCompatibleFields> createState() =>
+      _OpenAiCompatibleFieldsState();
+}
+
+class _OpenAiCompatibleFieldsState extends State<_OpenAiCompatibleFields> {
+  late final TextEditingController _baseUrlController = TextEditingController(
+    text: widget.store.openAiBaseUrl,
+  );
+  late final TextEditingController _modelController = TextEditingController(
+    text: widget.store.modelFor(AiBackendKind.openAiCompatible) ?? '',
+  );
+  late final TextEditingController _apiKeyController = TextEditingController(
+    text: widget.store.openAiApiKey,
+  );
+  final FocusNode _baseUrlFocus = FocusNode();
+  final FocusNode _modelFocus = FocusNode();
+  final FocusNode _apiKeyFocus = FocusNode();
+  bool _obscureKey = true;
+  bool _testing = false;
+  bool? _testOk;
+
+  @override
+  void initState() {
+    super.initState();
+    // Secure storage has no synchronous read -- a key set in an earlier run
+    // is not in the field until this resolves.
+    widget.store.loadOpenAiApiKey().then((_) {
+      if (!mounted || _apiKeyController.text.isNotEmpty) return;
+      final key = widget.store.openAiApiKey;
+      if (key.isNotEmpty) setState(() => _apiKeyController.text = key);
+    });
+    // Submitting (keyboard "done") is not the only way to leave a field --
+    // tapping Test or another field is losing focus just as much, and a
+    // paste-then-tap-Test used to leave the store holding the old value.
+    _baseUrlFocus.addListener(_onBaseUrlFocusChange);
+    _modelFocus.addListener(_onModelFocusChange);
+    _apiKeyFocus.addListener(_onApiKeyFocusChange);
+  }
+
+  @override
+  void dispose() {
+    _baseUrlFocus.removeListener(_onBaseUrlFocusChange);
+    _modelFocus.removeListener(_onModelFocusChange);
+    _apiKeyFocus.removeListener(_onApiKeyFocusChange);
+    _baseUrlFocus.dispose();
+    _modelFocus.dispose();
+    _apiKeyFocus.dispose();
+    _baseUrlController.dispose();
+    _modelController.dispose();
+    _apiKeyController.dispose();
+    super.dispose();
+  }
+
+  void _onBaseUrlFocusChange() {
+    if (!_baseUrlFocus.hasFocus) _saveBaseUrl();
+  }
+
+  void _onModelFocusChange() {
+    if (!_modelFocus.hasFocus) _saveModel();
+  }
+
+  void _onApiKeyFocusChange() {
+    if (!_apiKeyFocus.hasFocus) _saveApiKey();
+  }
+
+  Future<void> _saveBaseUrl() async {
+    await widget.store.setOpenAiBaseUrl(_baseUrlController.text);
+    widget.onSubmitted();
+  }
+
+  Future<void> _saveModel() async {
+    await widget.store.setModelFor(
+      AiBackendKind.openAiCompatible,
+      _modelController.text,
+    );
+    widget.onSubmitted();
+  }
+
+  /// Writes the key to secure storage. That write can genuinely fail (unlike
+  /// the plain-prefs fields above) -- caught here and surfaced as a SnackBar
+  /// rather than swallowed, so a paste that silently did not save is not
+  /// mistaken for one that did.
+  Future<void> _saveApiKey() async {
+    try {
+      await widget.store.setOpenAiApiKey(_apiKeyController.text);
+      widget.onSubmitted();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${widget.labels.openAiApiKeySaveFailed}: $e')),
+      );
+    }
+  }
+
+  OpenAiCompatiblePreset? _presetForLabel(String? label) {
+    for (final preset in openAiCompatiblePresets) {
+      if (preset.label == label) return preset;
+    }
+    return null;
+  }
+
+  OpenAiCompatiblePreset? _presetForBaseUrl(String baseUrl) {
+    for (final preset in openAiCompatiblePresets) {
+      if (preset.baseUrl == baseUrl) return preset;
+    }
+    return null;
+  }
+
+  Future<void> _test() async {
+    setState(() {
+      _testing = true;
+      _testOk = null;
+    });
+    // Test probes (and leaves persisted) exactly what is on screen, not
+    // whatever was last submitted -- a pasted key never reaches here
+    // otherwise, since typing alone does not write to the store.
+    await _saveBaseUrl();
+    await _saveModel();
+    await _saveApiKey();
+    final client = OpenAiCompatibleCompletionClient(
+      baseUrl: _baseUrlController.text,
+      model: _modelController.text,
+      apiKey: _apiKeyController.text,
+    );
+    final ok = await client.isAvailable();
+    if (!mounted) return;
+    setState(() {
+      _testing = false;
+      _testOk = ok;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final labels = widget.labels;
+    final cs = Theme.of(context).colorScheme;
+    final currentPreset = _presetForBaseUrl(_baseUrlController.text);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: DropdownButtonFormField<String>(
+            initialValue: currentPreset?.label,
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: labels.openAiPreset,
+              border: const OutlineInputBorder(),
+            ),
+            items: [
+              for (final preset in openAiCompatiblePresets)
+                DropdownMenuItem(
+                  value: preset.label,
+                  child: Text(preset.label),
+                ),
+              DropdownMenuItem(value: null, child: Text(labels.openAiCustomPreset)),
+            ],
+            onChanged: (label) {
+              final preset = _presetForLabel(label);
+              if (preset == null) return;
+              setState(() => _baseUrlController.text = preset.baseUrl);
+              _saveBaseUrl();
+            },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: TextField(
+            controller: _baseUrlController,
+            focusNode: _baseUrlFocus,
+            decoration: InputDecoration(
+              labelText: labels.openAiBaseUrl,
+              border: const OutlineInputBorder(),
+            ),
+            onSubmitted: (_) => _saveBaseUrl(),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: TextField(
+            controller: _modelController,
+            focusNode: _modelFocus,
+            decoration: InputDecoration(
+              labelText: labels.model,
+              border: const OutlineInputBorder(),
+            ),
+            onSubmitted: (_) => _saveModel(),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: TextField(
+            controller: _apiKeyController,
+            focusNode: _apiKeyFocus,
+            obscureText: _obscureKey,
+            decoration: InputDecoration(
+              labelText: labels.openAiApiKey,
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                tooltip: _obscureKey ? labels.openAiShowKey : labels.openAiHideKey,
+                icon: Icon(
+                  _obscureKey
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                ),
+                onPressed: () => setState(() => _obscureKey = !_obscureKey),
+              ),
+            ),
+            onSubmitted: (_) => _saveApiKey(),
+          ),
+        ),
+        Row(
+          children: [
+            TextButton(
+              onPressed: _testing ? null : _test,
+              child: Text(labels.openAiTest),
+            ),
+            const SizedBox(width: 8),
+            if (_testing)
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else if (_testOk != null)
+              Text(
+                _testOk! ? labels.openAiTestOk : labels.openAiTestFail,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: _testOk! ? cs.primary : cs.error,
+                ),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }

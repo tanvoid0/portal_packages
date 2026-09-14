@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'ai_backend_kind.dart';
+import 'ai_routing_mode.dart';
 
 /// User-visible labels for [AiBackendOption] rows.
 class AiBackendLabels {
@@ -17,6 +18,32 @@ class AiBackendLabels {
     this.edgeGalleryTitle = 'Google AI Edge Gallery',
     this.edgeGalleryDescription =
         'Opens the Edge Gallery app for on-device chat (external).',
+    this.openAiCompatibleTitle = 'OpenAI-compatible API',
+    this.openAiCompatibleDescription =
+        'Any provider that speaks the OpenAI chat API — OpenAI, Groq, '
+        'OpenRouter, DeepSeek, Mistral, xAI, Together, LM Studio, Ollama — '
+        'with your own key.',
+    this.openAiPreset = 'Provider preset',
+    this.openAiCustomPreset = 'Custom',
+    this.openAiBaseUrl = 'Base URL',
+    this.openAiApiKey = 'API key',
+    this.openAiShowKey = 'Show API key',
+    this.openAiHideKey = 'Hide API key',
+    this.openAiTest = 'Test',
+    this.openAiTestOk = 'Reachable',
+    this.openAiTestFail = 'Not reachable',
+    this.openAiApiKeySaveFailed = 'Could not save the API key',
+    this.routingTitle = 'Routing',
+    this.routingServerFirst = 'Server first',
+    this.routingServerFirstDescription =
+        'Try the server; fall back to your local backend if it is '
+        'unreachable.',
+    this.routingLocalOnly = 'Local only',
+    this.routingLocalOnlyDescription =
+        'Always use your local backend, even with a server available.',
+    this.routingServerOnly = 'Server only',
+    this.routingServerOnlyDescription =
+        'Always use the server, even with a local backend configured.',
     this.unavailable = 'Unavailable',
     this.selectedBadge = 'Selected',
     this.scanning = 'Checking available providers…',
@@ -44,6 +71,25 @@ class AiBackendLabels {
   final String onDeviceDescription;
   final String edgeGalleryTitle;
   final String edgeGalleryDescription;
+  final String openAiCompatibleTitle;
+  final String openAiCompatibleDescription;
+  final String openAiPreset;
+  final String openAiCustomPreset;
+  final String openAiBaseUrl;
+  final String openAiApiKey;
+  final String openAiShowKey;
+  final String openAiHideKey;
+  final String openAiTest;
+  final String openAiTestOk;
+  final String openAiTestFail;
+  final String openAiApiKeySaveFailed;
+  final String routingTitle;
+  final String routingServerFirst;
+  final String routingServerFirstDescription;
+  final String routingLocalOnly;
+  final String routingLocalOnlyDescription;
+  final String routingServerOnly;
+  final String routingServerOnlyDescription;
   final String unavailable;
   final String selectedBadge;
   final String scanning;
@@ -65,6 +111,7 @@ class AiBackendLabels {
     AiBackendKind.ollama => ollamaTitle,
     AiBackendKind.systemOnDevice => onDeviceTitle,
     AiBackendKind.edgeGalleryDelegate => edgeGalleryTitle,
+    AiBackendKind.openAiCompatible => openAiCompatibleTitle,
   };
 
   String descriptionFor(AiBackendKind kind) => switch (kind) {
@@ -72,6 +119,7 @@ class AiBackendLabels {
     AiBackendKind.ollama => ollamaDescription,
     AiBackendKind.systemOnDevice => onDeviceDescription,
     AiBackendKind.edgeGalleryDelegate => edgeGalleryDescription,
+    AiBackendKind.openAiCompatible => openAiCompatibleDescription,
   };
 
   /// One glyph per provider, so a row reads at a glance before the label
@@ -81,5 +129,19 @@ class AiBackendLabels {
     AiBackendKind.ollama => Icons.dns_outlined,
     AiBackendKind.systemOnDevice => Icons.phone_iphone_outlined,
     AiBackendKind.edgeGalleryDelegate => Icons.open_in_new_rounded,
+    AiBackendKind.openAiCompatible => Icons.api_outlined,
+  };
+
+  /// One-line description for a routing [mode], next to its control.
+  String routingDescriptionFor(AiRoutingMode mode) => switch (mode) {
+    AiRoutingMode.serverFirst => routingServerFirstDescription,
+    AiRoutingMode.localOnly => routingLocalOnlyDescription,
+    AiRoutingMode.serverOnly => routingServerOnlyDescription,
+  };
+
+  String routingLabelFor(AiRoutingMode mode) => switch (mode) {
+    AiRoutingMode.serverFirst => routingServerFirst,
+    AiRoutingMode.localOnly => routingLocalOnly,
+    AiRoutingMode.serverOnly => routingServerOnly,
   };
 }

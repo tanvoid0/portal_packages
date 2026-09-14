@@ -132,22 +132,26 @@ class OllamaCompletionClient
       );
     }
 
-    await for (final chunk in streamed.stream.transform(utf8.decoder)) {
-      for (final line in chunk.split('\n')) {
-        final trimmed = line.trim();
-        if (trimmed.isEmpty) continue;
-        try {
-          final decoded = jsonDecode(trimmed) as Map<String, dynamic>;
-          final message = decoded['message'];
-          if (message is Map) {
-            final content = message['content'] as String?;
-            if (content != null && content.isNotEmpty) {
-              yield content;
-            }
+    // LineSplitter, not a per-chunk split: a network read can end mid-line,
+    // and an NDJSON line split across two reads would otherwise lose
+    // whichever half arrived in the second chunk. It also folds CRLF for us.
+    final lines = streamed.stream.transform(utf8.decoder).transform(
+      const LineSplitter(),
+    );
+    await for (final line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      try {
+        final decoded = jsonDecode(trimmed) as Map<String, dynamic>;
+        final message = decoded['message'];
+        if (message is Map) {
+          final content = message['content'] as String?;
+          if (content != null && content.isNotEmpty) {
+            yield content;
           }
-        } catch (_) {
-          // Ignore malformed NDJSON lines.
         }
+      } catch (_) {
+        // Ignore malformed NDJSON lines.
       }
     }
   }

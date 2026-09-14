@@ -28,12 +28,16 @@ class AiBackendDiscovery {
     bool cloudEligible = true,
     String ollamaHost = kDefaultOllamaBaseUrl,
     bool includeEdgeGalleryDelegate = true,
+    String openAiBaseUrl = '',
+    String openAiModel = '',
   }) async {
     final options = <AiBackendOption>[];
 
     if (includeCloud) {
       options.add(_cloudOption(cloudEligible));
     }
+
+    options.add(_openAiCompatibleOption(openAiBaseUrl, openAiModel));
 
     final ollamaResult = await _probeOllama(ollamaHost);
     options.add(
@@ -103,6 +107,22 @@ class AiBackendDiscovery {
         'directClient': hasDirectGemini,
         'cloudEligible': cloudEligible,
       },
+    );
+  }
+
+  /// Needs no probe -- there is no daemon to reach, just a base URL and model
+  /// the user typed. "Reachable" is what the settings screen's Test button
+  /// checks; here, "available" only means "configured enough to try".
+  AiBackendOption _openAiCompatibleOption(String baseUrl, String model) {
+    final configured = baseUrl.trim().isNotEmpty && model.trim().isNotEmpty;
+    return AiBackendOption(
+      kind: AiBackendKind.openAiCompatible,
+      available: configured,
+      unavailableReason: configured
+          ? null
+          : 'Set a base URL and model in AI settings',
+      models: model.trim().isEmpty ? const [] : [model.trim()],
+      metadata: {'baseUrl': baseUrl},
     );
   }
 

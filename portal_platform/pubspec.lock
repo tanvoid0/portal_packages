@@ -974,14 +974,14 @@ packages:
       path: "../portal_crypto"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.1.1"
   portal_ui_core:
     dependency: "direct main"
     description:
       path: "../portal_ui_core"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.1.1"
   pub_semver:
     dependency: transitive
     description:

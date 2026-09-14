@@ -17,7 +17,7 @@ see the widgets.
 - `PortalAiRuntime` — one entry point; apps supply prompts/tools, runtime picks the client.
 - `AiChatSession` / `AiChatStore` — persisted multi-turn threads.
 - `AiProposal` — structured "model proposes, user confirms" edits.
-- `clients/` — Gemini, Ollama, server completion (streaming) and a document/multimodal client.
+- `clients/` — OpenAI-compatible (any provider), Ollama, Gemini, server completion, a server-first `FallbackCompletionClient`, and a document/multimodal client.
 - `widgets/` — chat deck, composer, gate and thread inbox.
 
 ```dart
@@ -33,20 +33,51 @@ final result = await ai.ask('Summarise this week', onReply: (delta) => print(del
 
 ## Backends — with or without a server
 
-`PortalAiRuntime.create` picks a client from what it is given, in this order.
-Nothing here needs a server; the server is one option among four.
+`PortalAiRuntime.create` picks a client from what it is given. Nothing here
+needs a server; the server is one option among five.
 
-| backend | comes from | notes |
+| backend | configured by | notes |
 |---|---|---|
 | **Ollama** (dev override) | `AI_OLLAMA_MODEL` / `AI_OLLAMA_HOST` in the `env` map | wins over everything — point a checkout at a local model, costs nothing |
-| **On-device** (Gemini Nano via AICore / ML Kit GenAI) | user picks it in the AI settings section (`AiBackendStore`) | Android devices with AICore; no network at all |
-| **Ollama** on the LAN | user picks it in settings and enters the host | same client as the override, user-chosen |
-| **Gemini cloud** with the user's own key | user picks it in settings and pastes a key | the key lives in the app's secure prefs, never in the build |
-| **Your server** | `post` (and optionally `postStream`) | production default: the key, model choice and per-user quota stay server-side; "cloud" in settings routes here whenever a server exists |
+| **On-device** — Gemini Nano via AICore / ML Kit GenAI | user picks it in AI settings | Android devices with AICore; no network at all |
+| **Ollama** on the LAN | user picks it in settings, enters the host | the phone talks to a machine on the same network |
+| **Any OpenAI-compatible API** | user pastes base URL + model + key in settings, or the app ships defaults in `.env` | OpenAI, Groq, OpenRouter, DeepSeek, Mistral, xAI, Together, LM Studio, Ollama `/v1`, Gemini's OpenAI endpoint — one client, `openAiCompatiblePresets` has the URLs |
+| **Your server** | `post` (and optionally `postStream`) | the key, model choice and per-user quota stay server-side; "cloud" in settings routes here |
 
-Omit `post` and the runtime works entirely on-device / LAN / with the user's
-own key — the settings section (`AiSettingsSection`) lets them choose. Give
-it `post` and cloud requests go to your API instead.
+### Keys: bring your own, or ship one
+
+Two ways to get a key into the OpenAI-compatible backend; the user's always
+wins:
+
+- **BYOK.** The AI settings section (`AiSettingsSection`) has base URL,
+  model and key fields with a *Test* button. The key goes to
+  `flutter_secure_storage`, never to shared preferences or the server.
+- **Developer default.** `AI_OPENAI_BASE_URL`, `AI_OPENAI_MODEL`,
+  `AI_OPENAI_API_KEY` in the app's `.env` (the `env` map you pass to
+  `create`). The app works out of the box without the user entering
+  anything.
+
+  A key in a bundled `.env` is inside the APK and extractable in minutes —
+  this is fine for a private or sideloaded build and for development, and
+  the wrong choice for a store app, where anyone can run up your bill. For
+  a store app, use the server transport: the key never leaves your backend.
+
+### Routing: server first, local when it can't
+
+When a server transport is present, `AiRoutingMode` (a control in the
+settings section, persisted per app) decides:
+
+| mode | behaviour |
+|---|---|
+| `serverFirst` (default) | try the server; on a transport failure — offline, DNS, timeout, 5xx — answer with the local backend the user configured, and mark the reply as answered locally. A 4xx (auth, quota) is surfaced, never hidden behind a fallback. |
+| `localOnly` | never touch the server. Privacy, airplane mode, or a user who just prefers their own model. |
+| `serverOnly` | the pre-0.2 behaviour. |
+
+Without a server transport the mode is moot: whatever local backend is
+configured answers, or the runtime tells you nothing is.
+
+`FallbackCompletionClient` is exported on its own if you want the same
+primary-then-fallback shape between any two clients.
 
 ### The server contract
 

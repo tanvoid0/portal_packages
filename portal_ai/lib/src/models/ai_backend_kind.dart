@@ -14,6 +14,11 @@ enum AiBackendKind {
 
   /// Opens Google AI Edge Gallery when installed (delegation, not in-app).
   edgeGalleryDelegate,
+
+  /// Any provider that speaks the OpenAI chat API -- OpenAI, Groq,
+  /// OpenRouter, DeepSeek, Mistral, xAI, Together, LM Studio, Ollama -- with
+  /// a user- or developer-supplied key.
+  openAiCompatible,
 }
 
 extension AiBackendKindIds on AiBackendKind {
@@ -22,6 +27,7 @@ extension AiBackendKindIds on AiBackendKind {
     AiBackendKind.ollama => 'ollama',
     AiBackendKind.systemOnDevice => 'system_on_device',
     AiBackendKind.edgeGalleryDelegate => 'edge_gallery',
+    AiBackendKind.openAiCompatible => 'openai_compatible',
   };
 
   static AiBackendKind? fromId(String? id) {
