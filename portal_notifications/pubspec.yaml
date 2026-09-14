@@ -1,7 +1,7 @@
 name: portal_notifications
 description: Shared local notification scheduling for Portal apps.
-version: 0.1.0
-repository: https://github.com/tanvoid0/pocket_portal/tree/main/packages/portal_notifications
+version: 0.1.1
+repository: https://github.com/tanvoid0/portal_packages/tree/main/portal_notifications
 
 environment:
   sdk: ">=3.8.1 <4.0.0"

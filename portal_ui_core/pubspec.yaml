@@ -1,7 +1,7 @@
 name: portal_ui_core
 description: Design tokens, ThemeExtension, and theme factories for the Portal UI kit.
-version: 0.1.0
-repository: https://github.com/tanvoid0/pocket_portal/tree/main/packages/portal_ui_core
+version: 0.1.1
+repository: https://github.com/tanvoid0/portal_packages/tree/main/portal_ui_core
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

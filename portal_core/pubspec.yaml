@@ -1,8 +1,8 @@
 name: portal_core
 
 description: Annotation-driven model codegen (JSON, copyWith) plus a local cache and repository base for Portal apps.
-version: 1.0.0
-repository: https://github.com/tanvoid0/pocket_portal/tree/main/packages/portal_core
+version: 1.0.1
+repository: https://github.com/tanvoid0/portal_packages/tree/main/portal_core
 
 environment:
   sdk: ">=3.8.1 <4.0.0"

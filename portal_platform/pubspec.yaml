@@ -1,7 +1,7 @@
 name: portal_platform
 description: Shared auth, API client, session, config, deep-link routing, and offline-first sync for Portal apps.
-version: 0.1.0
-repository: https://github.com/tanvoid0/pocket_portal/tree/main/packages/portal_platform
+version: 0.1.1
+repository: https://github.com/tanvoid0/portal_packages/tree/main/portal_platform
 
 environment:
   sdk: ">=3.8.1 <4.0.0"
