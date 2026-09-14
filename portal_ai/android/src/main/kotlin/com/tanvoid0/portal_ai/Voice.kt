@@ -152,6 +152,11 @@ class Voice(private val context: Context) {
         }
         val recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
         this.recognizer = recognizer
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            if (!locale.isNullOrBlank()) putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
+        }
         recognizer.setRecognitionListener(object : RecognitionListener {
             override fun onPartialResults(partialResults: Bundle?) {
                 val text = partialResults?.firstResult()
@@ -169,6 +174,21 @@ class Voice(private val context: Context) {
                 // with no final event and the page drops out of voice mode.
                 when (error) {
                     SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {}
+                    // The recognizer is installed but this language's pack
+                    // was never downloaded: a fresh phone, or a locale added
+                    // later. `isOnDeviceRecognitionAvailable` says yes either
+                    // way. Ask for the pack so the next tap works, and say
+                    // what happened this time instead of a bare code.
+                    SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            recognizer.triggerModelDownload(intent)
+                        }
+                        sink.error(
+                            "LANGUAGE_UNAVAILABLE",
+                            "Speech language pack not downloaded yet; download started",
+                            null,
+                        )
+                    }
                     else -> sink.error("LISTEN_FAILED", "Speech recognizer error $error", null)
                 }
                 sink.endOfStream()
@@ -185,11 +205,6 @@ class Voice(private val context: Context) {
             override fun onEndOfSpeech() {}
             override fun onEvent(eventType: Int, params: Bundle?) {}
         })
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            if (!locale.isNullOrBlank()) putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
-        }
         recognizer.startListening(intent)
     }
 

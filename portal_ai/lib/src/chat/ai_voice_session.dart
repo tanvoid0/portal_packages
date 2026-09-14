@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import '../platform/portal_ai_voice.dart';
 import 'ai_speech_text.dart';
@@ -123,7 +124,8 @@ class AiVoiceSession extends ChangeNotifier {
         notifyListeners();
       },
       onError: (Object e) {
-        error = e.toString();
+        // The platform side writes its message for a person to read.
+        error = e is PlatformException ? (e.message ?? e.code) : e.toString();
         stop();
       },
       onDone: () {
