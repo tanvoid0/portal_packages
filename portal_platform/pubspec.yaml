@@ -1,7 +1,7 @@
 name: portal_platform
 description: Shared auth, API client, session, config, deep-link routing, and offline-first sync for Portal apps.
 version: 0.1.0
-publish_to: none
+repository: https://github.com/tanvoid0/pocket_portal/tree/main/packages/portal_platform
 
 environment:
   sdk: ">=3.8.1 <4.0.0"
@@ -22,14 +22,12 @@ dependencies:
   sqflite: ^2.4.1
   flutter_secure_storage: ^10.0.0
   cryptography: ^2.7.0
-  portal_crypto:
-    path: ../portal_crypto
+  portal_crypto: ^0.1.0
   # For AppToast: the sync layer has user-facing outcomes (a write queued, a
   # change the server refused) and every app was wiring the same toasts by
   # hand. portal_ui_core depends only on Flutter, so this adds no weight and
   # no cycle.
-  portal_ui_core:
-    path: ../portal_ui_core
+  portal_ui_core: ^0.1.0
   flutter_dotenv: ^6.0.0
   app_links: ^7.0.0
   freezed_annotation: ^2.4.1
@@ -45,6 +43,8 @@ dependencies:
   # each app manifest; without it canLaunchUrl is false on Android 11+.
   url_launcher: ^6.3.1
   local_auth: ^2.3.0
+  local_auth_android: ^1.0.56
+  local_auth_darwin: ^1.6.1
   google_sign_in: ^6.2.2
 
 dev_dependencies:

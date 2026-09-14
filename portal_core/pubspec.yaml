@@ -1,8 +1,8 @@
 name: portal_core
 
-description: A starting point for Flutter libraries or applications.
+description: Annotation-driven model codegen (JSON, copyWith) plus a local cache and repository base for Portal apps.
 version: 1.0.0
-# repository: https://github.com/my_org/my_repo
+repository: https://github.com/tanvoid0/pocket_portal/tree/main/packages/portal_core
 
 environment:
   sdk: ">=3.8.1 <4.0.0"
@@ -42,4 +42,3 @@ targets:
         options:
           enabled: true
 
-publish_to: none

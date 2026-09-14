@@ -1,7 +1,7 @@
 name: portal_ai
 description: Platform-aware local and cloud AI backend discovery for Portal apps.
 version: 0.1.0
-publish_to: none
+repository: https://github.com/tanvoid0/pocket_portal/tree/main/packages/portal_ai
 
 environment:
   sdk: ">=3.12.0 <4.0.0"

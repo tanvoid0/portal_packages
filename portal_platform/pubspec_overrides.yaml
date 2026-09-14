@@ -1,0 +1,8 @@
+# Published pubspec depends on portal_crypto / portal_ui_core from pub.dev;
+# inside this monorepo resolve them from the sibling packages. `pub publish`
+# ignores this file.
+dependency_overrides:
+  portal_crypto:
+    path: ../portal_crypto
+  portal_ui_core:
+    path: ../portal_ui_core
