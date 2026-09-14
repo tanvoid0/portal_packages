@@ -1,4 +1,4 @@
-## 0.1.1
+## 0.1.2
 
-- Source moved to the public `portal_packages` repository; `repository:` link now resolves.
+- Example app and screenshots.
 

@@ -1,6 +1,6 @@
 name: portal_ui_core
 description: Design tokens, ThemeExtension, and theme factories for the Portal UI kit.
-version: 0.1.1
+version: 0.1.2
 repository: https://github.com/tanvoid0/portal_packages/tree/main/portal_ui_core
 
 environment:
