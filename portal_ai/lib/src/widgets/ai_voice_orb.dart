@@ -135,17 +135,19 @@ class _AiVoiceOrbState extends State<AiVoiceOrb>
     // In light mode every hue is inked a little toward black, or the halo
     // vanishes into the paper.
     Color ink(Color c) => dark ? c : Color.lerp(c, scheme.onSurface, 0.18)!;
-    // The partners are the accent's triad, so the orb follows the app's
-    // theme and the hues still sit far apart: a monochrome orb read as a
-    // flat disc, not glass. The saturation floor keeps a muted accent from
-    // rotating into three greys.
+    // The partners sit either side of the accent, a shade darker and a
+    // shade lighter, so the orb stays in the app's own hue family — a triad
+    // spun a coral brand into green and blue. Depth comes from the
+    // lightness split, not the hue distance; the saturation floor keeps a
+    // muted accent from fading into three greys.
     final hsl = HSLColor.fromColor(accent);
-    Color partner(double turn) => hsl
+    Color partner(double turn, double lift) => hsl
         .withHue((hsl.hue + turn) % 360)
         .withSaturation(math.max(hsl.saturation, 0.6))
+        .withLightness((hsl.lightness + lift).clamp(0.15, 0.85))
         .toColor();
-    final cool = ink(partner(120));
-    final warm = ink(partner(-120));
+    final cool = ink(partner(35, -0.18));
+    final warm = ink(partner(-35, 0.14));
     // The specular highlight is the light end of the scheme in either mode.
     final glare = dark ? scheme.onSurface : scheme.surface;
 
