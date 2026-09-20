@@ -203,7 +203,7 @@ List<Widget> _barActions(
 
   return [
     ...?trailing,
-    for (final a in inline) _ActionButton(action: a),
+    for (final a in inline) PortalActionButton(action: a),
     if (overflow.isNotEmpty)
       IconButton(
         tooltip: 'More',
@@ -333,8 +333,11 @@ class _PortalAppBarTitle extends StatelessWidget {
   }
 }
 
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({required this.action});
+/// A [PortalAction] as an inline icon button: `tooltip` from its label, the
+/// badge dot on the icon. What the bar draws for its first actions; the
+/// floating [PortalToolbar] draws the same, so an action reads alike in both.
+class PortalActionButton extends StatelessWidget {
+  const PortalActionButton({super.key, required this.action});
 
   final PortalAction action;
 
