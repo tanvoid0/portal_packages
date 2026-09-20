@@ -22,10 +22,11 @@ class _GalleryAppState extends State<GalleryApp> {
     return MaterialApp(
       title: 'portal_ui_core',
       debugShowCheckedModeBanner: false,
-      theme: buildPortalTheme(
-        brightness: _dark ? Brightness.dark : Brightness.light,
-        preset: _preset,
-      ),
+      // PortalThemeConfig, not buildPortalTheme: only the config path applies
+      // the component sub-themes the gallery exists to show.
+      theme: _dark
+          ? PortalThemeConfig(tokens: designTokensForPreset(_preset)).dark()
+          : PortalThemeConfig(tokens: designTokensForPreset(_preset)).light(),
       home: GalleryPage(
         dark: _dark,
         preset: _preset,
@@ -59,6 +60,7 @@ class _GalleryPageState extends State<GalleryPage> {
   var _nav = 0;
   var _chip = 1;
   var _loading = false;
+  var _slider = 0.4;
 
   @override
   Widget build(BuildContext context) {
@@ -166,6 +168,61 @@ class _GalleryPageState extends State<GalleryPage> {
             labels: const ['Today', 'Week', 'Month'],
             index: _tab,
             onChanged: (i) => setState(() => _tab = i),
+          ),
+          SizedBox(height: tokens.spacing.md),
+          DefaultTabController(
+            length: 3,
+            child: TabBar(
+              tabs: [
+                for (final t in ['Overview', 'History', 'Notes']) Tab(text: t),
+              ],
+            ),
+          ),
+          gap,
+          const PortalSectionHeader(title: 'Slider & pickers', icon: Icons.tune),
+          Slider(
+            value: _slider,
+            label: '${(_slider * 100).round()}%',
+            divisions: 10,
+            onChanged: (v) => setState(() => _slider = v),
+          ),
+          Wrap(
+            spacing: tokens.spacing.sm,
+            runSpacing: tokens.spacing.sm,
+            children: [
+              PortalButton(
+                label: 'Pick date',
+                variant: PortalButtonVariant.secondary,
+                onPressed: () => showDatePicker(
+                  context: context,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime(2030),
+                ),
+              ),
+              PortalButton(
+                label: 'Pick time',
+                variant: PortalButtonVariant.secondary,
+                onPressed: () => showTimePicker(
+                  context: context,
+                  initialTime: TimeOfDay.now(),
+                ),
+              ),
+              PortalButton(
+                label: 'Bottom sheet',
+                variant: PortalButtonVariant.secondary,
+                onPressed: () => showModalBottomSheet<void>(
+                  context: context,
+                  builder: (_) => Padding(
+                    padding: EdgeInsets.all(tokens.spacing.lg),
+                    child: const PortalEmptyState(
+                      icon: Icons.layers_outlined,
+                      title: 'Themed sheet',
+                      message: 'radii.xl top, drag handle, panel surface.',
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
           gap,
           const PortalSectionHeader(title: 'Search', icon: Icons.search),

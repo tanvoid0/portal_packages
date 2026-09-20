@@ -49,6 +49,37 @@ void main() {
     });
   });
 
+  group('B4 sub-themes', () {
+    test('pickers, sheet, tabs and slider are themed from tokens', () {
+      final theme = PortalThemePalette.violet.toConfig().light();
+      // Pickers share the dialog's shell, whatever surface the palette gave it.
+      final panel = theme.dialogTheme.backgroundColor;
+      final xl = BorderRadius.circular(portalUiThemeFrom(theme)!.tokens.radii.xl);
+
+      expect(theme.datePickerTheme.backgroundColor, panel);
+      expect((theme.datePickerTheme.shape as RoundedRectangleBorder).borderRadius, xl);
+      expect(theme.timePickerTheme.backgroundColor, panel);
+      expect((theme.timePickerTheme.shape as RoundedRectangleBorder).borderRadius, xl);
+      // The unselected hour/minute field must not vanish into the panel.
+      final unselectedField = WidgetStateProperty.resolveAs<Color?>(
+        theme.timePickerTheme.hourMinuteColor,
+        const <WidgetState>{},
+      );
+      expect(unselectedField, isNotNull);
+      expect(unselectedField, isNot(panel));
+      // Handle styled, not forced: apps still hand-draw one on transparent sheets.
+      expect(theme.bottomSheetTheme.showDragHandle, isNull);
+      expect(theme.bottomSheetTheme.dragHandleSize, const Size(36, 4));
+      // Indicator left to M3 so TabBar.indicatorColor and .secondary still work.
+      expect(theme.tabBarTheme.indicator, isNull);
+      expect(theme.tabBarTheme.dividerColor, Colors.transparent);
+      expect(theme.sliderTheme.thumbShape, isA<HandleThumbShape>());
+      expect(theme.sliderTheme.trackShape, isA<GappedSliderTrackShape>());
+      expect(theme.sliderTheme.rangeThumbShape, isA<HandleRangeSliderThumbShape>());
+      expect(theme.sliderTheme.tickMarkShape, isA<RoundSliderTickMarkShape>());
+    });
+  });
+
   group('PortalAppTheme', () {
     test('delegates to PortalThemeConfig', () {
       final modes = portalDefaultAppTheme.build();

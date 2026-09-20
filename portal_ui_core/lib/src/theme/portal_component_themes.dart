@@ -95,6 +95,11 @@ ThemeData applyPortalComponentThemes({
         borderRadius: BorderRadius.circular(r.md),
         borderSide: side ?? borderSide,
       );
+  // Dialogs and the date/time pickers share one shell: radii.xl, hairline.
+  final panelShape = RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(r.xl),
+    side: BorderSide(color: border.withValues(alpha: 0.35)),
+  );
 
   return base.copyWith(
     primaryColor: cs.primary,
@@ -298,10 +303,7 @@ ThemeData applyPortalComponentThemes({
       backgroundColor: panelSurface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(r.xl),
-        side: BorderSide(color: border.withValues(alpha: 0.35)),
-      ),
+      shape: panelShape,
       titleTextStyle: TextStyle(
         color: cs.onSurface,
         fontWeight: FontWeight.w600,
@@ -314,11 +316,40 @@ ThemeData applyPortalComponentThemes({
         height: 1.45,
       ),
     ),
+    datePickerTheme: DatePickerThemeData(
+      backgroundColor: panelSurface,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: panelShape,
+    ),
+    timePickerTheme: TimePickerThemeData(
+      backgroundColor: panelSurface,
+      elevation: 0,
+      shape: panelShape,
+      // The dial and the hour/minute fields are fields: one tone off the
+      // panel, like inputFill. M3's unselected default is Highest, which a
+      // surface palette folds into the panel itself.
+      dialBackgroundColor: inputFill,
+      hourMinuteColor: WidgetStateColor.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? cs.primaryContainer
+            : inputFill,
+      ),
+      hourMinuteShape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(r.md),
+      ),
+      dayPeriodShape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(r.md),
+      ),
+    ),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: panelSurface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       modalElevation: 0,
+      // Styles the handle; does not force it on. Apps still hand-draw one on
+      // a transparent sheet, and a theme handle would float 48dp above it.
+      // C1's PortalSheet passes showDragHandle itself.
       dragHandleColor: border,
       dragHandleSize: const Size(36, 4),
       shape: RoundedRectangleBorder(
@@ -404,9 +435,38 @@ ThemeData applyPortalComponentThemes({
         ),
       ),
     ),
+    // Indicator left to M3: a 3dp rounded label-width primary bar with the
+    // elastic slide. An explicit `indicator` here would override
+    // TabBar.indicatorColor and give TabBar.secondary the primary pill too.
+    tabBarTheme: TabBarThemeData(
+      dividerColor: Colors.transparent,
+      labelColor: cs.onSurface,
+      unselectedLabelColor: muted,
+      overlayColor: WidgetStatePropertyAll(cs.primary.withValues(alpha: 0.08)),
+    ),
+    // M3's 2024 slider spelled out (`year2023: false` is deprecated): a
+    // 4x44 pill handle that narrows under the finger, a tall track with a
+    // gap either side of it, and a rounded value label.
     sliderTheme: SliderThemeData(
+      trackHeight: 16,
+      trackGap: 6,
+      thumbShape: const HandleThumbShape(),
+      trackShape: const GappedSliderTrackShape(),
+      rangeThumbShape: const HandleRangeSliderThumbShape(),
+      rangeTrackShape: const GappedRangeSliderTrackShape(),
+      tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 2),
+      valueIndicatorShape: const RoundedRectSliderValueIndicatorShape(),
+      thumbSize: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.pressed)
+            ? const Size(2, 44)
+            : const Size(4, 44),
+      ),
       activeTrackColor: cs.primary,
-      inactiveTrackColor: cs.outlineVariant,
+      // Tinted like the progress track, not M3's secondaryContainer: a surface
+      // palette maps that to surfacePanel, a hair off the card in dark mode.
+      inactiveTrackColor: cs.primary.withValues(alpha: 0.15),
+      activeTickMarkColor: cs.onPrimary,
+      inactiveTickMarkColor: cs.primary,
       thumbColor: cs.primary,
       overlayColor: cs.primary.withValues(alpha: 0.12),
       valueIndicatorColor: cs.primary,
