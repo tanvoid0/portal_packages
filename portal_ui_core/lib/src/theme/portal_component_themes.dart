@@ -480,6 +480,7 @@ ThemeData applyPortalComponentThemes({
       color: cs.primary,
       linearTrackColor: cs.primary.withValues(alpha: 0.15),
       circularTrackColor: cs.primary.withValues(alpha: 0.15),
+      refreshBackgroundColor: cs.portalElevatedSurface,
     ),
     popupMenuTheme: PopupMenuThemeData(
       color: panelSurface,

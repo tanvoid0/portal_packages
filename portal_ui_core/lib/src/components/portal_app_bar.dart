@@ -388,6 +388,11 @@ class PortalHeader extends StatelessWidget {
   /// Non-action widgets before the actions. See [PortalAppBar.trailing].
   final List<Widget>? trailing;
 
+  /// Height at rest, above the status bar — M3's large bar. Passed to the
+  /// sliver rather than left to Material's private default so
+  /// `PortalRefresh.belowBar` can measure against it.
+  static const double expandedHeight = 152;
+
   @override
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
@@ -406,6 +411,7 @@ class PortalHeader extends StatelessWidget {
         // pinned extent from a constant, not from toolbarHeight, so both go.
         toolbarHeight: kToolbarHeight,
         collapsedHeight: MediaQuery.paddingOf(context).top + kToolbarHeight,
+        expandedHeight: expandedHeight,
         backgroundColor: tint,
         scrolledUnderElevation: 0,
         title: _LargeTitle(title: title, subtitle: subtitle),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/portal_ui_theme.dart';
 import 'portal_app_bar.dart';
+import 'portal_refresh.dart';
 
 /// Standard scrolling page: sliver app bar, gutter-aligned content, bottom
 /// clearance for the floating nav, optional pull-to-refresh.
@@ -102,9 +103,14 @@ class PortalScrollPage extends StatelessWidget {
       bottomNavigationBar: bottomNavigationBar,
       body: onRefresh == null
           ? scroll
-          : RefreshIndicator(
-              color: portal.primary,
+          : PortalRefresh(
               onRefresh: onRefresh!,
+              // Under the bar, not over it. A custom [appBar] is assumed
+              // compact — the same offset the default bar gets.
+              edgeOffset: bar == null
+                  ? 0
+                  : PortalRefresh.belowBar(context,
+                      large: appBar == null && header != null),
               child: scroll,
             ),
     );
