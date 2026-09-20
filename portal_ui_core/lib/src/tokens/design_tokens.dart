@@ -55,6 +55,18 @@ class PortalRadii {
   final double full;
 }
 
+/// Avatar diameters — a list row (`sm`), a bar or tile (`md`), a profile
+/// header (`lg`). `PortalProgressRing` sizes itself to `lg` by default so a
+/// ring and an avatar line up in the same row.
+@immutable
+class PortalAvatarSizes {
+  const PortalAvatarSizes({this.sm = 32, this.md = 40, this.lg = 56});
+
+  final double sm;
+  final double md;
+  final double lg;
+}
+
 /// Typography scale (font sizes and typeface). Pair with [TextTheme] in
 /// [buildPortalTheme].
 @immutable
@@ -427,6 +439,7 @@ class DesignTokens {
     this.elevation = const PortalElevation(),
     this.gradients = const PortalGradients(),
     this.layout = const PortalLayoutInsets(),
+    this.avatarSizes = const PortalAvatarSizes(),
     this.minTapTarget = 44,
     this.borderWidth = 1,
     this.expressiveCorners = true,
@@ -443,6 +456,9 @@ class DesignTokens {
   /// Page gutter, section gap and the clearance a floating nav needs.
   /// Read this instead of writing a literal inset at a call site.
   final PortalLayoutInsets layout;
+
+  /// Avatar diameters; see [PortalAvatarSizes].
+  final PortalAvatarSizes avatarSizes;
 
   /// Minimum interactive dimension (accessibility).
   final double minTapTarget;
