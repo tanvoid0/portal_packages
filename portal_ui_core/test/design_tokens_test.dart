@@ -123,6 +123,32 @@ void main() {
       expect(app.spacing.lg, 16); // inherited default
     });
   });
+
+  group('Typeface', () {
+    test('buildPortalTheme sets the packaged Plus Jakarta Sans everywhere', () {
+      final theme = buildPortalTheme(brightness: Brightness.light);
+      const family = PortalTypeScale.defaultFontFamily;
+      expect(family, 'packages/portal_ui_core/PlusJakartaSans');
+      expect(theme.textTheme.bodyLarge?.fontFamily, family);
+      expect(theme.textTheme.displayLarge?.fontFamily, family);
+      expect(theme.textTheme.labelSmall?.fontFamily, family);
+      expect(theme.primaryTextTheme.bodyMedium?.fontFamily, family);
+    });
+
+    test('a per-style family in PortalTextStyles wins over the token', () {
+      final theme = buildPortalTheme(
+        brightness: Brightness.light,
+        tokens: const DesignTokens(
+          textStyles: PortalTextStyles(
+            headline: TextStyle(fontSize: 28, fontFamily: 'Lora'),
+          ),
+        ),
+      );
+      expect(theme.textTheme.headlineLarge?.fontFamily, 'Lora');
+      expect(theme.textTheme.bodyLarge?.fontFamily,
+          PortalTypeScale.defaultFontFamily);
+    });
+  });
 }
 
 class _FlatElevation extends PortalElevation {

@@ -54,7 +54,8 @@ class PortalRadii {
   final double full;
 }
 
-/// Typography scale (font sizes). Pair with [TextTheme] in [buildPortalTheme].
+/// Typography scale (font sizes and typeface). Pair with [TextTheme] in
+/// [buildPortalTheme].
 @immutable
 class PortalTypeScale {
   const PortalTypeScale({
@@ -64,7 +65,14 @@ class PortalTypeScale {
     this.lg = 16,
     this.xl = 18,
     this.xxl = 22,
+    this.fontFamily = defaultFontFamily,
   });
+
+  /// Plus Jakarta Sans, bundled with this package. This is Flutter's
+  /// package-font key, so it resolves from any app that depends on ui_core
+  /// without the app declaring a font of its own.
+  static const String defaultFontFamily =
+      'packages/portal_ui_core/PlusJakartaSans';
 
   final double xs;
   final double sm;
@@ -72,6 +80,11 @@ class PortalTypeScale {
   final double lg;
   final double xl;
   final double xxl;
+
+  /// Typeface [buildPortalTheme] sets on [ThemeData.fontFamily]. Fills every
+  /// text style that does not name its own family, so a per-style override
+  /// (a serif heading, say) still wins. `null` leaves the platform default.
+  final String? fontFamily;
 }
 
 /// Typography *styles* — complete [TextStyle] definitions for semantic roles.

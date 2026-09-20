@@ -90,10 +90,14 @@ ThemeData buildPortalTheme({
   final portal = _portalExtension(scheme, resolvedTokens);
   final textTheme = _textTheme(scheme, resolvedTokens);
 
+  // ThemeData merges [textTheme] over its typography defaults, so
+  // [fontFamily] lands on every style that does not name its own family and
+  // a per-style override in [PortalTextStyles] is left alone.
   return ThemeData(
     useMaterial3: true,
     brightness: brightness,
     colorScheme: scheme,
+    fontFamily: resolvedTokens.typeScale.fontFamily,
     scaffoldBackgroundColor: scheme.surface,
     textTheme: textTheme,
     extensions: <ThemeExtension<dynamic>>[portal],
