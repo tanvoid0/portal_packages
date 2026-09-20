@@ -49,6 +49,7 @@ export 'src/components/portal_scroll_page.dart';
 export 'src/components/portal_search_field.dart';
 export 'src/components/portal_section_header.dart';
 export 'src/components/portal_segmented_tabs.dart';
+export 'src/components/portal_sheet.dart';
 export 'src/components/portal_skeleton.dart';
 export 'src/components/portal_stat_card.dart';
 export 'src/components/portal_startup_gate.dart';
