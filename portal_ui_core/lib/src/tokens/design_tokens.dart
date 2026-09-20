@@ -312,6 +312,44 @@ class PortalElevation {
   }
 }
 
+/// The three gradients the fleet actually draws, built from the scheme so
+/// they follow a theme change. Everything else was one of 38 ad-hoc
+/// `LinearGradient`s in app code.
+@immutable
+class PortalGradients {
+  const PortalGradients();
+
+  /// A faint top-left light on a surface: `onSurface` at 4% fading to
+  /// nothing. Layered *over* the surface colour, never instead of it.
+  LinearGradient surfaceSheen(ColorScheme scheme) => LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          scheme.onSurface.withValues(alpha: 0.04),
+          scheme.onSurface.withValues(alpha: 0),
+        ],
+      );
+
+  /// Brand fill for a hero or a highlighted card: `primary` →
+  /// `primaryContainer` at 135° (top-left to bottom-right).
+  LinearGradient accent(ColorScheme scheme) => LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [scheme.primary, scheme.primaryContainer],
+      );
+
+  /// Legibility scrim for text over an image: `scrim` at 60% rising from
+  /// the bottom edge to nothing.
+  LinearGradient imageScrim(ColorScheme scheme) => LinearGradient(
+        begin: Alignment.bottomCenter,
+        end: Alignment.topCenter,
+        colors: [
+          scheme.scrim.withValues(alpha: 0.6),
+          scheme.scrim.withValues(alpha: 0),
+        ],
+      );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DesignTokens — the root bundle
 // ─────────────────────────────────────────────────────────────────────────────
@@ -353,6 +391,7 @@ class DesignTokens {
     this.textStyles = const PortalTextStyles(),
     this.motion = const PortalMotion(),
     this.elevation = const PortalElevation(),
+    this.gradients = const PortalGradients(),
     this.layout = const PortalLayoutInsets(),
     this.minTapTarget = 44,
     this.borderWidth = 1,
@@ -365,6 +404,7 @@ class DesignTokens {
   final PortalTextStyles textStyles;
   final PortalMotion motion;
   final PortalElevation elevation;
+  final PortalGradients gradients;
 
   /// Page gutter, section gap and the clearance a floating nav needs.
   /// Read this instead of writing a literal inset at a call site.

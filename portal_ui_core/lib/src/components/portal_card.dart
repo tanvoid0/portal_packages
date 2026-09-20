@@ -23,6 +23,7 @@ class PortalCard extends StatelessWidget {
     this.heroAccent,
     this.heroOffset = const Offset(12, 12),
     this.gradient,
+    this.sheen = false,
     this.backgroundColor,
     this.borderRadius,
   });
@@ -40,6 +41,11 @@ class PortalCard extends StatelessWidget {
   final Offset heroOffset;
 
   final Gradient? gradient;
+
+  /// Lays [PortalGradients.surfaceSheen] over the surface colour, behind the
+  /// content — a faint top-left light that lifts a card off a flat page.
+  final bool sheen;
+
   final Color? backgroundColor;
   final BorderRadius? borderRadius;
 
@@ -73,6 +79,16 @@ class PortalCard extends StatelessWidget {
           ),
           inner,
         ],
+      );
+    }
+
+    if (sheen) {
+      content = DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: t.gradients.surfaceSheen(Theme.of(context).colorScheme),
+          borderRadius: radius,
+        ),
+        child: content,
       );
     }
 

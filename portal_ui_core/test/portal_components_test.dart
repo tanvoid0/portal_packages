@@ -88,6 +88,37 @@ void main() {
     expect(find.text('+3'), findsOneWidget);
   });
 
+  testWidgets('a sheen card paints the surface sheen behind its content',
+      (t) async {
+    await t.pumpWidget(_host(const PortalCard(
+      sheen: true,
+      child: Text('lift'),
+    )));
+
+    final scheme = Theme.of(t.element(find.text('lift'))).colorScheme;
+    final sheen = t
+        .widgetList<DecoratedBox>(find.descendant(
+          of: find.byType(PortalCard),
+          matching: find.byType(DecoratedBox),
+        ))
+        .map((b) => (b.decoration as BoxDecoration).gradient)
+        .whereType<LinearGradient>()
+        .singleWhere(
+          (g) => g.colors.first == scheme.onSurface.withValues(alpha: 0.04),
+        );
+    expect(sheen.colors.last.a, 0);
+    expect(find.text('lift'), findsOneWidget);
+  });
+
+  test('gradients: accent runs primary to primaryContainer, scrim is 60% scrim',
+      () {
+    const g = PortalGradients();
+    final scheme = ColorScheme.fromSeed(seedColor: Colors.teal);
+    expect(g.accent(scheme).colors, [scheme.primary, scheme.primaryContainer]);
+    expect(g.imageScrim(scheme).colors.first.a, closeTo(0.6, 0.01));
+    expect(g.imageScrim(scheme).begin, Alignment.bottomCenter);
+  });
+
   testWidgets('filter chip meets the tap-target floor and reports taps',
       (t) async {
     var taps = 0;
