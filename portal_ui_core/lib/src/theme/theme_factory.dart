@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../tokens/design_tokens.dart';
 import 'portal_default_color_schemes.dart';
+import 'portal_semantic_colors.dart';
 import 'portal_theme_build_context.dart';
 import 'portal_typography.dart';
 import 'portal_ui_theme.dart';
@@ -100,7 +101,10 @@ ThemeData buildPortalTheme({
     fontFamily: resolvedTokens.typeScale.fontFamily,
     scaffoldBackgroundColor: scheme.surface,
     textTheme: textTheme,
-    extensions: <ThemeExtension<dynamic>>[portal],
+    extensions: <ThemeExtension<dynamic>>[
+      portal,
+      PortalSemanticColors.fromScheme(scheme),
+    ],
     splashFactory: InkSparkle.splashFactory,
   );
 }

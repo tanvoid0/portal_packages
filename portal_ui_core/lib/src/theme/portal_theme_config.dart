@@ -213,7 +213,9 @@ class PortalThemeConfig {
         layout: layout,
       );
       portal = portalUiThemeBuilder!(preCtx, portal);
-      theme = theme.copyWith(extensions: <ThemeExtension<dynamic>>[portal]);
+      theme = theme.copyWith(
+        extensions: [...theme.extensions.values, portal],
+      );
     }
 
     final buildCtx = PortalThemeBuildContext(

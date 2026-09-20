@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/portal_semantic_colors.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_card.dart';
 
@@ -15,6 +16,7 @@ class PortalStatCard extends StatelessWidget {
     required this.label,
     this.icon,
     this.accentColor,
+    this.delta,
     this.footer,
     this.onTap,
   });
@@ -26,7 +28,14 @@ class PortalStatCard extends StatelessWidget {
   /// Tints the glyph well. Defaults to the app's primary.
   final Color? accentColor;
 
-  /// Sparkline, delta, or any small trailing widget.
+  /// Change since last period, e.g. `'+12%'` or `'-3 kg'`. A leading `+`
+  /// paints it `success`, a leading `-` paints it `danger`, anything else is
+  /// muted.
+  // ponytail: the sign decides the colour; add a trend enum when an app
+  // needs "down is good" (weight loss) — none does yet.
+  final String? delta;
+
+  /// Sparkline or any small trailing widget.
   final Widget? footer;
 
   final VoidCallback? onTap;
@@ -68,6 +77,20 @@ class PortalStatCard extends StatelessWidget {
             style: tokens.textStyles.overline
                 .copyWith(color: portal.onSurfaceVariant),
           ),
+          if (delta != null) ...[
+            SizedBox(height: tokens.spacing.xs),
+            Text(
+              delta!,
+              style: tokens.textStyles.caption.copyWith(
+                color: switch (delta!.isEmpty ? '' : delta![0]) {
+                  '+' => PortalSemanticColors.of(context).success,
+                  '-' => PortalSemanticColors.of(context).danger,
+                  _ => portal.onSurfaceVariant,
+                },
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
           if (footer != null) ...[
             SizedBox(height: tokens.spacing.sm),
             footer!,

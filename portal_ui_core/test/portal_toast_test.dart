@@ -17,6 +17,7 @@ void main() {
         late PortalToastColors success;
         late PortalToastColors destructive;
         late ColorScheme cs;
+        late PortalSemanticColors semantic;
 
         await tester.pumpWidget(
           MaterialApp(
@@ -24,6 +25,7 @@ void main() {
             home: Builder(
               builder: (context) {
                 cs = Theme.of(context).colorScheme;
+                semantic = PortalSemanticColors.of(context);
                 neutral = portalToastColors(context, PortalToastVariant.neutral);
                 success = portalToastColors(context, PortalToastVariant.success);
                 destructive =
@@ -39,7 +41,7 @@ void main() {
         expect(success.background.a, 1.0);
         expect(destructive.background.a, 1.0);
         expect(neutral.background, cs.surface);
-        expect(success.background, cs.secondary);
+        expect(success.background, semantic.success);
         expect(destructive.background, cs.error);
       }
     });

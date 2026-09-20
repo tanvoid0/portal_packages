@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'portal_semantic_colors.dart';
+
 /// Transient feedback variants. Palettes always resolve to **opaque**
 /// [ColorScheme] roles so toasts stay readable on any visual theme, including
 /// glass.
@@ -27,30 +29,31 @@ class PortalToastColors {
 /// Forces a color to full opacity without changing its hue.
 Color portalOpaque(Color color) => color.withValues(alpha: 1);
 
-/// Toast fills from [ColorScheme] — never from glass-tinted [PortalUiTheme]
-/// surfaces. Neutral is cream/surface chrome; success is secondary; destructive
-/// is error.
+/// Toast fills from [ColorScheme] / [PortalSemanticColors] — never from
+/// glass-tinted [PortalUiTheme] surfaces. Neutral is cream/surface chrome;
+/// success and destructive are the semantic `success` and `danger` roles.
 PortalToastColors portalToastColors(
   BuildContext context,
   PortalToastVariant variant,
 ) {
   final cs = Theme.of(context).colorScheme;
+  final semantic = PortalSemanticColors.of(context);
   switch (variant) {
     case PortalToastVariant.success:
       return PortalToastColors(
-        background: portalOpaque(cs.secondary),
-        foreground: portalOpaque(cs.onSecondary),
-        border: portalOpaque(cs.secondary),
-        icon: portalOpaque(cs.onSecondary),
-        action: portalOpaque(cs.onSecondary),
+        background: portalOpaque(semantic.success),
+        foreground: portalOpaque(semantic.onSuccess),
+        border: portalOpaque(semantic.success),
+        icon: portalOpaque(semantic.onSuccess),
+        action: portalOpaque(semantic.onSuccess),
       );
     case PortalToastVariant.destructive:
       return PortalToastColors(
-        background: portalOpaque(cs.error),
-        foreground: portalOpaque(cs.onError),
-        border: portalOpaque(cs.error),
-        icon: portalOpaque(cs.onError),
-        action: portalOpaque(cs.onError),
+        background: portalOpaque(semantic.danger),
+        foreground: portalOpaque(semantic.onDanger),
+        border: portalOpaque(semantic.danger),
+        icon: portalOpaque(semantic.onDanger),
+        action: portalOpaque(semantic.onDanger),
       );
     case PortalToastVariant.neutral:
       return PortalToastColors(
