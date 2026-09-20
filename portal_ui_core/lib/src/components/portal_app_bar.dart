@@ -1,5 +1,9 @@
-import 'package:flutter/material.dart';
+import 'dart:ui' show ImageFilter;
 
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+
+import '../theme/portal_surface_treatment.dart';
 import '../theme/portal_ui_theme.dart';
 
 /// One action in a [PortalAppBar].
@@ -344,6 +348,172 @@ class _ActionButton extends StatelessWidget {
         smallSize: 8,
         child: Icon(action.icon),
       ),
+    );
+  }
+}
+
+/// The fleet's large-title header: a page title at `textStyles.headline`
+/// that collapses into the compact [PortalSliverAppBar] shape as the page
+/// scrolls, with what scrolls under the collapsed bar blurred through it.
+///
+/// Built on [SliverAppBar.large] — Material owns the collapse, the
+/// cross-fade and the pinned toolbar. This adds the Portal type on both ends
+/// of the collapse, the fleet's [PortalAction] overflow, and the glass: the
+/// bar's background is the theme's bar colour at [PortalGlassStyle.tintAlpha]
+/// over a [PortalGlassStyle.blurSigma] backdrop blur. The navigation layer is
+/// the one surface that is glass on every visual theme, so nothing inside it
+/// (a [PortalCard] in [trailing], say) should be glass again.
+///
+/// A sliver: hand it to [PortalScrollPage.header] or put it first in a
+/// `CustomScrollView`. `scrolledUnderElevation` is 0 — the blur is the
+/// scrolled-under signal.
+class PortalHeader extends StatelessWidget {
+  const PortalHeader.large({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.actions = const [],
+    this.trailing,
+  });
+
+  final String title;
+
+  /// Context line under the title. Shown large under the expanded title and
+  /// compact under the collapsed one, like [PortalAppBar.subtitle].
+  final String? subtitle;
+
+  /// Overflow past two into the action sheet. See [PortalAppBar.actions].
+  final List<PortalAction> actions;
+
+  /// Non-action widgets before the actions. See [PortalAppBar.trailing].
+  final List<Widget>? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final portal = PortalUiTheme.of(context);
+    final theme = Theme.of(context);
+    final glass =
+        portal.glassStyle ?? PortalGlassStyle.forBrightness(theme.brightness);
+    // Absolute alpha, so a glass visual theme that already frosts
+    // appBarTheme.backgroundColor is not frosted twice.
+    final tint = (theme.appBarTheme.backgroundColor ?? portal.surface)
+        .withValues(alpha: glass.tintAlpha);
+
+    return _SliverBackdropBlur(
+      sigma: glass.blurSigma,
+      child: SliverAppBar.large(
+        // Collapse to the fleet's 56, not M3's 64: `.large` derives its
+        // pinned extent from a constant, not from toolbarHeight, so both go.
+        toolbarHeight: kToolbarHeight,
+        collapsedHeight: MediaQuery.paddingOf(context).top + kToolbarHeight,
+        backgroundColor: tint,
+        scrolledUnderElevation: 0,
+        title: _LargeTitle(title: title, subtitle: subtitle),
+        actions: _barActions(context, actions: actions, trailing: trailing),
+      ),
+    );
+  }
+}
+
+class _LargeTitle extends StatelessWidget {
+  const _LargeTitle({required this.title, this.subtitle});
+
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    // SliverAppBar.large builds this same widget twice — once in the
+    // toolbar, once in the expanded flexible space — and styles both from
+    // one titleTextStyle, so the widget has to tell the slots apart itself.
+    // The toolbar copy sits inside Material's NavigationToolbar; the
+    // expanded copy is a Stack sibling of it.
+    final collapsed =
+        context.findAncestorWidgetOfExactType<NavigationToolbar>() != null;
+    if (collapsed) return _PortalAppBarTitle(title: title, subtitle: subtitle);
+
+    final portal = PortalUiTheme.of(context);
+    final styles = portal.tokens.textStyles;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: styles.headline.copyWith(color: portal.onSurface),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        if (subtitle != null)
+          Text(
+            subtitle!,
+            style: styles.body.copyWith(color: portal.onSurfaceVariant),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+      ],
+    );
+  }
+}
+
+/// [BackdropFilter] for a sliver child: blurs whatever is painted under it.
+/// Flutter ships no sliver equivalent, and a box [BackdropFilter] cannot wrap
+/// a [SliverAppBar].
+class _SliverBackdropBlur extends SingleChildRenderObjectWidget {
+  const _SliverBackdropBlur({required this.sigma, required Widget super.child});
+
+  final double sigma;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderSliverBackdropBlur(sigma);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderSliverBackdropBlur renderObject,
+  ) =>
+      renderObject.sigma = sigma;
+}
+
+class _RenderSliverBackdropBlur extends RenderProxySliver {
+  _RenderSliverBackdropBlur(this._sigma);
+
+  double _sigma;
+  set sigma(double value) {
+    if (value == _sigma) return;
+    _sigma = value;
+    markNeedsPaint();
+  }
+
+  // A handle keeps the layer alive across frames; a bare field would be
+  // disposed with the clip layer's children the first time it is rebuilt.
+  final _backdrop = LayerHandle<BackdropFilterLayer>(BackdropFilterLayer());
+
+  @override
+  bool get alwaysNeedsCompositing => child != null;
+
+  @override
+  void dispose() {
+    _backdrop.layer = null;
+    super.dispose();
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    if (child == null || !geometry!.visible) return;
+    // A backdrop layer blurs everything inside the nearest clip, which here
+    // would be the whole viewport — clip it to the bar first.
+    layer = context.pushClipRect(
+      needsCompositing,
+      offset,
+      paintBounds,
+      (context, offset) {
+        final backdrop = _backdrop.layer!
+          ..filter = ImageFilter.blur(sigmaX: _sigma, sigmaY: _sigma);
+        context.pushLayer(backdrop, super.paint, offset);
+      },
+      oldLayer: layer as ClipRectLayer?,
     );
   }
 }

@@ -16,6 +16,7 @@ class PortalScrollPage extends StatelessWidget {
     required this.children,
     this.title,
     this.subtitle,
+    this.header,
     this.appBar,
     this.actions = const [],
     this.trailing,
@@ -33,8 +34,13 @@ class PortalScrollPage extends StatelessWidget {
   final String? title;
   final String? subtitle;
 
+  /// The large-title header — `PortalHeader.large(title: …)` — in place of
+  /// the compact bar. Carries its own title and actions, so [title],
+  /// [subtitle], [actions] and [trailing] are ignored when it is given.
+  final PortalHeader? header;
+
   /// A custom sliver app bar. Supply this when the app dresses its own —
-  /// it must be a sliver.
+  /// it must be a sliver. Wins over [header].
   final Widget? appBar;
 
   /// Actions for the default bar; overflow past two into the action sheet.
@@ -61,6 +67,7 @@ class PortalScrollPage extends StatelessWidget {
     final layout = tokens.layout;
 
     final bar = appBar ??
+        header ??
         (title == null
             ? null
             : PortalSliverAppBar(
