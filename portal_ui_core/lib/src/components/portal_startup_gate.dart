@@ -16,7 +16,7 @@ import 'portal_startup_splash.dart';
 /// late AppConfig config;
 /// late bool isLoggedIn;
 /// runApp(PortalStartupGate(
-///   icon: Icons.shopping_cart,
+///   icon: Symbols.shopping_cart_rounded,
 ///   title: 'Portal Shopping',
 ///   theme: AppTheme.lightTheme,
 ///   darkTheme: AppTheme.darkTheme,

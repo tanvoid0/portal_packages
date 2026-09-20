@@ -106,8 +106,11 @@ ThemeData applyPortalComponentThemes({
     scaffoldBackgroundColor: scaffold,
     canvasColor: canvas,
     dividerColor: border.withValues(alpha: 0.45),
-    iconTheme: IconThemeData(color: muted, size: 22),
-    primaryIconTheme: IconThemeData(color: cs.onPrimary, size: 22),
+    // copyWith, not a fresh IconThemeData: the Symbols axes (weight, fill,
+    // grade, opticalSize) come from buildPortalTheme and must survive.
+    iconTheme: base.iconTheme.copyWith(color: muted, size: 22),
+    primaryIconTheme:
+        base.primaryIconTheme.copyWith(color: cs.onPrimary, size: 22),
     splashColor: cs.primary.withValues(alpha: 0.08),
     highlightColor: cs.primary.withValues(alpha: 0.04),
     hoverColor: cs.primary.withValues(alpha: 0.04),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 /// One named piece of startup work.
 ///
@@ -111,7 +112,7 @@ class _PortalStartupSplashState extends State<PortalStartupSplash>
             children: [
               const Spacer(flex: 3),
               _Mark(
-                icon: failed ? Icons.error_outline : widget.icon,
+                icon: failed ? Symbols.error_rounded : widget.icon,
                 color: failed ? colors.error : colors.primary,
                 pulse: still || failed ? null : _pulse,
               ),
@@ -303,7 +304,7 @@ class _Failure extends StatelessWidget {
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: onCopyTraceId,
-              icon: const Icon(Icons.copy, size: 18),
+              icon: const Icon(Symbols.content_copy_rounded, size: 18),
               label: const Text('Copy trace ID'),
             ),
           ],

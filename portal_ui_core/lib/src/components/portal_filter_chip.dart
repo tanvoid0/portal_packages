@@ -66,6 +66,9 @@ class PortalFilterChip extends StatelessWidget {
         ? (onSelectedColor ?? portal.onPrimary)
         : (onUnselectedColor ?? portal.onSurfaceVariant);
     final radius = BorderRadius.circular(tokens.radii.full);
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : tokens.motion.fast;
 
     // Selection has to reach a screen reader too: the pressable announces
     // the button, but the state the fill and border carry visually would
@@ -78,7 +81,7 @@ class PortalFilterChip extends StatelessWidget {
         haptic: PortalHapticKind.selection,
         borderRadius: radius,
         child: AnimatedContainer(
-          duration: tokens.motion.fast,
+          duration: duration,
           curve: tokens.motion.standard,
           constraints: BoxConstraints(minHeight: tokens.minTapTarget),
           padding: EdgeInsets.symmetric(horizontal: tokens.spacing.md),
@@ -97,7 +100,17 @@ class PortalFilterChip extends StatelessWidget {
                 leading!,
                 SizedBox(width: tokens.spacing.xs),
               ] else if (icon != null) ...[
-                Icon(icon, size: tokens.typeScale.md, color: ink),
+                TweenAnimationBuilder<double>(
+                  tween: Tween(end: selected ? 1 : 0),
+                  duration: duration,
+                  curve: tokens.motion.standard,
+                  builder: (_, fillAxis, __) => Icon(
+                    icon,
+                    fill: fillAxis.clamp(0.0, 1.0),
+                    size: tokens.typeScale.md,
+                    color: ink,
+                  ),
+                ),
                 SizedBox(width: tokens.spacing.xs),
               ],
               Text(

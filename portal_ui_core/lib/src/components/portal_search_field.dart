@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../theme/portal_ui_theme.dart';
 import '../tokens/portal_radii_utils.dart';
@@ -56,7 +57,7 @@ class PortalSearchField extends StatelessWidget {
         decoration: InputDecoration(
           hintText: hintText,
           hintStyle: TextStyle(color: muted),
-          prefixIcon: leading ?? Icon(Icons.search, color: muted),
+          prefixIcon: leading ?? Icon(Symbols.search_rounded, color: muted),
           suffixIcon: trailing,
           border: OutlineInputBorder(
             borderRadius: radius,

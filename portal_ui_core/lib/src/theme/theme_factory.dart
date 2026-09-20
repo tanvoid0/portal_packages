@@ -77,6 +77,9 @@ TextTheme _textTheme(ColorScheme scheme, DesignTokens tokens) {
   );
 }
 
+const _symbolsAxes =
+    IconThemeData(fill: 0, weight: 400, grade: 0, opticalSize: 24);
+
 /// Builds [ThemeData] with [PortalUiTheme] attached. Use [preset] for spacing
 /// and radii; override [colorScheme] and [tokens] for brand/layout.
 ///
@@ -100,6 +103,16 @@ ThemeData buildPortalTheme({
     brightness: brightness,
     colorScheme: scheme,
     fontFamily: resolvedTokens.typeScale.fontFamily,
+    // One icon voice (C7): Material Symbols at weight 400, grade 0, optical
+    // size 24, unfilled — `fill` is what selected states animate. Colours are
+    // Material's own defaults; the component themes recolour with copyWith so
+    // these axes survive.
+    iconTheme: _symbolsAxes.copyWith(
+      color: brightness == Brightness.dark
+          ? kDefaultIconLightColor
+          : kDefaultIconDarkColor,
+    ),
+    primaryIconTheme: _symbolsAxes.copyWith(color: scheme.onPrimary),
     scaffoldBackgroundColor: scheme.surface,
     textTheme: textTheme,
     extensions: <ThemeExtension<dynamic>>[

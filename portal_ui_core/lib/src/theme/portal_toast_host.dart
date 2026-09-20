@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../motion/portal_haptics.dart';
 import '../tokens/design_tokens.dart';
@@ -293,11 +294,11 @@ class _PortalToastCardState extends State<PortalToastCard> {
   IconData get _icon {
     switch (data.variant) {
       case PortalToastVariant.success:
-        return Icons.check_circle_outline;
+        return Symbols.check_circle_rounded;
       case PortalToastVariant.destructive:
-        return Icons.error_outline;
+        return Symbols.error_rounded;
       case PortalToastVariant.neutral:
-        return Icons.info_outline;
+        return Symbols.info_rounded;
     }
   }
 
@@ -385,7 +386,7 @@ class _PortalToastCardState extends State<PortalToastCard> {
                     button: true,
                     child: IconButton(
                       onPressed: onDismiss,
-                      icon: Icon(Icons.close,
+                      icon: Icon(Symbols.close_rounded,
                           size: 18, color: colors.foreground),
                       visualDensity: VisualDensity.compact,
                       style: IconButton.styleFrom(

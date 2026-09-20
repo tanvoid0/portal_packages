@@ -1,6 +1,7 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/rendering.dart';
 
 import '../theme/portal_surface_treatment.dart';
@@ -210,7 +211,7 @@ List<Widget> _barActions(
         icon: Badge(
           isLabelVisible: overflow.any((a) => a.badge),
           smallSize: 8,
-          child: const Icon(Icons.more_horiz),
+          child: const Icon(Symbols.more_horiz_rounded),
         ),
         onPressed: () => showPortalActionSheet(context, overflow),
       ),

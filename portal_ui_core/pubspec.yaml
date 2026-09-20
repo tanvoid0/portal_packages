@@ -18,6 +18,10 @@ dependencies:
   # 1.9.0 caps material_color_utilities at 0.13.0 (what Flutter pins today);
   # a Flutter bump past that needs a dependency_override or a fork.
   dynamic_color: ^1.9.0
+  # Fleet icon set (C7): rounded style, weight 400, opsz 24 via the theme's
+  # IconThemeData. Const `Symbols.*_rounded` only, so release builds tree-shake
+  # the three fonts down to the glyphs in use.
+  material_symbols_icons: ^4.2960.0
 
 dev_dependencies:
   flutter_test:

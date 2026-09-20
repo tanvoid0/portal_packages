@@ -442,7 +442,7 @@ void main() {
     )));
 
     expect(find.text('Search recipes'), findsOneWidget);
-    expect(find.byIcon(Icons.search), findsOneWidget);
+    expect(find.byIcon(Symbols.search_rounded), findsOneWidget);
 
     await t.enterText(find.byType(TextField), 'pasta');
     expect(changed, 'pasta');

@@ -74,12 +74,12 @@ class _GalleryPageState extends State<GalleryPage> {
         subtitle: widget.preset.name,
         actions: [
           PortalAction(
-            icon: widget.dark ? Icons.light_mode : Icons.dark_mode,
+            icon: widget.dark ? Symbols.light_mode_rounded : Symbols.dark_mode_rounded,
             label: widget.dark ? 'Light theme' : 'Dark theme',
             onPressed: () => widget.onDarkChanged(!widget.dark),
           ),
           PortalAction(
-            icon: Icons.tune,
+            icon: Symbols.tune_rounded,
             label: 'Next preset',
             onPressed: () {
               final all = PortalUiPreset.values;
@@ -93,7 +93,7 @@ class _GalleryPageState extends State<GalleryPage> {
       body: ListView(
         padding: EdgeInsets.all(tokens.spacing.lg),
         children: [
-          const PortalSectionHeader(title: 'Buttons', icon: Icons.smart_button),
+          const PortalSectionHeader(title: 'Buttons', icon: Symbols.smart_button_rounded),
           Wrap(
             spacing: tokens.spacing.sm,
             runSpacing: tokens.spacing.sm,
@@ -103,7 +103,7 @@ class _GalleryPageState extends State<GalleryPage> {
               PortalButton(
                 label: 'Loading',
                 isLoading: _loading,
-                leading: const Icon(Icons.cloud_upload),
+                leading: const Icon(Symbols.cloud_upload_rounded),
                 onPressed: () async {
                   setState(() => _loading = true);
                   await Future<void>.delayed(const Duration(seconds: 2));
@@ -113,14 +113,14 @@ class _GalleryPageState extends State<GalleryPage> {
             ],
           ),
           gap,
-          const PortalSectionHeader(title: 'Stats', icon: Icons.insights),
+          const PortalSectionHeader(title: 'Stats', icon: Symbols.insights_rounded),
           Row(
             children: [
               Expanded(
                 child: PortalStatCard(
                   value: '12.4k',
                   label: 'Steps',
-                  icon: Icons.directions_walk,
+                  icon: Symbols.directions_walk_rounded,
                 ),
               ),
               SizedBox(width: tokens.spacing.md),
@@ -128,14 +128,14 @@ class _GalleryPageState extends State<GalleryPage> {
                 child: PortalStatCard(
                   value: '48 min',
                   label: 'Active',
-                  icon: Icons.timer,
+                  icon: Symbols.timer_rounded,
                   accentColor: scheme.tertiary,
                 ),
               ),
             ],
           ),
           gap,
-          const PortalSectionHeader(title: 'Cards', icon: Icons.style),
+          const PortalSectionHeader(title: 'Cards', icon: Symbols.style_rounded),
           for (final v in PortalCardVariant.values) ...[
             PortalCard(
               variant: v,
@@ -143,16 +143,16 @@ class _GalleryPageState extends State<GalleryPage> {
               onTap: () {},
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.fitness_center),
+                leading: const Icon(Symbols.fitness_center_rounded),
                 title: Text('PortalCard.${v.name}'),
                 subtitle: const Text('Tap ripple, themed border and radius'),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: const Icon(Symbols.chevron_right_rounded),
               ),
             ),
             SizedBox(height: tokens.spacing.sm),
           ],
           gap,
-          const PortalSectionHeader(title: 'Filters & tabs', icon: Icons.filter_alt),
+          const PortalSectionHeader(title: 'Filters & tabs', icon: Symbols.filter_alt_rounded),
           PortalFilterChipRow(
             children: [
               for (final (i, label) in ['All', 'Strength', 'Cardio', 'Mobility'].indexed)
@@ -179,7 +179,7 @@ class _GalleryPageState extends State<GalleryPage> {
             ),
           ),
           gap,
-          const PortalSectionHeader(title: 'Slider & pickers', icon: Icons.tune),
+          const PortalSectionHeader(title: 'Slider & pickers', icon: Symbols.tune_rounded),
           Slider(
             value: _slider,
             label: '${(_slider * 100).round()}%',
@@ -215,7 +215,7 @@ class _GalleryPageState extends State<GalleryPage> {
                   builder: (_) => Padding(
                     padding: EdgeInsets.all(tokens.spacing.lg),
                     child: const PortalEmptyState(
-                      icon: Icons.layers_outlined,
+                      icon: Symbols.layers_rounded,
                       title: 'Themed sheet',
                       message: 'radii.xl top, drag handle, panel surface.',
                     ),
@@ -225,22 +225,22 @@ class _GalleryPageState extends State<GalleryPage> {
             ],
           ),
           gap,
-          const PortalSectionHeader(title: 'Search', icon: Icons.search),
+          const PortalSectionHeader(title: 'Search', icon: Symbols.search_rounded),
           const PortalSearchField(hintText: 'Search exercises'),
           gap,
-          const PortalSectionHeader(title: 'Loading', icon: Icons.hourglass_top),
+          const PortalSectionHeader(title: 'Loading', icon: Symbols.hourglass_top_rounded),
           const PortalListSkeleton(itemCount: 3, shrinkWrap: true, physics: NeverScrollableScrollPhysics()),
           gap,
-          const PortalSectionHeader(title: 'Empty', icon: Icons.inbox),
+          const PortalSectionHeader(title: 'Empty', icon: Symbols.inbox_rounded),
           PortalEmptyState(
-            icon: Icons.inbox_outlined,
+            icon: Symbols.inbox_rounded,
             title: 'No workouts yet',
             message: 'Log your first session and it shows up here.',
             actionLabel: 'Add workout',
             onAction: () {},
           ),
           gap,
-          const PortalSectionHeader(title: 'Dialog', icon: Icons.warning_amber),
+          const PortalSectionHeader(title: 'Dialog', icon: Symbols.warning_rounded),
           PortalButton(
             label: 'Confirm dialog',
             variant: PortalButtonVariant.destructive,
@@ -259,9 +259,9 @@ class _GalleryPageState extends State<GalleryPage> {
         selectedIndex: _nav,
         onDestinationSelected: (i) => setState(() => _nav = i),
         destinations: const [
-          PortalNavDestination(icon: Icons.home_outlined, selectedIcon: Icons.home, label: 'Home'),
-          PortalNavDestination(icon: Icons.bar_chart_outlined, selectedIcon: Icons.bar_chart, label: 'Stats', badgeCount: 3),
-          PortalNavDestination(icon: Icons.settings_outlined, selectedIcon: Icons.settings, label: 'Settings'),
+          PortalNavDestination(icon: Symbols.home_rounded, label: 'Home'),
+          PortalNavDestination(icon: Symbols.bar_chart_rounded, label: 'Stats', badgeCount: 3),
+          PortalNavDestination(icon: Symbols.settings_rounded, label: 'Settings'),
         ],
       ),
     );

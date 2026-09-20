@@ -8,13 +8,18 @@ import '../theme/portal_ui_theme.dart';
 class PortalNavDestination {
   const PortalNavDestination({
     required this.icon,
-    required this.selectedIcon,
+    this.selectedIcon,
     required this.label,
     this.badgeCount,
   });
 
+  /// A `Symbols.*_rounded` glyph. Selection fills it (`fill` 0 → 1) on
+  /// `tokens.motion.standard`, so no second icon is needed.
   final IconData icon;
-  final IconData selectedIcon;
+
+  /// Glyph to swap in while selected. Only for a set that still uses
+  /// Material's outlined / filled icon pair; leave null for Symbols.
+  final IconData? selectedIcon;
   final String label;
 
   /// Renders a count on the icon. Null or zero shows nothing.
@@ -92,6 +97,9 @@ class PortalBottomNavBar extends StatelessWidget {
     final border = borderColor ?? portal.border;
     final mark = markColor ?? portal.onCard;
     final well = selectedWellColor ?? portal.muted;
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : tokens.motion.medium;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -101,7 +109,7 @@ class PortalBottomNavBar extends StatelessWidget {
         outerBottomPadding + bottomInset * 0.35,
       ),
       child: AnimatedContainer(
-        duration: tokens.motion.medium,
+        duration: duration,
         curve: tokens.motion.standard,
         height: height,
         decoration: BoxDecoration(
@@ -125,7 +133,7 @@ class PortalBottomNavBar extends StatelessWidget {
                   selectedMark: selectedMarkColor ?? mark,
                   well: well,
                   radius: tokens.radii.lg,
-                  duration: tokens.motion.medium,
+                  duration: duration,
                   curve: tokens.motion.standard,
                 ),
               ),
@@ -194,12 +202,18 @@ class _NavItem extends StatelessWidget {
                       color: isSelected ? well : Colors.transparent,
                       borderRadius: BorderRadius.circular(15),
                     ),
-                    child: Icon(
-                      isSelected
-                          ? destination.selectedIcon
-                          : destination.icon,
-                      size: 22,
-                      color: fg,
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(end: isSelected ? 1 : 0),
+                      duration: duration,
+                      curve: curve,
+                      builder: (_, fill, __) => Icon(
+                        isSelected
+                            ? destination.selectedIcon ?? destination.icon
+                            : destination.icon,
+                        fill: fill.clamp(0.0, 1.0),
+                        size: 22,
+                        color: fg,
+                      ),
                     ),
                   ),
                   if (count > 0)

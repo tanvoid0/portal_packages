@@ -23,6 +23,7 @@ export 'src/theme/portal_theme_registry.dart';
 export 'src/theme/portal_visual_theme.dart';
 export 'src/theme/portal_tokens_mixin.dart';
 export 'src/theme/portal_form_field.dart';
+export 'src/theme/portal_icons.dart';
 export 'src/theme/portal_theme_helpers.dart';
 export 'src/theme/portal_typography.dart';
 export 'src/theme/portal_typography_config.dart';
