@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../theme/portal_ui_theme.dart';
 import '../tokens/design_tokens.dart';
 import '../tokens/portal_radii_utils.dart';
+import '../motion/portal_hero.dart';
 import 'portal_pressable.dart';
 
 enum PortalCardVariant {
@@ -44,6 +45,7 @@ class PortalCard extends StatelessWidget {
     this.sheen = false,
     this.backgroundColor,
     this.borderRadius,
+    this.heroTag,
   });
 
   final Widget child;
@@ -66,6 +68,10 @@ class PortalCard extends StatelessWidget {
 
   final Color? backgroundColor;
   final BorderRadius? borderRadius;
+
+  /// Wraps the card in a [PortalHero] with this tag, so it flies to a
+  /// matching hero on the next route keeping its corners on the way.
+  final Object? heroTag;
 
   @override
   Widget build(BuildContext context) {
@@ -220,6 +226,10 @@ class PortalCard extends StatelessWidget {
         borderRadius: radius,
         child: decorated,
       );
+    }
+    if (heroTag != null) {
+      decorated =
+          PortalHero(tag: heroTag!, borderRadius: radius, child: decorated);
     }
     if (margin != null) {
       return Padding(padding: margin!, child: decorated);

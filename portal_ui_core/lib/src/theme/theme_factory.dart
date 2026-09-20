@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../motion/portal_page_transitions.dart';
 import '../tokens/design_tokens.dart';
 import 'portal_default_color_schemes.dart';
 import 'portal_semantic_colors.dart';
@@ -106,5 +107,15 @@ ThemeData buildPortalTheme({
       PortalSemanticColors.fromScheme(scheme),
     ],
     splashFactory: InkSparkle.splashFactory,
+    // Every platform: the fleet ships Android-only, and the example app on
+    // desktop should move the same way.
+    pageTransitionsTheme: PageTransitionsTheme(
+      builders: {
+        for (final platform in TargetPlatform.values)
+          platform: PortalPageTransitionsBuilder(
+            duration: resolvedTokens.motion.medium,
+          ),
+      },
+    ),
   );
 }
