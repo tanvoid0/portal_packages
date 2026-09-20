@@ -166,6 +166,7 @@ class PortalMotion {
     this.slow = const Duration(milliseconds: 500),
     this.staggerStep = const Duration(milliseconds: 60),
     this.listRevealDuration = const Duration(milliseconds: 280),
+    this.pressScale = 0.97,
     Curve? standard,
     Curve? emphasized,
   })  : _standard = standard,
@@ -180,6 +181,9 @@ class PortalMotion {
 
   /// Duration for list item fade/slide reveal.
   final Duration listRevealDuration;
+
+  /// Scale a `PortalPressable` shrinks to while held. 1 disables the press.
+  final double pressScale;
 
   // Static because `SpringDescription.withDampingRatio` is not const and this
   // class has to stay const-constructible for `DesignTokens`.

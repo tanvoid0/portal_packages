@@ -13,6 +13,7 @@ const _tokens = DesignTokens(
     listBottomInset: 108,
   ),
   minTapTarget: 48,
+  motion: PortalMotion(pressScale: 0.9),
 );
 
 Widget _host(Widget child) {
@@ -130,6 +131,54 @@ void main() {
     expect(taps, 1);
   });
 
+  testWidgets('pressable scales down while held and springs back to 1',
+      (t) async {
+    await t.pumpWidget(_host(Center(
+      child: PortalPressable(
+        onTap: () {},
+        child: const SizedBox(width: 120, height: 48),
+      ),
+    )));
+    // Scaffold has a ScaleTransition of its own (the FAB slot).
+    final pressable = find.byType(PortalPressable);
+    Finder inside(Type type) =>
+        find.descendant(of: pressable, matching: find.byType(type));
+    double scale() =>
+        t.widget<ScaleTransition>(inside(ScaleTransition)).scale.value;
+    expect(scale(), 1);
+
+    final gesture = await t.startGesture(t.getCenter(pressable));
+    await t.pump();
+    expect(
+      t.widget<AnimatedScale>(inside(AnimatedScale)).scale,
+      0.9,
+      reason: 'target is the pressScale token, not a literal',
+    );
+    await t.pump(const Duration(milliseconds: 50));
+    expect(scale(), lessThan(1));
+
+    await gesture.up();
+    await t.pumpAndSettle();
+    expect(scale(), 1);
+  });
+
+  testWidgets('a quick tap in a scrollable still shows the press', (t) async {
+    // In a ListView the highlight waits for the arena, so down and up arrive
+    // in one event; the press has to be held for the tap to be visible.
+    await t.pumpWidget(_host(ListView(children: [
+      PortalPressable(onTap: () {}, child: const SizedBox(height: 48)),
+    ])));
+    final target = find.descendant(
+      of: find.byType(PortalPressable),
+      matching: find.byType(AnimatedScale),
+    );
+    await t.tap(find.byType(PortalPressable));
+    await t.pump();
+    expect(t.widget<AnimatedScale>(target).scale, 0.9);
+    await t.pumpAndSettle();
+    expect(t.widget<AnimatedScale>(target).scale, 1);
+  });
+
   testWidgets('filter chip announces its selected state', (t) async {
     final handle = t.ensureSemantics();
 
@@ -141,6 +190,8 @@ void main() {
       matchesSemantics(
         label: 'Chest',
         isButton: true,
+        hasEnabledState: true,
+        isEnabled: true,
         hasSelectedState: true,
         isSelected: true,
         hasTapAction: true,
@@ -157,6 +208,8 @@ void main() {
       matchesSemantics(
         label: 'Chest',
         isButton: true,
+        hasEnabledState: true,
+        isEnabled: true,
         hasSelectedState: true,
         isSelected: false,
         hasTapAction: true,

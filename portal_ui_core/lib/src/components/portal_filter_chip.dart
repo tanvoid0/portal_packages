@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/portal_ui_theme.dart';
+import 'portal_pressable.dart';
 
 /// Selectable pill.
 ///
@@ -25,6 +26,7 @@ class PortalFilterChip extends StatelessWidget {
 
   final String label;
   final bool selected;
+
   /// Null for a chip that only displays state -- a metadata label rendered as
   /// a pill. It then takes no ink and does not announce as a button.
   final VoidCallback? onTap;
@@ -64,47 +66,43 @@ class PortalFilterChip extends StatelessWidget {
         : (onUnselectedColor ?? portal.onSurfaceVariant);
     final radius = BorderRadius.circular(tokens.radii.full);
 
-    // Selection has to reach a screen reader too: an InkWell on its own
-    // announces as neither a button nor a selected one, so the state the
-    // fill and border carry visually would be invisible to TalkBack.
+    // Selection has to reach a screen reader too: the pressable announces
+    // the button, but the state the fill and border carry visually would
+    // otherwise be invisible to TalkBack.
     return Semantics(
-      button: onTap != null,
       selected: selected,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: radius,
-          onTap: onTap,
-          onLongPress: onLongPress,
-          child: AnimatedContainer(
-            duration: tokens.motion.fast,
-            curve: tokens.motion.standard,
-            constraints: BoxConstraints(minHeight: tokens.minTapTarget),
-            padding: EdgeInsets.symmetric(horizontal: tokens.spacing.md),
-            decoration: BoxDecoration(
-              color: fill,
-              borderRadius: radius,
-              border: Border.all(
-                color: selected ? fill : (borderColor ?? portal.outline),
-                width: tokens.borderWidth,
-              ),
+      child: PortalPressable(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        borderRadius: radius,
+        child: AnimatedContainer(
+          duration: tokens.motion.fast,
+          curve: tokens.motion.standard,
+          constraints: BoxConstraints(minHeight: tokens.minTapTarget),
+          padding: EdgeInsets.symmetric(horizontal: tokens.spacing.md),
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: radius,
+            border: Border.all(
+              color: selected ? fill : (borderColor ?? portal.outline),
+              width: tokens.borderWidth,
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (leading != null) ...[
-                  leading!,
-                  SizedBox(width: tokens.spacing.xs),
-                ] else if (icon != null) ...[
-                  Icon(icon, size: tokens.typeScale.md, color: ink),
-                  SizedBox(width: tokens.spacing.xs),
-                ],
-                Text(
-                  label,
-                  style: tokens.textStyles.caption.copyWith(color: ink),
-                ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (leading != null) ...[
+                leading!,
+                SizedBox(width: tokens.spacing.xs),
+              ] else if (icon != null) ...[
+                Icon(icon, size: tokens.typeScale.md, color: ink),
+                SizedBox(width: tokens.spacing.xs),
               ],
-            ),
+              Text(
+                label,
+                style: tokens.textStyles.caption.copyWith(color: ink),
+              ),
+            ],
           ),
         ),
       ),

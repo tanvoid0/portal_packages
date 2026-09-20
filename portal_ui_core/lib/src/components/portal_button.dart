@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/portal_ui_theme.dart';
 import '../theme/portal_typography.dart';
 import '../tokens/design_tokens.dart';
+import 'portal_pressable.dart';
 
 enum PortalButtonVariant { primary, secondary, outline, destructive, ghost }
 
@@ -83,45 +84,33 @@ class PortalButton extends StatelessWidget {
       ),
     );
 
-    final effectiveOnPressed = isLoading ? null : onPressed;
-    if (effectiveOnPressed == null) {
-      return _shell(
-        border: style.border,
-        background: style.background,
-        radius: radius,
-        hPad: hPad,
-        vPad: vPad,
-        minSize: tokens.minTapTarget,
-        child: styled,
-      );
-    }
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: effectiveOnPressed,
-        borderRadius: BorderRadius.circular(radius),
-        splashColor: portal.primary.withValues(alpha: 0.12),
-        highlightColor: portal.primary.withValues(alpha: 0.06),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: style.background,
-            borderRadius: BorderRadius.circular(radius),
-            border: style.border,
-          ),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: tokens.minTapTarget,
-                minWidth: tokens.minTapTarget,
-              ),
-              child: Align(
-                alignment: Alignment.center,
-                heightFactor: 1,
-                widthFactor: expand ? null : 1,
-                child: styled,
-              ),
+    // Ripple stays (it is what a button feels like); the press scale rides on
+    // top. `Ink` rather than a DecoratedBox so the splash paints over the fill.
+    return PortalPressable(
+      onTap: onPressed,
+      enabled: !isLoading,
+      ripple: true,
+      borderRadius: BorderRadius.circular(radius),
+      splashColor: portal.primary.withValues(alpha: 0.12),
+      highlightColor: portal.primary.withValues(alpha: 0.06),
+      child: Ink(
+        decoration: BoxDecoration(
+          color: style.background,
+          borderRadius: BorderRadius.circular(radius),
+          border: style.border,
+        ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: tokens.minTapTarget,
+              minWidth: tokens.minTapTarget,
+            ),
+            child: Align(
+              alignment: Alignment.center,
+              heightFactor: 1,
+              widthFactor: expand ? null : 1,
+              child: styled,
             ),
           ),
         ),
@@ -191,36 +180,6 @@ class PortalButton extends StatelessWidget {
           border: null,
         );
     }
-  }
-
-  Widget _shell({
-    required Widget child,
-    required Color background,
-    required double radius,
-    required double hPad,
-    required double vPad,
-    required double minSize,
-    required Border? border,
-  }) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(radius),
-        border: border,
-      ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: minSize, minWidth: minSize),
-          child: Align(
-            alignment: Alignment.center,
-            heightFactor: 1,
-            widthFactor: expand ? null : 1,
-            child: child,
-          ),
-        ),
-      ),
-    );
   }
 }
 

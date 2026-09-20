@@ -1,0 +1,135 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import '../motion/portal_spring_curve.dart';
+import '../theme/portal_ui_theme.dart';
+import '../tokens/design_tokens.dart';
+
+/// Press state for anything tappable: shrinks to `tokens.motion.pressScale`
+/// while held and springs back on release.
+///
+/// Hosts the [InkWell] itself so the scale tracks Material's own notion of
+/// "pressed" — a press that turns into a scroll releases; a hold stays pressed
+/// until release, and with [onLongPress] set it releases when the long-press
+/// fires. A tap always plays the press curve out before springing back, even
+/// one so quick that Material's highlight came and went in a single event.
+/// By default there is no ripple: the scale *is* the feedback. Pass [ripple]
+/// for a control that should keep Material's splash as well; its child then
+/// has to be an [Ink] (not a `DecoratedBox`) or the splash paints under the
+/// background — and so does the focus/hover overlay when the child is opaque
+/// (a [PortalCard]), which the touch fleet never sees but a desktop target
+/// would want drawn as a focus border on the card instead.
+///
+/// Announces as a button when it has a handler (and as disabled when
+/// [enabled] is false); with no handler it is plain content, so a display-only
+/// pill stays a pill.
+class PortalPressable extends StatefulWidget {
+  const PortalPressable({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.onLongPress,
+    this.enabled = true,
+    this.ripple = false,
+    this.borderRadius,
+    this.splashColor,
+    this.highlightColor,
+  });
+
+  final Widget child;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+
+  /// False refuses taps and announces disabled, keeping the layout. For "not
+  /// a button at all" pass no handlers instead.
+  final bool enabled;
+
+  /// Keep Material's splash on top of the scale. Off, the ink is [NoSplash]
+  /// and the pressed overlay transparent.
+  final bool ripple;
+
+  /// Clips the ink (and hover/focus overlay) to the child's shape.
+  final BorderRadius? borderRadius;
+
+  /// Only read with [ripple].
+  final Color? splashColor;
+  final Color? highlightColor;
+
+  @override
+  State<PortalPressable> createState() => _PortalPressableState();
+}
+
+class _PortalPressableState extends State<PortalPressable> {
+  // Press runs on the effects spring (never overshoots on the way down),
+  // release on the spatial one so it lands with a little bounce.
+  static final _press = PortalSpringCurve(PortalMotion.effectsFast);
+  static final _release = PortalMotion.spatial;
+
+  bool _pressed = false;
+
+  // The press curve is still playing; a release that lands meanwhile waits for
+  // it. Inside a scrollable the highlight is deferred until the arena resolves,
+  // so a quick tap delivers down and up in one event and would otherwise never
+  // render a pressed frame — no ripple, no scale, no feedback at all.
+  Timer? _pulse;
+  bool _releaseQueued = false;
+
+  void _highlight(bool down) {
+    if (down) {
+      _pulse?.cancel();
+      _releaseQueued = false;
+      _pulse = Timer(_press.duration, () {
+        _pulse = null;
+        if (_releaseQueued) _settle();
+      });
+      setState(() => _pressed = true);
+    } else if (_pulse != null) {
+      _releaseQueued = true;
+    } else {
+      _settle();
+    }
+  }
+
+  void _settle() {
+    if (mounted) setState(() => _pressed = false);
+  }
+
+  @override
+  void dispose() {
+    _pulse?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = PortalUiTheme.of(context).tokens;
+    final hasHandler = widget.onTap != null || widget.onLongPress != null;
+    final interactive = widget.enabled && hasHandler;
+    final curve = _pressed ? _press : _release;
+
+    return Semantics(
+      button: hasHandler,
+      enabled: hasHandler ? widget.enabled : null,
+      child: AnimatedScale(
+        scale: _pressed ? tokens.motion.pressScale : 1,
+        duration: curve.duration,
+        curve: curve,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: interactive ? widget.onTap : null,
+            onLongPress: interactive ? widget.onLongPress : null,
+            onHighlightChanged: _highlight,
+            borderRadius: widget.borderRadius,
+            splashFactory: widget.ripple ? null : NoSplash.splashFactory,
+            splashColor: widget.ripple ? widget.splashColor : null,
+            highlightColor:
+                widget.ripple ? widget.highlightColor : Colors.transparent,
+            child: widget.child,
+          ),
+        ),
+      ),
+    );
+  }
+}

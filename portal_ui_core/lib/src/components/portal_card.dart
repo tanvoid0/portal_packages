@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../theme/portal_ui_theme.dart';
 import '../tokens/design_tokens.dart';
 import '../tokens/portal_radii_utils.dart';
+import 'portal_pressable.dart';
 
 enum PortalCardVariant { standard, glass, hero, asymmetric }
 
@@ -49,7 +50,8 @@ class PortalCard extends StatelessWidget {
     final brightness = Theme.of(context).brightness;
     final radius = borderRadius ?? _borderRadius(t.radii, variant);
     final borderSide = BorderSide(
-      color: portal.outline.withValues(alpha: variant == PortalCardVariant.glass ? 0.2 : 0.65),
+      color: portal.outline
+          .withValues(alpha: variant == PortalCardVariant.glass ? 0.2 : 0.65),
       width: t.borderWidth,
     );
     final shadows = _shadows(t.elevation, elevation, brightness);
@@ -93,7 +95,7 @@ class PortalCard extends StatelessWidget {
               // wrap every other variant already has.
               child: Material(
                 type: MaterialType.transparency,
-                child: _maybeInk(content, onTap, radius),
+                child: content,
               ),
             ),
           ),
@@ -107,7 +109,7 @@ class PortalCard extends StatelessWidget {
             border: borderSide,
             shadows: shadows,
             gradient: gradient,
-            child: _maybeInk(content, onTap, radius),
+            child: content,
           ),
         );
       case PortalCardVariant.asymmetric:
@@ -116,7 +118,9 @@ class PortalCard extends StatelessWidget {
           side: borderSide,
         );
         decorated = Material(
-          color: gradient == null ? (backgroundColor ?? portal.surface) : Colors.transparent,
+          color: gradient == null
+              ? (backgroundColor ?? portal.surface)
+              : Colors.transparent,
           elevation: 0,
           shadowColor: Colors.transparent,
           shape: shape,
@@ -127,7 +131,7 @@ class PortalCard extends StatelessWidget {
               boxShadow: shadows,
               borderRadius: radius,
             ),
-            child: _maybeInk(content, onTap, radius),
+            child: content,
           ),
         );
       case PortalCardVariant.standard:
@@ -135,7 +139,9 @@ class PortalCard extends StatelessWidget {
             ? t.radii.continuousBorder(borderRadius: radius, side: borderSide)
             : RoundedRectangleBorder(borderRadius: radius, side: borderSide);
         decorated = Material(
-          color: gradient == null ? (backgroundColor ?? portal.surface) : Colors.transparent,
+          color: gradient == null
+              ? (backgroundColor ?? portal.surface)
+              : Colors.transparent,
           elevation: 0,
           shadowColor: Colors.transparent,
           shape: shape,
@@ -146,11 +152,20 @@ class PortalCard extends StatelessWidget {
               boxShadow: shadows,
               borderRadius: radius,
             ),
-            child: _maybeInk(content, onTap, radius),
+            child: content,
           ),
         );
     }
 
+    // The whole surface presses, shadow and border included; the scale is the
+    // feedback, so no ripple.
+    if (onTap != null) {
+      decorated = PortalPressable(
+        onTap: onTap,
+        borderRadius: radius,
+        child: decorated,
+      );
+    }
     if (margin != null) {
       return Padding(padding: margin!, child: decorated);
     }
@@ -202,10 +217,5 @@ class PortalCard extends StatelessWidget {
       ),
       child: child,
     );
-  }
-
-  Widget _maybeInk(Widget child, VoidCallback? onTap, BorderRadius radius) {
-    if (onTap == null) return child;
-    return InkWell(onTap: onTap, borderRadius: radius, child: child);
   }
 }
