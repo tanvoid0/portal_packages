@@ -34,27 +34,37 @@ class PortalSegmentedTabs extends StatelessWidget {
         for (var i = 0; i < labels.length; i++) ...[
           if (i > 0) SizedBox(width: tokens.spacing.sm),
           Expanded(
-            child: Material(
-              color: index == i
-                  ? tint.withValues(alpha: 0.15)
-                  : portal.surfaceVariant,
-              borderRadius: radius,
-              child: InkWell(
-                onTap: () => onChanged(i),
+            // Fill under, ink over: a Material paints its ink features before
+            // its child, so the tint must sit outside the InkWell's Material
+            // or the ripple is hidden by the (opaque) segment colour.
+            child: AnimatedContainer(
+              duration: tokens.motion.fast,
+              curve: tokens.motion.standard,
+              decoration: BoxDecoration(
+                color: index == i
+                    ? tint.withValues(alpha: 0.15)
+                    : portal.surfaceVariant,
                 borderRadius: radius,
-                child: Container(
-                  constraints:
-                      BoxConstraints(minHeight: tokens.minTapTarget),
-                  alignment: Alignment.center,
-                  padding:
-                      EdgeInsets.symmetric(horizontal: tokens.spacing.sm),
-                  child: Text(
-                    labels[i],
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: tokens.textStyles.caption.copyWith(
-                      color: index == i ? tint : portal.onSurfaceVariant,
+              ),
+              child: Material(
+                type: MaterialType.transparency,
+                child: InkWell(
+                  onTap: () => onChanged(i),
+                  borderRadius: radius,
+                  child: Container(
+                    constraints:
+                        BoxConstraints(minHeight: tokens.minTapTarget),
+                    alignment: Alignment.center,
+                    padding:
+                        EdgeInsets.symmetric(horizontal: tokens.spacing.sm),
+                    child: Text(
+                      labels[i],
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: tokens.textStyles.caption.copyWith(
+                        color: index == i ? tint : portal.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ),

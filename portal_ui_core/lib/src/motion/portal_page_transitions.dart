@@ -2,6 +2,7 @@ import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/portal_ui_theme.dart';
+import '../tokens/design_tokens.dart';
 
 /// Material motion page routes using the official [animations] package.
 ///
@@ -29,7 +30,13 @@ class PortalPageTransitions {
       pageBuilder: (_, __, ___) => page,
       transitionsBuilder: (_, animation, secondaryAnimation, child) {
         return SharedAxisTransition(
-          animation: CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+          animation: CurvedAnimation(
+            parent: animation,
+            curve: PortalMotion.effects,
+            // Flipped on pop so back decelerates like push did; without it a
+            // decelerating spring run backwards is an accelerate-out.
+            reverseCurve: PortalMotion.effects.flipped,
+          ),
           secondaryAnimation: secondaryAnimation,
           transitionType: type,
           child: child,
@@ -53,7 +60,13 @@ class PortalPageTransitions {
       pageBuilder: (_, __, ___) => page,
       transitionsBuilder: (_, animation, secondaryAnimation, child) {
         return FadeThroughTransition(
-          animation: CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+          animation: CurvedAnimation(
+            parent: animation,
+            curve: PortalMotion.effects,
+            // Flipped on pop so back decelerates like push did; without it a
+            // decelerating spring run backwards is an accelerate-out.
+            reverseCurve: PortalMotion.effects.flipped,
+          ),
           secondaryAnimation: secondaryAnimation,
           child: child,
         );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../motion/portal_spring_curve.dart';
 import '../theme/portal_layout_insets.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -149,6 +150,14 @@ class PortalTextStyles {
 }
 
 /// Motion tokens for consistent animation across the system.
+///
+/// Springs follow the M3 Expressive scheme. *Spatial* springs move and resize
+/// things and overshoot a little on the way in; *effects* springs (damping
+/// ratio 1) fade and recolour and never pass their target, so they are the
+/// safe choice for anything that asserts on `0..1` — `Opacity`, shadow and
+/// padding lerps, the `animations` package. Wrap one in [PortalSpringCurve]
+/// for an implicit animation, or hand it to `AnimationController.animateWith`
+/// as a `SpringSimulation`.
 @immutable
 class PortalMotion {
   const PortalMotion({
@@ -157,9 +166,10 @@ class PortalMotion {
     this.slow = const Duration(milliseconds: 500),
     this.staggerStep = const Duration(milliseconds: 60),
     this.listRevealDuration = const Duration(milliseconds: 280),
-    this.standard = Curves.easeOutCubic,
-    this.emphasized = Curves.easeInOutCubic,
-  });
+    Curve? standard,
+    Curve? emphasized,
+  })  : _standard = standard,
+        _emphasized = emphasized;
 
   final Duration fast;
   final Duration medium;
@@ -171,8 +181,38 @@ class PortalMotion {
   /// Duration for list item fade/slide reveal.
   final Duration listRevealDuration;
 
-  final Curve standard;
-  final Curve emphasized;
+  // Static because `SpringDescription.withDampingRatio` is not const and this
+  // class has to stay const-constructible for `DesignTokens`.
+  static final SpringDescription spatialFast = _spring(800, .6);
+  static final SpringDescription spatialDefault = _spring(380, .8);
+  static final SpringDescription spatialSlow = _spring(200, .8);
+  static final SpringDescription effectsFast = _spring(3800, 1);
+  static final SpringDescription effectsDefault = _spring(1600, 1);
+  static final SpringDescription effectsSlow = _spring(800, 1);
+
+  static SpringDescription _spring(double stiffness, double ratio) =>
+      SpringDescription.withDampingRatio(
+        mass: 1,
+        stiffness: stiffness,
+        ratio: ratio,
+      );
+
+  /// [spatialDefault] as a curve. Pair it with its own settle time:
+  /// `AnimatedSlide(duration: PortalMotion.spatial.duration, curve: PortalMotion.spatial)`.
+  static final PortalSpringCurve spatial = PortalSpringCurve(spatialDefault);
+
+  /// [effectsDefault] as a curve; never overshoots. Same pairing as [spatial].
+  static final PortalSpringCurve effects = PortalSpringCurve(effectsDefault);
+
+  final Curve? _standard;
+  final Curve? _emphasized;
+
+  /// Kept from the easing era, now [effects]: a decelerating spring that
+  /// never overshoots, so every existing caller keeps working.
+  Curve get standard => _standard ?? effects;
+
+  /// Kept from the easing era, now [spatial]: overshoots, for movement only.
+  Curve get emphasized => _emphasized ?? spatial;
 }
 
 /// Elevation / shadow tokens.
