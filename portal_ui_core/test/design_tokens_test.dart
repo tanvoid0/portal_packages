@@ -9,11 +9,12 @@ void main() {
       expect(d.spacing.lg, 16);
       expect(d.spacing.md, 12);
       expect(d.spacing.xxxl, 48);
-      expect(d.radii.md, 10);
-      expect(d.radii.lg, 14);
-      expect(d.radii.xl, 20);
+      expect(d.radii.md, 12);
+      expect(d.radii.lg, 20);
+      expect(d.radii.xl, 28);
       expect(d.typeScale.md, 14);
       expect(d.minTapTarget, 44);
+      expect(d.expressiveCorners, isTrue);
     });
 
     test('compact tightens spacing, radii, type, and tap target', () {

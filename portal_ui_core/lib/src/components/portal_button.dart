@@ -36,8 +36,15 @@ class PortalButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
-    final (hPad, vPad, radius, labelFontSize) = _metrics(tokens);
+    final (hPad, vPad, labelFontSize) = _metrics(tokens);
     final style = _styleFor(portal);
+    // Filled buttons are pills; tonal, outlined and ghost keep a soft corner.
+    final radius = switch (variant) {
+      PortalButtonVariant.primary ||
+      PortalButtonVariant.destructive =>
+        tokens.radii.full,
+      _ => tokens.radii.md,
+    };
     final textStyle = portalControlLabelStyle(
       labelFontSize,
       color: style.foreground,
@@ -118,29 +125,14 @@ class PortalButton extends StatelessWidget {
     );
   }
 
-  (double, double, double, double) _metrics(DesignTokens tokens) {
+  (double, double, double) _metrics(DesignTokens tokens) {
     switch (size) {
       case PortalButtonSize.sm:
-        return (
-          tokens.spacing.md,
-          tokens.spacing.sm,
-          tokens.radii.sm,
-          tokens.typeScale.sm,
-        );
+        return (tokens.spacing.md, tokens.spacing.sm, tokens.typeScale.sm);
       case PortalButtonSize.md:
-        return (
-          tokens.spacing.lg,
-          tokens.spacing.md,
-          tokens.radii.md,
-          tokens.typeScale.md,
-        );
+        return (tokens.spacing.lg, tokens.spacing.md, tokens.typeScale.md);
       case PortalButtonSize.lg:
-        return (
-          tokens.spacing.xl,
-          tokens.spacing.lg,
-          tokens.radii.lg,
-          tokens.typeScale.lg,
-        );
+        return (tokens.spacing.xl, tokens.spacing.lg, tokens.typeScale.lg);
     }
   }
 

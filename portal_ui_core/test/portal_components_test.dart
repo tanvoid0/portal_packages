@@ -88,6 +88,90 @@ void main() {
     expect(find.text('+3'), findsOneWidget);
   });
 
+  testWidgets('a card is tonal and borderless by default, outlined has an edge',
+      (t) async {
+    OutlinedBorder shapeOf(String label) => t
+        .widget<Material>(find.ancestor(
+          of: find.text(label),
+          matching: find.byType(Material),
+        ).first)
+        .shape! as OutlinedBorder;
+
+    await t.pumpWidget(_host(const Column(children: [
+      PortalCard(child: Text('tonal')),
+      PortalCard(variant: PortalCardVariant.outlined, child: Text('edge')),
+    ])));
+
+    final scheme = Theme.of(t.element(find.text('tonal'))).colorScheme;
+    final tonal = shapeOf('tonal');
+    expect(tonal.side, BorderSide.none);
+    expect(tonal, isA<ContinuousRectangleBorder>());
+    expect(
+      t
+          .widget<Material>(find.ancestor(
+            of: find.text('tonal'),
+            matching: find.byType(Material),
+          ).first)
+          .color,
+      scheme.surfaceContainerLow,
+    );
+    expect(shapeOf('edge').side.width, _tokens.borderWidth);
+  });
+
+  test('the card theme is tonal with no border; inputs have no resting edge',
+      () {
+    for (final brightness in Brightness.values) {
+      final base = buildPortalTheme(brightness: brightness, tokens: _tokens);
+      final theme = applyPortalComponentThemes(
+        base: base,
+        colorScheme: base.colorScheme,
+        tokens: _tokens,
+        textTheme: base.textTheme,
+      );
+      final cs = base.colorScheme;
+      expect(
+        theme.cardTheme.color,
+        brightness == Brightness.dark
+            ? cs.surfaceContainerHigh
+            : cs.surfaceContainerLow,
+      );
+      expect((theme.cardTheme.shape! as OutlinedBorder).side, BorderSide.none);
+      expect(
+        (theme.inputDecorationTheme.enabledBorder! as OutlineInputBorder)
+            .borderSide,
+        BorderSide.none,
+      );
+      expect(
+        (theme.inputDecorationTheme.focusedBorder! as OutlineInputBorder)
+            .borderSide
+            .color,
+        cs.primary,
+      );
+      // No resting edge, so the fill is what makes a field visible: it must
+      // differ from every surface a field sits on.
+      expect(theme.inputDecorationTheme.fillColor, cs.surfaceContainerHighest);
+      expect(theme.inputDecorationTheme.fillColor,
+          isNot(theme.dialogTheme.backgroundColor));
+      expect(theme.inputDecorationTheme.fillColor, isNot(theme.cardTheme.color));
+    }
+  });
+
+  test('on the palette path the input fill still differs from card and panel',
+      () {
+    // A surface palette maps surfaceContainerHighest and cardColor to the same
+    // colour, so the field steps to surfaceContainerHigh there.
+    const config = PortalThemeConfig();
+    for (final theme in [config.light(), config.dark()]) {
+      expect(theme.inputDecorationTheme.fillColor,
+          theme.colorScheme.surfaceContainerHigh);
+      expect(theme.inputDecorationTheme.fillColor,
+          isNot(theme.dialogTheme.backgroundColor));
+      expect(theme.inputDecorationTheme.fillColor, isNot(theme.cardTheme.color));
+      expect(theme.inputDecorationTheme.fillColor,
+          isNot(theme.scaffoldBackgroundColor));
+    }
+  });
+
   testWidgets('a sheen card paints the surface sheen behind its content',
       (t) async {
     await t.pumpWidget(_host(const PortalCard(
@@ -101,7 +185,9 @@ void main() {
           of: find.byType(PortalCard),
           matching: find.byType(DecoratedBox),
         ))
-        .map((b) => (b.decoration as BoxDecoration).gradient)
+        .map((b) => b.decoration)
+        .whereType<BoxDecoration>()
+        .map((d) => d.gradient)
         .whereType<LinearGradient>()
         .singleWhere(
           (g) => g.colors.first == scheme.onSurface.withValues(alpha: 0.04),

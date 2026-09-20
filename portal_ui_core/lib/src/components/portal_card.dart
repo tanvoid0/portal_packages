@@ -6,7 +6,25 @@ import '../tokens/design_tokens.dart';
 import '../tokens/portal_radii_utils.dart';
 import 'portal_pressable.dart';
 
-enum PortalCardVariant { standard, glass, hero, asymmetric }
+enum PortalCardVariant {
+  /// The card theme's tone on the page, no border. The default.
+  tonal,
+
+  /// `surface` with a hairline outline — for a card that must read as a
+  /// boundary on a surface-coloured page.
+  outlined,
+
+  /// `surface` lifted by a shadow ([PortalCardElevation.card] unless
+  /// [PortalCard.elevation] says otherwise), no border.
+  elevated,
+  glass,
+  hero,
+  asymmetric,
+
+  /// The pre-tonal default: `surface` with an outline. Same as [outlined],
+  /// which new code should name.
+  standard,
+}
 
 enum PortalCardElevation { flat, soft, card }
 
@@ -17,7 +35,7 @@ class PortalCard extends StatelessWidget {
     this.padding,
     this.margin,
     this.onTap,
-    this.variant = PortalCardVariant.standard,
+    this.variant = PortalCardVariant.tonal,
     this.elevation = PortalCardElevation.flat,
     this.clipBehavior = Clip.antiAlias,
     this.heroAccent,
@@ -60,7 +78,14 @@ class PortalCard extends StatelessWidget {
           .withValues(alpha: variant == PortalCardVariant.glass ? 0.2 : 0.65),
       width: t.borderWidth,
     );
-    final shadows = _shadows(t.elevation, elevation, brightness);
+    final shadows = _shadows(
+      t.elevation,
+      variant == PortalCardVariant.elevated &&
+              elevation == PortalCardElevation.flat
+          ? PortalCardElevation.card
+          : elevation,
+      brightness,
+    );
 
     final inner = Padding(
       padding: padding ?? EdgeInsets.all(t.spacing.lg),
@@ -150,25 +175,39 @@ class PortalCard extends StatelessWidget {
             child: content,
           ),
         );
+      case PortalCardVariant.tonal:
+      case PortalCardVariant.outlined:
+      case PortalCardVariant.elevated:
       case PortalCardVariant.standard:
-        final shape = portal.tokens.expressiveCorners
-            ? t.radii.continuousBorder(borderRadius: radius, side: borderSide)
-            : RoundedRectangleBorder(borderRadius: radius, side: borderSide);
-        decorated = Material(
-          color: gradient == null
-              ? (backgroundColor ?? portal.surface)
-              : Colors.transparent,
-          elevation: 0,
-          shadowColor: Colors.transparent,
-          shape: shape,
-          clipBehavior: clipBehavior,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: gradient,
-              boxShadow: shadows,
-              borderRadius: radius,
+        final tonal = variant == PortalCardVariant.tonal;
+        final side = tonal || variant == PortalCardVariant.elevated
+            ? BorderSide.none
+            : borderSide;
+        final shape = t.expressiveCorners
+            ? t.radii.continuousBorder(borderRadius: radius, side: side)
+            : t.radii.roundedBorder(borderRadius: radius, side: side);
+        final theme = Theme.of(context);
+        final fill = backgroundColor ??
+            (tonal
+                ? theme.cardTheme.color ?? theme.colorScheme.surfaceContainerLow
+                : portal.surface);
+        // Shadow outside the Material: its clip would swallow one painted
+        // inside, which is why `elevated` never lifted before.
+        decorated = DecoratedBox(
+          decoration: ShapeDecoration(shape: shape, shadows: shadows),
+          child: Material(
+            color: gradient == null ? fill : Colors.transparent,
+            elevation: 0,
+            shadowColor: Colors.transparent,
+            shape: shape,
+            clipBehavior: clipBehavior,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: gradient,
+                borderRadius: radius,
+              ),
+              child: content,
             ),
-            child: content,
           ),
         );
     }

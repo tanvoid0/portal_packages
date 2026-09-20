@@ -24,12 +24,18 @@ extension PortalRadiiUtils on PortalRadii {
       BorderRadius.circular(value ?? lg);
 
   /// iOS-style continuous corners for [Material] / [Card].
+  ///
+  /// The radius is doubled on the way in: Flutter draws a continuous corner
+  /// as a cubic with both handles on the corner, so its apex sits r/8 in
+  /// against a circle's 0.29r and a nominal 20 reads *tighter* than the
+  /// rounded rect it replaces. At 2r the apex lands at 0.25r — the squircle
+  /// that is as full as the circle, then softer into the straight edge.
   ContinuousRectangleBorder continuousBorder({
     BorderRadius? borderRadius,
     BorderSide side = BorderSide.none,
   }) {
     return ContinuousRectangleBorder(
-      borderRadius: borderRadius ?? circular(),
+      borderRadius: (borderRadius ?? circular()) * 2,
       side: side,
     );
   }

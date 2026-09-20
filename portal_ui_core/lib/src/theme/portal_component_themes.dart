@@ -59,7 +59,13 @@ ThemeData applyPortalComponentThemes({
   final muted = cs.onSurfaceVariant;
   final border = cs.outline;
   final elevated = cs.surfaceContainerHigh;
-  final cardSurface = options.cardColor ?? cs.surfaceContainerHighest;
+  // Tonal: a card is a tone step off the page, not a bordered box.
+  final cardSurface = options.cardColor ??
+      (cs.brightness == Brightness.dark
+          ? cs.surfaceContainerHigh
+          : cs.surfaceContainerLow);
+  // Floating panels (dialog, sheet, popup) sit one tone above a card.
+  final panelSurface = options.cardColor ?? cs.surfaceContainerHigh;
   final scaffold =
       options.scaffoldBackgroundColor ?? cs.surface;
   final canvas = options.canvasColor ?? cs.surfaceContainerHighest;
@@ -69,7 +75,13 @@ ThemeData applyPortalComponentThemes({
   final appBarBg = options.appBarBackgroundColor ?? scaffold;
   final overlay =
       options.systemUiOverlayStyle ?? portalSystemUiOverlay(cs.brightness);
-  final borderColor = border.withValues(alpha: 0.25);
+  // A field is one tone off whatever holds it: page, card or panel. Highest
+  // by default; a surface palette folds Highest into its card colour, so
+  // there the field steps to High instead of vanishing into the card.
+  final inputFill =
+      {scaffold, cardSurface, panelSurface}.contains(cs.surfaceContainerHighest)
+          ? cs.surfaceContainerHigh
+          : cs.surfaceContainerHighest;
   final borderSide = BorderSide(
     color: border.withValues(alpha: 0.75),
     width: borderWidth,
@@ -106,14 +118,8 @@ ThemeData applyPortalComponentThemes({
       surfaceTintColor: Colors.transparent,
       margin: EdgeInsets.symmetric(vertical: s.xs),
       shape: tokens.expressiveCorners
-          ? r.continuousBorder(
-              borderRadius: r.circular(r.lg),
-              side: BorderSide(color: borderColor, width: borderWidth),
-            )
-          : RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(r.lg),
-              side: BorderSide(color: borderColor, width: borderWidth),
-            ),
+          ? r.continuousBorder(borderRadius: r.circular(r.lg))
+          : r.roundedBorder(borderRadius: r.circular(r.lg)),
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: appBarBg,
@@ -176,22 +182,18 @@ ThemeData applyPortalComponentThemes({
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: elevated.withValues(alpha: 0.55),
+      fillColor: inputFill,
       isDense: true,
       contentPadding: EdgeInsets.symmetric(horizontal: s.lg, vertical: s.md),
       hintStyle: TextStyle(color: muted),
       labelStyle: TextStyle(color: muted),
-      border: outlineBorder(),
-      enabledBorder: outlineBorder(),
+      border: outlineBorder(side: BorderSide.none),
+      enabledBorder: outlineBorder(side: BorderSide.none),
+      disabledBorder: outlineBorder(side: BorderSide.none),
       focusedBorder: outlineBorder(side: focusedBorder),
       errorBorder: outlineBorder(side: BorderSide(color: cs.error)),
       focusedErrorBorder: outlineBorder(
         side: BorderSide(color: cs.error, width: borderWidth + 0.5),
-      ),
-      disabledBorder: outlineBorder(
-        side: borderSide.copyWith(
-          color: border.withValues(alpha: 0.35),
-        ),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
@@ -204,7 +206,7 @@ ThemeData applyPortalComponentThemes({
         padding: EdgeInsets.symmetric(horizontal: s.xl, vertical: s.md),
         minimumSize: Size(tokens.minTapTarget, tokens.minTapTarget),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(r.md),
+          borderRadius: BorderRadius.circular(r.full),
         ),
         textStyle: const TextStyle(
           fontWeight: FontWeight.w600,
@@ -222,7 +224,7 @@ ThemeData applyPortalComponentThemes({
         padding: EdgeInsets.symmetric(horizontal: s.xl, vertical: s.md),
         minimumSize: Size(tokens.minTapTarget, tokens.minTapTarget),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(r.md),
+          borderRadius: BorderRadius.circular(r.full),
         ),
         textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
       ),
@@ -293,7 +295,7 @@ ThemeData applyPortalComponentThemes({
       ),
     ),
     dialogTheme: DialogThemeData(
-      backgroundColor: cardSurface,
+      backgroundColor: panelSurface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -313,7 +315,7 @@ ThemeData applyPortalComponentThemes({
       ),
     ),
     bottomSheetTheme: BottomSheetThemeData(
-      backgroundColor: cardSurface,
+      backgroundColor: panelSurface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       modalElevation: 0,
@@ -420,7 +422,7 @@ ThemeData applyPortalComponentThemes({
       circularTrackColor: cs.primary.withValues(alpha: 0.15),
     ),
     popupMenuTheme: PopupMenuThemeData(
-      color: cardSurface,
+      color: panelSurface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(

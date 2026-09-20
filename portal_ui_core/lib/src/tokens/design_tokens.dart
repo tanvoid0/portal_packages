@@ -41,10 +41,10 @@ class PortalSpacing {
 @immutable
 class PortalRadii {
   const PortalRadii({
-    this.sm = 6,
-    this.md = 10,
-    this.lg = 14,
-    this.xl = 20,
+    this.sm = 8,
+    this.md = 12,
+    this.lg = 20,
+    this.xl = 28,
     this.full = 999,
   });
 
@@ -429,7 +429,7 @@ class DesignTokens {
     this.layout = const PortalLayoutInsets(),
     this.minTapTarget = 44,
     this.borderWidth = 1,
-    this.expressiveCorners = false,
+    this.expressiveCorners = true,
   });
 
   final PortalSpacing spacing;
@@ -449,7 +449,8 @@ class DesignTokens {
 
   final double borderWidth;
 
-  /// When true, [applyPortalComponentThemes] uses [ContinuousRectangleBorder] for cards.
+  /// When true (the default), cards use a [ContinuousRectangleBorder] — the
+  /// squircle — instead of a plain rounded rect.
   final bool expressiveCorners;
 
   // ── Named presets ────────────────────────────────────────────────────────
@@ -468,7 +469,7 @@ class DesignTokens {
   );
 
   static const DesignTokens rounded = DesignTokens(
-    radii: PortalRadii(sm: 10, md: 16, lg: 20, xl: 28),
+    radii: PortalRadii(sm: 10, md: 16, lg: 24, xl: 32),
   );
 
   /// Warm, generous radii suited for content-heavy apps (recipes, media).
