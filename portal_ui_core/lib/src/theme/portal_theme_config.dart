@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_color_utilities/material_color_utilities.dart';
 
 import '../motion/portal_haptics.dart';
 import '../tokens/design_tokens.dart';
@@ -42,6 +43,7 @@ class PortalThemeConfig {
     this.customize,
     this.useComponentThemes = true,
     this.haptics = true,
+    this.dynamicColor = false,
   });
 
   /// When set, documents which catalog palette this config started from.
@@ -66,6 +68,16 @@ class PortalThemeConfig {
   /// Sets [PortalHaptics.enabled] when a theme is built from this config.
   final bool haptics;
 
+  /// Follow the device's dynamic colour (Android 12+ Material You).
+  ///
+  /// Off by default: every app has a deliberate brand palette and wallpaper
+  /// colour fights it. On, `PortalDynamicColorBuilder` harmonises the brand
+  /// seed toward the wallpaper's primary — see [build] `wallpaper:`. The flag
+  /// is read by that widget only, and may flip at runtime (the widget keeps
+  /// its subtree mounted); [build] itself harmonises whenever it is handed a
+  /// wallpaper scheme.
+  final bool dynamicColor;
+
   PortalUiPreset get resolvedPreset =>
       preset ?? portalPresetForTokens(tokens);
 
@@ -85,6 +97,7 @@ class PortalThemeConfig {
     PortalThemeCustomizer? customize,
     bool? useComponentThemes,
     bool haptics = true,
+    bool dynamicColor = false,
   }) {
     return PortalThemeConfig(
       palette: palette,
@@ -101,6 +114,7 @@ class PortalThemeConfig {
       customize: customize,
       useComponentThemes: useComponentThemes ?? true,
       haptics: haptics,
+      dynamicColor: dynamicColor,
     );
   }
 
@@ -127,6 +141,7 @@ class PortalThemeConfig {
     PortalThemeCustomizer? customize,
     bool? useComponentThemes,
     bool? haptics,
+    bool? dynamicColor,
     bool clearPreset = false,
     bool clearPortalUiThemeBuilder = false,
     bool clearColorSchemeBuilder = false,
@@ -161,14 +176,30 @@ class PortalThemeConfig {
       customize: clearCustomize ? null : (customize ?? this.customize),
       useComponentThemes: useComponentThemes ?? this.useComponentThemes,
       haptics: haptics ?? this.haptics,
+      dynamicColor: dynamicColor ?? this.dynamicColor,
     );
   }
 
   /// Both light and dark themes for an optional runtime [accent].
-  PortalThemeModes build({Color? accent}) {
+  ///
+  /// [wallpaper] is the device's dynamic scheme (what
+  /// `PortalDynamicColorBuilder` feeds in). When given, the seed — [accent] or
+  /// the palette's — is harmonised toward its primary ([Blend.harmonize]: hue
+  /// rotated up to 15°, chroma and tone kept), so the palette nods to the
+  /// wallpaper without giving up the brand. Semantic roles derive from the
+  /// resulting primary and follow. Surfaces and tokens are the config's own
+  /// either way.
+  PortalThemeModes build({Color? accent, ColorScheme? wallpaper}) {
+    var seed = accent;
+    if (wallpaper != null) {
+      seed = Color(Blend.harmonize(
+        (accent ?? colorPalettes.seedColor).toARGB32(),
+        wallpaper.primary.toARGB32(),
+      ));
+    }
     return PortalThemeModes(
-      light: light(accent: accent),
-      dark: dark(accent: accent),
+      light: light(accent: seed),
+      dark: dark(accent: seed),
     );
   }
 

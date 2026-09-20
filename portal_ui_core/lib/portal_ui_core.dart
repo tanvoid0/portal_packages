@@ -11,6 +11,7 @@ export 'src/theme/portal_themed_surface.dart';
 export 'src/theme/portal_visual_theme_styles.dart';
 export 'src/theme/portal_theme_build_context.dart';
 export 'src/theme/portal_theme_config.dart';
+export 'src/theme/portal_dynamic_color_builder.dart';
 export 'src/theme/portal_theme_palette.dart';
 export 'src/theme/portal_theme_palette_id.dart';
 export 'src/theme/portal_design_token_presets.dart';
