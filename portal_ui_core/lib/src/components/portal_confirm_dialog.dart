@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../motion/portal_haptics.dart';
+
 /// Asks the user to confirm an action. Resolves to true only if they did —
 /// dismissing by tapping outside or pressing back counts as a cancel.
 ///
@@ -29,7 +31,10 @@ Future<bool> portalConfirm(
             child: Text(cancelLabel),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () {
+              PortalHaptics.medium();
+              Navigator.pop(ctx, true);
+            },
             style: isDestructive
                 ? TextButton.styleFrom(foregroundColor: scheme.error)
                 : null,

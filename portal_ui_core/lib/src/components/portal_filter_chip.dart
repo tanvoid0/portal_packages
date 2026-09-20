@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../motion/portal_haptics.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_pressable.dart';
 
@@ -74,6 +75,7 @@ class PortalFilterChip extends StatelessWidget {
       child: PortalPressable(
         onTap: onTap,
         onLongPress: onLongPress,
+        haptic: PortalHapticKind.selection,
         borderRadius: radius,
         child: AnimatedContainer(
           duration: tokens.motion.fast,

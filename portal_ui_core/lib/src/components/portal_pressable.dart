@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../motion/portal_haptics.dart';
 import '../motion/portal_spring_curve.dart';
 import '../theme/portal_ui_theme.dart';
 import '../tokens/design_tokens.dart';
@@ -31,6 +32,7 @@ class PortalPressable extends StatefulWidget {
     this.onTap,
     this.onLongPress,
     this.enabled = true,
+    this.haptic,
     this.ripple = false,
     this.borderRadius,
     this.splashColor,
@@ -44,6 +46,10 @@ class PortalPressable extends StatefulWidget {
   /// False refuses taps and announces disabled, keeping the layout. For "not
   /// a button at all" pass no handlers instead.
   final bool enabled;
+
+  /// Played on tap, before [onTap]. Off by default: a card in a list should
+  /// not buzz, a chip that changes selection should.
+  final PortalHapticKind? haptic;
 
   /// Keep Material's splash on top of the scale. Off, the ink is [NoSplash]
   /// and the pressed overlay transparent.
@@ -95,6 +101,11 @@ class _PortalPressableState extends State<PortalPressable> {
     if (mounted) setState(() => _pressed = false);
   }
 
+  void _tap() {
+    if (widget.haptic case final kind?) PortalHaptics.play(kind);
+    widget.onTap?.call();
+  }
+
   @override
   void dispose() {
     _pulse?.cancel();
@@ -118,7 +129,7 @@ class _PortalPressableState extends State<PortalPressable> {
         child: Material(
           type: MaterialType.transparency,
           child: InkWell(
-            onTap: interactive ? widget.onTap : null,
+            onTap: interactive && widget.onTap != null ? _tap : null,
             onLongPress: interactive ? widget.onLongPress : null,
             onHighlightChanged: _highlight,
             borderRadius: widget.borderRadius,

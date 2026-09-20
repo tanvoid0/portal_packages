@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../motion/portal_haptics.dart';
 import '../theme/portal_ui_theme.dart';
 
 /// A destination in [PortalBottomNavBar].
@@ -116,7 +117,10 @@ class PortalBottomNavBar extends StatelessWidget {
                 child: _NavItem(
                   destination: destinations[i],
                   isSelected: i == selectedIndex,
-                  onTap: () => onDestinationSelected(i),
+                  onTap: () {
+                    if (i != selectedIndex) PortalHaptics.selection();
+                    onDestinationSelected(i);
+                  },
                   mark: mark,
                   selectedMark: selectedMarkColor ?? mark,
                   well: well,

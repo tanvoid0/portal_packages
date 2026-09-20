@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../motion/portal_haptics.dart';
 import '../tokens/design_tokens.dart';
 import 'portal_color_palettes.dart';
 import 'portal_component_themes.dart';
@@ -40,6 +41,7 @@ class PortalThemeConfig {
     this.portalUiThemeBuilder,
     this.customize,
     this.useComponentThemes = true,
+    this.haptics = true,
   });
 
   /// When set, documents which catalog palette this config started from.
@@ -61,6 +63,9 @@ class PortalThemeConfig {
   final PortalThemeCustomizer? customize;
   final bool useComponentThemes;
 
+  /// Sets [PortalHaptics.enabled] when a theme is built from this config.
+  final bool haptics;
+
   PortalUiPreset get resolvedPreset =>
       preset ?? portalPresetForTokens(tokens);
 
@@ -79,6 +84,7 @@ class PortalThemeConfig {
     PortalUiThemeBuilder? portalUiThemeBuilder,
     PortalThemeCustomizer? customize,
     bool? useComponentThemes,
+    bool haptics = true,
   }) {
     return PortalThemeConfig(
       palette: palette,
@@ -94,6 +100,7 @@ class PortalThemeConfig {
       portalUiThemeBuilder: portalUiThemeBuilder,
       customize: customize,
       useComponentThemes: useComponentThemes ?? true,
+      haptics: haptics,
     );
   }
 
@@ -119,6 +126,7 @@ class PortalThemeConfig {
     PortalUiThemeBuilder? portalUiThemeBuilder,
     PortalThemeCustomizer? customize,
     bool? useComponentThemes,
+    bool? haptics,
     bool clearPreset = false,
     bool clearPortalUiThemeBuilder = false,
     bool clearColorSchemeBuilder = false,
@@ -152,6 +160,7 @@ class PortalThemeConfig {
           : (portalUiThemeBuilder ?? this.portalUiThemeBuilder),
       customize: clearCustomize ? null : (customize ?? this.customize),
       useComponentThemes: useComponentThemes ?? this.useComponentThemes,
+      haptics: haptics ?? this.haptics,
     );
   }
 
@@ -173,6 +182,7 @@ class PortalThemeConfig {
     required Brightness brightness,
     Color? accent,
   }) {
+    PortalHaptics.enabled = haptics;
     final resolvedAccent = accent ?? colorPalettes.seedColor;
     final colorScheme = _resolveColorScheme(
       brightness: brightness,

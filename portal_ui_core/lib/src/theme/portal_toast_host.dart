@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../motion/portal_haptics.dart';
 import '../tokens/design_tokens.dart';
 import 'portal_toast.dart';
 import 'portal_ui_theme.dart';
@@ -255,7 +256,7 @@ class _PortalToastHostState extends State<PortalToastHost> {
 
 /// Opaque toast chrome. Uses [portalToastColors] so glass themes cannot
 /// wash out the fill.
-class PortalToastCard extends StatelessWidget {
+class PortalToastCard extends StatefulWidget {
   const PortalToastCard({
     required this.data,
     super.key,
@@ -264,6 +265,30 @@ class PortalToastCard extends StatelessWidget {
 
   final PortalToastData data;
   final VoidCallback? onDismiss;
+
+  @override
+  State<PortalToastCard> createState() => _PortalToastCardState();
+}
+
+class _PortalToastCardState extends State<PortalToastCard> {
+  PortalToastData get data => widget.data;
+  VoidCallback? get onDismiss => widget.onDismiss;
+
+  // Fires as the card lands on screen, so a queued toast buzzes when it
+  // appears, not when it was raised — and a headless `AppToast.show` (no
+  // host, no binding) stays silent.
+  @override
+  void initState() {
+    super.initState();
+    switch (data.variant) {
+      case PortalToastVariant.success:
+        PortalHaptics.success();
+      case PortalToastVariant.destructive:
+        PortalHaptics.error();
+      case PortalToastVariant.neutral:
+        break;
+    }
+  }
 
   IconData get _icon {
     switch (data.variant) {

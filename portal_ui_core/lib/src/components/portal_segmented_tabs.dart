@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../motion/portal_haptics.dart';
 import '../theme/portal_ui_theme.dart';
 
 /// Full-width segmented control — two to four peer views of the same data.
@@ -49,7 +50,10 @@ class PortalSegmentedTabs extends StatelessWidget {
               child: Material(
                 type: MaterialType.transparency,
                 child: InkWell(
-                  onTap: () => onChanged(i),
+                  onTap: () {
+                    if (i != index) PortalHaptics.selection();
+                    onChanged(i);
+                  },
                   borderRadius: radius,
                   child: Container(
                     constraints:
