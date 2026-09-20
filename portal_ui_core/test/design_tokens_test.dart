@@ -89,6 +89,49 @@ void main() {
       const d = DesignTokens.defaults;
       expect(d.textStyles.display.fontSize, 34);
     });
+
+    test('hero tops the ramp at 44/w800 with a 1.1 line height', () {
+      const s = PortalTextStyles();
+      expect(s.hero.fontSize, 44);
+      expect(s.hero.fontWeight, FontWeight.w800);
+      expect(s.hero.height, 1.1);
+      expect(s.hero.letterSpacing, -1.0);
+    });
+
+    test('every style has a line height', () {
+      const s = PortalTextStyles();
+      for (final style in [
+        s.hero,
+        s.display,
+        s.headline,
+        s.title,
+        s.subtitle,
+        s.body,
+        s.caption,
+        s.overline,
+      ]) {
+        expect(style.height, isNotNull);
+      }
+      expect(s.body.height, 1.5);
+      expect(s.overline.height, 1.4);
+    });
+
+    test('numeric adds tabular figures and keeps the rest', () {
+      const s = PortalTextStyles();
+      final n = s.numeric(s.title);
+      expect(n.fontFeatures, contains(const FontFeature.tabularFigures()));
+      expect(n.fontSize, s.title.fontSize);
+      expect(n.fontWeight, s.title.fontWeight);
+    });
+
+    test('emphasized is one weight heavier, tracked -0.2, capped at w900', () {
+      const s = PortalTextStyles();
+      final e = s.emphasized(s.body);
+      expect(e.fontWeight, FontWeight.w500);
+      expect(e.letterSpacing, closeTo(0.1 - 0.2, 1e-9));
+      final capped = s.emphasized(const TextStyle(fontWeight: FontWeight.w900));
+      expect(capped.fontWeight, FontWeight.w900);
+    });
   });
 
   group('PortalElevation', () {

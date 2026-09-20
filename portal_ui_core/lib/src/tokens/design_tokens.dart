@@ -90,16 +90,26 @@ class PortalTypeScale {
 
 /// Typography *styles* — complete [TextStyle] definitions for semantic roles.
 ///
+/// Every style carries a `height`: 1.1 for the two figure sizes, 1.2 for
+/// headings, 1.5 for reading text, 1.4 for the small labels. [emphasized]
+/// and [numeric] derive a variant from any of them.
+///
 /// Customise by passing different values at construction or by subclassing
 /// to add app-specific roles (e.g. `RecipeTextStyles extends PortalTextStyles`
 /// adding a `sectionHeader` style).
 @immutable
 class PortalTextStyles {
   const PortalTextStyles({
+    this.hero = const TextStyle(
+      fontSize: 44,
+      fontWeight: FontWeight.w800,
+      height: 1.1,
+      letterSpacing: -1.0,
+    ),
     this.display = const TextStyle(
       fontSize: 34,
       fontWeight: FontWeight.w800,
-      height: 1.15,
+      height: 1.1,
       letterSpacing: -0.5,
     ),
     this.headline = const TextStyle(
@@ -111,13 +121,13 @@ class PortalTextStyles {
     this.title = const TextStyle(
       fontSize: 22,
       fontWeight: FontWeight.w600,
-      height: 1.25,
+      height: 1.2,
       letterSpacing: -0.2,
     ),
     this.subtitle = const TextStyle(
       fontSize: 17,
       fontWeight: FontWeight.w600,
-      height: 1.3,
+      height: 1.25,
       letterSpacing: -0.1,
     ),
     this.body = const TextStyle(
@@ -135,11 +145,14 @@ class PortalTextStyles {
     this.overline = const TextStyle(
       fontSize: 11,
       fontWeight: FontWeight.w600,
-      height: 1.3,
+      height: 1.4,
       letterSpacing: 0.8,
     ),
   });
 
+  /// One figure that owns the screen — a balance, a stat page's headline
+  /// number. Above [display]; pair with [numeric] when it holds digits.
+  final TextStyle hero;
   final TextStyle display;
   final TextStyle headline;
   final TextStyle title;
@@ -147,6 +160,27 @@ class PortalTextStyles {
   final TextStyle body;
   final TextStyle caption;
   final TextStyle overline;
+
+  /// [style] one weight heavier and tracked 0.2 tighter — a selected tab, the
+  /// current value in a list of values. Already `w900` stays `w900`.
+  TextStyle emphasized(TextStyle style) {
+    final weight = style.fontWeight ?? FontWeight.normal;
+    final heavier =
+        weight.value >= 900 ? weight : FontWeight(weight.value + 100);
+    return style.copyWith(
+      fontWeight: heavier,
+      letterSpacing: (style.letterSpacing ?? 0) - 0.2,
+    );
+  }
+
+  /// [style] with tabular figures, so digits share a width and a counter or
+  /// a column of amounts does not jitter as the values change.
+  TextStyle numeric(TextStyle style) => style.copyWith(
+        fontFeatures: [
+          ...?style.fontFeatures,
+          const FontFeature.tabularFigures(),
+        ],
+      );
 }
 
 /// Motion tokens for consistent animation across the system.

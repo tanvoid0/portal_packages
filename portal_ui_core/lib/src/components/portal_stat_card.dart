@@ -6,9 +6,9 @@ import 'portal_card.dart';
 
 /// One metric: glyph, value, label, optional footer.
 ///
-/// The value carries the weight — it is set in `textStyles.headline`, the
-/// label in `overline`. Anything richer than a footer belongs in a real card,
-/// not here.
+/// The value carries the weight — tabular figures in `textStyles.title`, or
+/// `textStyles.hero` when [hero] is set; the label is `overline`. Anything
+/// richer than a footer belongs in a real card, not here.
 class PortalStatCard extends StatelessWidget {
   const PortalStatCard({
     super.key,
@@ -19,6 +19,7 @@ class PortalStatCard extends StatelessWidget {
     this.delta,
     this.footer,
     this.onTap,
+    this.hero = false,
   });
 
   final String value;
@@ -39,6 +40,10 @@ class PortalStatCard extends StatelessWidget {
   final Widget? footer;
 
   final VoidCallback? onTap;
+
+  /// Set the value in `hero` (44) instead of `title` (22). For the one figure
+  /// a page is about — a balance, a total — not a card in a row of three.
+  final bool hero;
 
   @override
   Widget build(BuildContext context) {
@@ -66,10 +71,9 @@ class PortalStatCard extends StatelessWidget {
           ],
           Text(
             value,
-            style: tokens.textStyles.headline.copyWith(
-              color: portal.onSurface,
-              height: 1,
-            ),
+            style: tokens.textStyles
+                .numeric(hero ? tokens.textStyles.hero : tokens.textStyles.title)
+                .copyWith(color: portal.onSurface),
           ),
           SizedBox(height: tokens.spacing.xs),
           Text(
