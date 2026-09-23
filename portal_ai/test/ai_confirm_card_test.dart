@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 /// Replies with one tool call, then a final message.
 class _Scripted implements AiCompletionClient {
@@ -48,6 +49,7 @@ Future<void> _pump(
 }) async {
   await tester.pumpWidget(
     MaterialApp(
+      theme: buildPortalTheme(brightness: Brightness.light),
       home: Scaffold(
         body: AiAssistantPage(runtime: runtime, onEditToolCall: onEdit),
       ),

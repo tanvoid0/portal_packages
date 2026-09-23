@@ -97,6 +97,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.15"
+  dynamic_color:
+    dependency: transitive
+    description:
+      name: dynamic_color
+      sha256: "4aeb76de323e8eb660bab5557d826ad7ebbf1434a598f0c6aa8a11a9696a6757"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.9.0"
   fake_async:
     dependency: transitive
     description:
@@ -400,6 +408,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.13.0"
+  material_symbols_icons:
+    dependency: transitive
+    description:
+      name: material_symbols_icons
+      sha256: bd513edc2bc9b034108d5518c48cf5cebbb67d0653728cc452368cb27ca80bb0
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.2960.0"
   meta:
     dependency: transitive
     description:
@@ -514,11 +530,10 @@ packages:
   portal_ui_core:
     dependency: "direct main"
     description:
-      name: portal_ui_core
-      sha256: "574ead5f0388e006a42020c768d3ac2a615c4686a75479f3bff3f1dc29bd645b"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.1.1"
+      path: "../../portal_ui_core"
+      relative: true
+    source: path
+    version: "0.2.0"
   pub_semver:
     dependency: transitive
     description:

@@ -1,0 +1,6 @@
+# Published pubspec depends on portal_ui_core from pub.dev; inside this
+# monorepo resolve it from the sibling package. `pub publish` ignores this
+# file.
+dependency_overrides:
+  portal_ui_core:
+    path: ../portal_ui_core

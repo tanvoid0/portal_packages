@@ -101,4 +101,40 @@ void main() {
     expect(find.byIcon(Icons.attach_file), findsOneWidget);
     expect(find.byIcon(Icons.mic), findsOneWidget);
   });
+
+  testWidgets('minChars holds the send button until the text is long enough',
+      (t) async {
+    final controller = TextEditingController(text: 'hi');
+    var submits = 0;
+    await t.pumpWidget(_host(PortalComposer(
+      controller: controller,
+      minChars: 4,
+      onSubmit: () => submits++,
+    )));
+    await t.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await t.pump();
+    expect(submits, 0);
+
+    controller.text = 'hello';
+    await t.pump();
+    await t.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await t.pump();
+    expect(submits, 1);
+  });
+
+  testWidgets('maxLength truncates typed text and draws no counter of its own',
+      (t) async {
+    final controller = TextEditingController();
+    await t.pumpWidget(_host(PortalComposer(
+      controller: controller,
+      maxLength: 5,
+      onSubmit: () {},
+    )));
+    await t.enterText(find.byType(TextField), 'far too long');
+    await t.pump();
+    expect(controller.text, 'far t');
+    // The caller renders its own count into `trailing`; Flutter's would sit
+    // under the pill where the dock has no room for it.
+    expect(find.text('5/5'), findsNothing);
+  });
 }

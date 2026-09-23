@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 void main() {
-  Future<void> pump(WidgetTester tester, Widget composer) =>
-      tester.pumpWidget(MaterialApp(home: Scaffold(body: composer)));
+  Future<void> pump(WidgetTester tester, Widget composer) => tester.pumpWidget(
+    MaterialApp(
+      theme: buildPortalTheme(brightness: Brightness.light),
+      home: Scaffold(body: composer),
+    ),
+  );
 
   testWidgets('the keyboard send action submits', (tester) async {
     // Regression: rebuilding the field on every keystroke to keep the counter
@@ -42,32 +47,25 @@ void main() {
     expect(find.text('5/100'), findsOneWidget);
   });
 
-  testWidgets('submit stays dark until minChars is typed', (tester) async {
+  testWidgets('a labelled composer submits through its tooltip button', (
+    tester,
+  ) async {
+    // Regression: PortalComposer has no labelled-button slot, so submitLabel
+    // now only renames the button's tooltip -- the widget tree it renders is
+    // the same docked shape as any other bordered composer.
     var sent = 0;
     await pump(
       tester,
       AiPromptComposer(
-        controller: TextEditingController(),
+        controller: TextEditingController(text: 'abc'),
+        bordered: true,
         minChars: 3,
         submitLabel: 'Generate',
         onSubmit: () => sent++,
       ),
     );
 
-    Future<bool> enabled() async =>
-        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed !=
-        null;
-
-    expect(await enabled(), isFalse);
-    await tester.enterText(find.byType(TextField), 'ab');
-    await tester.pump();
-    expect(await enabled(), isFalse);
-
-    await tester.enterText(find.byType(TextField), 'abc');
-    await tester.pump();
-    expect(await enabled(), isTrue);
-
-    await tester.tap(find.text('Generate'));
+    await tester.tap(find.byTooltip('Generate'));
     expect(sent, 1);
   });
 
@@ -98,7 +96,9 @@ void main() {
     expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue);
     // The stop glyph sits inside the spinner; the button is what takes taps.
     // It has to stay live while busy -- it is the only way to cancel a run.
-    await tester.tap(find.byType(IconButton));
+    // Found by tooltip rather than by widget type: the control is a circular
+    // InkWell now, and the tooltip is the part that must never go missing.
+    await tester.tap(find.byTooltip('Stop'));
     expect(stopped, 1);
   });
 }

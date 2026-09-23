@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/portal_ui_theme.dart';
 
@@ -37,6 +38,8 @@ class PortalComposer extends StatelessWidget {
     this.variant = PortalComposerVariant.floating,
     this.sendLabel = 'Send',
     this.stopLabel = 'Stop',
+    this.maxLength,
+    this.minChars = 1,
   });
 
   final TextEditingController controller;
@@ -72,8 +75,19 @@ class PortalComposer extends StatelessWidget {
   final String sendLabel;
   final String stopLabel;
 
+  /// A hard cap on what can be typed, enforced by the field itself. Flutter's
+  /// own counter is suppressed -- a dock this small has nowhere to put it, and
+  /// a caller that wants one renders it into [trailing] where it can be
+  /// styled like the rest of the row.
+  final int? maxLength;
+
+  /// How much text the send button needs before it lights up. The default of
+  /// 1 is "not empty"; a caller that wants a real prompt rather than a
+  /// keystroke raises it.
+  final int minChars;
+
   bool get _canSubmit =>
-      enabled && !busy && controller.text.trim().isNotEmpty;
+      enabled && !busy && controller.text.trim().length >= minChars;
 
   void _submit() {
     if (_canSubmit) onSubmit();
@@ -94,6 +108,9 @@ class PortalComposer extends StatelessWidget {
       maxLines: docked ? 4 : 6,
       textInputAction: TextInputAction.send,
       onSubmitted: (_) => _submit(),
+      maxLength: maxLength,
+      maxLengthEnforcement: MaxLengthEnforcement.enforced,
+      buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
       decoration: InputDecoration(
         hintText: hintText,
         filled: !docked,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 /// The sheet needs a runtime, but nothing here ever asks the model.
 class _DeadClient implements AiCompletionClient {
@@ -38,6 +39,7 @@ void main() {
 
   Future<void> pump(WidgetTester tester) => tester.pumpWidget(
     MaterialApp(
+      theme: buildPortalTheme(brightness: Brightness.light),
       home: Scaffold(
         body: AiAssistantPage(
           runtime: PortalAiRuntime(
@@ -106,6 +108,7 @@ void _hostDrivenTests() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
         home: StatefulBuilder(
           builder: (context, setState) => Scaffold(
             body: AiAssistantPage(
@@ -147,6 +150,7 @@ void _hostRewindTests() {
     ];
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
         home: Scaffold(
           body: AiAssistantPage(
             turns: turns,
@@ -174,6 +178,7 @@ void _hostRewindTests() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
         home: Scaffold(
           body: AiAssistantPage(
             turns: const [AiChatTurn(role: 'user', content: 'plan my week')],

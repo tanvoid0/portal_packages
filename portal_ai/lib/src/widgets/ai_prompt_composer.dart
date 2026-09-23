@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 /// The box you type the question into.
 ///
 /// One widget for both shapes portal had: the assistant page's plain field
 /// with a send arrow, and portal_task's landing composer with a character
 /// count, an attach button and a labelled generate button. Passing
-/// [submitLabel] picks the second; leaving it null picks the first.
+/// [submitLabel] picks the second; leaving it null picks the first. Both
+/// shapes render through [PortalComposer] -- [bordered] just picks its
+/// [PortalComposerVariant.docked] over [PortalComposerVariant.floating].
 ///
 /// The attach button is always drawn when [onAttach] is set, rather than
 /// swapping places with submit once you have typed three characters the way
@@ -27,6 +30,7 @@ class AiPromptComposer extends StatelessWidget {
     this.hintText = '',
     this.submitLabel,
     this.minChars = 1,
+    this.sendLabel = 'Send',
     this.stopLabel = 'Stop',
     this.attachLabel = 'Attach a photo',
     this.micLabel = 'Speak',
@@ -61,17 +65,22 @@ class AiPromptComposer extends StatelessWidget {
   /// The voice conversation is on: the microphone draws selected.
   final bool listening;
 
-  /// Caps the field and shows `n/max` in the footer.
+  /// A hard cap, enforced by the field, plus an `n/max` count beside the
+  /// field's own controls.
   final int? maxLength;
 
   final String hintText;
 
-  /// Draws submit as a labelled filled button instead of an arrow.
+  /// Draws submit's tooltip from this instead of [sendLabel]. `PortalComposer`
+  /// has no labelled-button slot, so this no longer swaps the arrow for a
+  /// `FilledButton` the way it used to -- it only renames what a screen
+  /// reader hears.
   final String? submitLabel;
 
-  /// How much has to be typed before submit lights up.
+  /// How much text send needs before it lights up. 1 is "not empty".
   final int minChars;
 
+  final String sendLabel;
   final String stopLabel;
   final String attachLabel;
   final String micLabel;
@@ -81,103 +90,46 @@ class AiPromptComposer extends StatelessWidget {
   /// The assistant page's own outlined field is the default.
   final bool bordered;
 
-  bool get _canSubmit =>
-      enabled && !busy && controller.text.trim().length >= minChars;
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final showFooter =
-        maxLength != null || onAttach != null || submitLabel != null;
-
-    // The field itself is built once and left alone. Rebuilding it on every
-    // keystroke -- which is what wrapping it in a ListenableBuilder did --
-    // drops the platform text-input connection, so a keyboard send action
-    // lands on nothing. Only the parts that read the text rebuild.
-    final field = TextField(
+    return PortalComposer(
       controller: controller,
+      onSubmit: onSubmit,
       focusNode: focusNode,
+      hintText: hintText,
       enabled: enabled,
-      // Read-only rather than disabled while a run is in flight: a disabled
-      // field disables its own suffix, which is where the stop button lives,
-      // so the only way to cancel was unclickable.
-      readOnly: busy,
-      minLines: bordered ? 2 : 1,
-      maxLines: 4,
+      busy: busy,
+      onStop: onStop,
+      variant: bordered
+          ? PortalComposerVariant.docked
+          : PortalComposerVariant.floating,
+      sendLabel: submitLabel ?? sendLabel,
+      stopLabel: stopLabel,
       maxLength: maxLength,
-      textInputAction: TextInputAction.send,
-      onSubmitted: (_) {
-        if (_canSubmit) onSubmit();
-      },
-      // The count belongs in the footer next to the buttons, not floating
-      // under the field on its own line.
-      buildCounter:
-          (_, {required currentLength, required isFocused, maxLength}) => null,
-      decoration: InputDecoration(
-        hintText: hintText,
-        border: bordered ? InputBorder.none : const OutlineInputBorder(),
-        isDense: bordered,
-        // With a footer there is a submit button down there already.
-        suffixIcon: showFooter
-            ? null
-            : onMic == null
-            ? _live(_submitButton)
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [_micButton(), _live(_submitButton)],
-              ),
-      ),
-    );
-
-    final column = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        field,
-        if (showFooter)
-          Row(
-            children: [
-              if (maxLength case final max?)
-                _live(
-                  (context) => Text(
-                    '${controller.text.characters.length}/$max',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              const Spacer(),
-              if (onMic != null) _micButton(),
-              if (onAttach case final attach?)
-                IconButton(
-                  tooltip: attachLabel,
-                  onPressed: enabled && !busy ? attach : null,
-                  icon: const Icon(Icons.add_photo_alternate_outlined),
-                  visualDensity: VisualDensity.compact,
-                ),
-              _live(_submitButton),
-            ],
-          ),
+      minChars: minChars,
+      leading: [
+        // Attach sits on the leading edge, the way every assistant puts it:
+        // it acts on what you are about to write, while mic and send act on
+        // what is written.
+        if (onAttach case final attach?) _attachButton(attach),
       ],
-    );
-
-    if (!bordered) return column;
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: scheme.primary.withValues(alpha: 0.5)),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 12, 12, 4),
-      child: column,
+      trailing: [
+        if (onMic != null) _micButton(),
+        // A cap you cannot see is a cap that truncates you by surprise --
+        // one muted count beside the buttons, only when there is a cap.
+        if (maxLength case final max?) _counter(max),
+      ],
     );
   }
 
-  /// Rebuilds one small thing whenever what is typed changes.
-  Widget _live(Widget Function(BuildContext) build) => ListenableBuilder(
-    listenable: controller,
-    builder: (context, _) => build(context),
+  /// A paperclip, not a photo frame: this button takes a PDF or a text file
+  /// as readily as an image, and an icon that promises pictures is an icon
+  /// that hides the feature from anyone holding a document.
+  Widget _attachButton(VoidCallback attach) => IconButton(
+    tooltip: attachLabel,
+    onPressed: enabled && !busy ? attach : null,
+    icon: const Icon(Icons.attach_file_rounded),
+    visualDensity: VisualDensity.compact,
   );
 
   /// Selected while the conversation is on, so a screen reader hears the
@@ -186,41 +138,17 @@ class AiPromptComposer extends StatelessWidget {
     tooltip: listening ? micStopLabel : micLabel,
     onPressed: enabled && !busy ? onMic : null,
     isSelected: listening,
-    icon: Icon(listening ? Icons.mic : Icons.mic_none),
+    icon: Icon(listening ? Icons.mic : Icons.mic_none_rounded),
     visualDensity: VisualDensity.compact,
   );
 
-  Widget _submitButton(BuildContext context) {
-    final canSubmit = _canSubmit;
-    if (busy) {
-      // One spinner, and it is also the stop button: the ring shows the run is
-      // live, tapping it cancels.
-      return IconButton(
-        tooltip: stopLabel,
-        onPressed: onStop,
-        icon: const SizedBox(
-          width: 20,
-          height: 20,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              CircularProgressIndicator(strokeWidth: 2),
-              Icon(Icons.stop_rounded, size: 12),
-            ],
-          ),
-        ),
-      );
-    }
-    if (submitLabel case final label?) {
-      return FilledButton.icon(
-        onPressed: canSubmit ? onSubmit : null,
-        icon: const Icon(Icons.auto_awesome_outlined, size: 18),
-        label: Text(label),
-      );
-    }
-    return IconButton(
-      icon: const Icon(Icons.arrow_upward),
-      onPressed: canSubmit ? onSubmit : null,
-    );
-  }
+  Widget _counter(int max) => ListenableBuilder(
+    listenable: controller,
+    builder: (context, _) => Text(
+      '${controller.text.characters.length}/$max',
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    ),
+  );
 }

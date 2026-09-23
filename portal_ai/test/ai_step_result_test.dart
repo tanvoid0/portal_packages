@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 class _Scripted implements AiCompletionClient {
   _Scripted(this.replies);
@@ -51,7 +52,10 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: AiAssistantPage(runtime: runtime))),
+      MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
+        home: Scaffold(body: AiAssistantPage(runtime: runtime)),
+      ),
     );
     await tester.enterText(find.byType(TextField).last, 'add milk');
     await tester.testTextInput.receiveAction(TextInputAction.send);

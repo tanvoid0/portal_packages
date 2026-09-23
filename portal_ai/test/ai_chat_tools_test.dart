@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Answers every call with the same JSON, and remembers what it was asked.
@@ -40,6 +41,7 @@ Future<void> _pumpChat(
   final store = await PrefsAiChatStore.open('portal_test_tools');
   await tester.pumpWidget(
     MaterialApp(
+      theme: buildPortalTheme(brightness: Brightness.light),
       home: Scaffold(
         body: AiAssistantPage(
           title: 'Assistant',
@@ -72,7 +74,7 @@ void main() {
     await _ask(tester, 'about porridge');
 
     // Find lives in the header's overflow menu, alongside the two exports.
-    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.tap(find.byIcon(Icons.more_vert_rounded));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Find in conversation'));
     await tester.pumpAndSettle();
@@ -112,7 +114,9 @@ void main() {
 
     await _pumpChat(tester, client, documents: documents);
     // A document client is what puts the attach button in the composer.
-    expect(find.byIcon(Icons.add_photo_alternate_outlined), findsOneWidget);
+    // A paperclip, not a photo frame: this path takes a PDF as readily as an
+    // image, and the icon has to say so.
+    expect(find.byIcon(Icons.attach_file_rounded), findsOneWidget);
     expect(
       await documents.extractText(bytes: const [1], filename: 'receipt.pdf'),
       isA<AiDocumentText>().having((r) => r.text, 'text', 'TOTAL 12.40 EUR'),

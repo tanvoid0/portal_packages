@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Hands back one reply, in pieces, so the page has something to render mid
@@ -36,6 +37,7 @@ class _DrippingClient implements AiCompletionClient {
 }
 
 Widget _page(AiCompletionClient client, {AiChatStore? store}) => MaterialApp(
+  theme: buildPortalTheme(brightness: Brightness.light),
   home: Scaffold(
     body: AiAssistantPage(
       title: 'Assistant',
@@ -112,7 +114,7 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.send);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.copy_outlined));
+    await tester.tap(find.byIcon(Icons.copy_rounded));
     await tester.pumpAndSettle();
 
     expect(clipboard, ['the answer']);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Replays a fixed script of model replies, one per turn.
@@ -84,6 +85,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
         home: Scaffold(
           body: AiAssistantPage(
             store: store,
@@ -130,7 +132,7 @@ void main() {
     );
     expect(find.text('just milk then'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.history));
+    await tester.tap(find.byIcon(Icons.history_rounded));
     await tester.pumpAndSettle();
     expect(find.text('4 messages'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.close));
@@ -143,7 +145,7 @@ void main() {
     expect(turns[1].payload!['blocks'], hasLength(1));
 
     // Deleting the open thread clears the sheet and empties the store.
-    await tester.tap(find.byIcon(Icons.history));
+    await tester.tap(find.byIcon(Icons.history_rounded));
     await tester.pumpAndSettle();
     // Scoped to the sheet: the chat header now carries an overflow menu of
     // its own, so a bare byIcon matches two.
@@ -171,6 +173,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
         home: Scaffold(
           body: AiAssistantPage(
             store: store,

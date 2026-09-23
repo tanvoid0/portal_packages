@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 /// The face the header and every assistant bubble draw, so counting it counts
 /// avatars. A host-supplied avatar is the only handle a test has on them --
@@ -10,6 +11,7 @@ const _face = Icon(Icons.face, key: ValueKey('face'));
 Future<void> _pump(WidgetTester tester, List<AiChatTurn> turns) =>
     tester.pumpWidget(
       MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
         home: Scaffold(
           body: AiAssistantPage(
             avatar: _face,

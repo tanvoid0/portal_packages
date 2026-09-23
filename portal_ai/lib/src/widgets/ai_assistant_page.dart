@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 import '../chat/ai_attachment.dart';
 import '../chat/ai_chat_export.dart';
@@ -24,6 +26,7 @@ import 'ai_suggestion_cards.dart';
 import 'ai_voice_page.dart';
 import 'ai_item_list.dart';
 import 'ai_markdown.dart';
+import 'ai_presence_orb.dart';
 import 'ai_prompt_composer.dart';
 import 'ai_settings_section.dart';
 import 'ai_thinking_tile.dart';
@@ -61,6 +64,7 @@ class AiAssistantPage extends StatefulWidget {
     this.canEditToolCall,
     this.initialPrompt,
     this.autoSend = false,
+    this.resumeLastSession = false,
     this.consent,
     this.onAttach,
     this.documents,
@@ -70,6 +74,19 @@ class AiAssistantPage extends StatefulWidget {
          'give the page a runtime to drive the agent, or an onSend that '
          'generates the reply itself',
        );
+
+  /// Opens on the most recent stored thread instead of a blank deck.
+  ///
+  /// Off by default, and that default is right for the embedded assistant:
+  /// you tap the sparkle in the gym app to ask something *now*, and being
+  /// dropped back into last Tuesday's conversation would be an obstacle.
+  ///
+  /// A dedicated chat app is the other case entirely. There the thread is
+  /// the document, and an app that throws it away every time you leave is
+  /// an app you cannot use for anything that takes two sittings. Requires
+  /// a [store]; ignored when [initialPrompt] is set, since an explicit
+  /// question is the user asking for a new one.
+  final bool resumeLastSession;
 
   /// Drives the agent loop. Null when [onSend] answers instead.
   final PortalAiRuntime? runtime;
@@ -338,8 +355,13 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   /// Which prompts the deck shows, and what swaps them. Seeded from the app's
   /// own list so two visits do not open on the same three cards, topped up
   /// with whatever the model suggests.
-  late final _rotator = AiSuggestionRotator(pool: widget.suggestions)
-    ..refresh();
+  /// Four on a full page, three in the sheet. Wrapped two-up, four
+  /// suggestions plus the shuffle and more-ideas cards make three even rows;
+  /// three would leave a single card stranded on the last one.
+  late final _rotator = AiSuggestionRotator(
+    pool: widget.suggestions,
+    visibleCount: widget.fill ? 4 : 3,
+  )..refresh();
 
   /// Swaps one card every so often while the deck is the only thing on screen.
   /// Cancelled the moment a conversation starts -- nothing should move under a
@@ -360,6 +382,14 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       _visibleTurns.isEmpty &&
       _reply == null &&
       _error == null;
+
+  /// The opening screen, and the only place the deck is centred.
+  ///
+  /// [_showingDeck] already means nothing else has happened yet; this adds
+  /// that the page owns the whole screen. In the embedded sheet the deck
+  /// stays top-aligned, because there the sheet is sized to its content and
+  /// centring it would only add empty space above.
+  bool get _deckOnly => _showingDeck && widget.fill;
 
   bool get _gated => widget.consent?.accepted == false;
 
@@ -474,10 +504,14 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     super.initState();
     _scroll.addListener(_watchScroll);
     _reloadSessions();
+    final initial = widget.initialPrompt?.trim();
+    final hasInitial = initial != null && initial.isNotEmpty;
+    if (widget.resumeLastSession && !hasInitial) _resumeLastSession();
+    // After the resume: whether the deck shows at all depends on whether a
+    // thread was restored, and the rotation timer only runs while it does.
     _syncRotation();
     unawaited(_probeVoice());
-    final initial = widget.initialPrompt?.trim();
-    if (initial == null || initial.isEmpty) return;
+    if (!hasInitial) return;
     _input.text = initial;
     if (!widget.autoSend) return;
     // After the first frame: _send() calls setState, and the confirm dialog
@@ -566,17 +600,40 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   }
 
   void _loadSession(String id) {
+    if (!_adoptSession(id)) return;
+    setState(() {});
+  }
+
+  /// Restores the newest thread during [initState].
+  ///
+  /// Separate from [_loadSession] because this runs before the first build,
+  /// where there is no state to set -- the fields simply have to be right
+  /// by the time [build] reads them.
+  void _resumeLastSession() {
+    if (_sessions.isEmpty) return;
+    // Sorted by the store today, but the newest thread is the whole point of
+    // this, so it is found rather than assumed. Pinning reorders the list
+    // and must not decide which one reopens.
+    var newest = _sessions.first;
+    for (final session in _sessions.skip(1)) {
+      if (session.updatedAt.isAfter(newest.updatedAt)) newest = session;
+    }
+    _adoptSession(newest.id);
+  }
+
+  /// Swaps the transcript over to [id]. False when the store has no such
+  /// session, which leaves everything as it was.
+  bool _adoptSession(String id) {
     final session = widget.store?.load(id);
-    if (session == null) return;
-    setState(() {
-      _sessionId = session.id;
-      _turns
-        ..clear()
-        ..addAll(session.turns);
-      _steps.clear();
-      _reply = null;
-      _error = null;
-    });
+    if (session == null) return false;
+    _sessionId = session.id;
+    _turns
+      ..clear()
+      ..addAll(session.turns);
+    _steps.clear();
+    _reply = null;
+    _error = null;
+    return true;
   }
 
   void _newChat() {
@@ -642,17 +699,27 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     );
   }
 
+  /// A [Tooltip] only where the target is actually live.
+  ///
+  /// The title is the biggest tap target on the screen and it was unnamed;
+  /// but it is also inert when there is no backend store to choose from,
+  /// and a tooltip on a dead region announces an action that does not
+  /// exist.
+  // ponytail: 'Change model' is a literal, like the panel's 'AI settings'.
+  // Both belong in AiChatLabels; that file is owned by another session
+  // right now, so they go together in one copy pass.
+  Widget _wrapPicker(bool enabled, Widget child) =>
+      enabled ? Tooltip(message: 'Change model', child: child) : child;
+
   Future<void> _showHistory() async {
     final store = widget.store;
     if (store == null) return;
-    final chosen = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => Dialog(
-        // Deleting keeps the dialog open, so it rebuilds from the store rather
-        // than from the list this page captured when it opened.
-        child: StatefulBuilder(
+    // Deleting keeps the sheet open, so it rebuilds from the store rather
+    // than from the list this page captured when it opened.
+    Widget body(BuildContext dialogContext, {required bool fullHeight}) =>
+        StatefulBuilder(
           builder: (dialogContext, setDialogState) => SizedBox(
-            height: 420,
+            height: fullHeight ? double.infinity : 420,
             child: AiChatHistoryList(
               sessions: _sessions,
               selectedId: _sessionId,
@@ -682,9 +749,88 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
               },
             ),
           ),
-        ),
-      ),
-    );
+        );
+
+    // On a full page the threads ARE the navigation, so they get the shape
+    // navigation has: a panel off the leading edge, floor to ceiling. The
+    // centred 420pt dialog is right in the embedded sheet -- there the page
+    // behind it belongs to another app and a panel covering its edge would
+    // read as that app's own drawer.
+    //
+    // A Drawer would be the obvious widget and is the wrong one: this page
+    // does not own the Scaffold, its host does, and a page cannot put a
+    // drawer on someone else's.
+    final chosen = widget.fill
+        ? await showGeneralDialog<String>(
+            context: context,
+            barrierDismissible: true,
+            barrierLabel: MaterialLocalizations.of(
+              context,
+            ).modalBarrierDismissLabel,
+            barrierColor: Theme.of(
+              context,
+            ).colorScheme.scrim.withValues(alpha: 0.5),
+            transitionDuration: const Duration(milliseconds: 220),
+            pageBuilder: (dialogContext, _, _) => Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Material(
+                color: Theme.of(dialogContext).colorScheme.surfaceContainer,
+                child: SafeArea(
+                  child: SizedBox(
+                    // Never the whole width: the sliver of conversation still
+                    // showing is what says this is a panel over the chat and
+                    // not a screen you navigated to.
+                    width: math.min(
+                      340,
+                      MediaQuery.sizeOf(dialogContext).width * 0.86,
+                    ),
+                    child: Column(
+                      children: [
+                        Expanded(child: body(dialogContext, fullHeight: true)),
+                        // Configuration lives at the foot of the navigation,
+                        // the way it does in every app that has a drawer --
+                        // not as a third icon competing with "new chat".
+                        if (widget.onSettings case final openSettings?) ...[
+                          const Divider(height: 1),
+                          SafeArea(
+                            top: false,
+                            child: ListTile(
+                              leading: const Icon(Icons.tune_rounded),
+                              title: const Text('AI settings'),
+                              onTap: () {
+                                // Close the panel first: settings pushes a
+                                // route, and leaving the panel open behind it
+                                // means coming back to a drawer nobody asked
+                                // to reopen.
+                                Navigator.of(dialogContext).pop();
+                                openSettings();
+                              },
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            transitionBuilder: (context, animation, _, child) =>
+                SlideTransition(
+                  position: Tween(begin: const Offset(-1, 0), end: Offset.zero)
+                      .animate(
+                        CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                        ),
+                      ),
+                  child: child,
+                ),
+          )
+        : await showDialog<String>(
+            context: context,
+            builder: (dialogContext) =>
+                Dialog(child: body(dialogContext, fullHeight: false)),
+          );
     if (chosen == null) return;
     if (chosen.isEmpty) {
       _newChat();
@@ -1095,10 +1241,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   static String _stepResultText(String result) {
     const declined = 'user declined this action';
     if (!result.startsWith(declined)) return result;
-    final note = result.substring(declined.length).replaceFirst(
-      RegExp(r'^ and asked instead: '),
-      '',
-    );
+    final note = result
+        .substring(declined.length)
+        .replaceFirst(RegExp(r'^ and asked instead: '), '');
     return note.trim().isEmpty ? 'Declined' : 'Declined — asked for: $note';
   }
 
@@ -1306,16 +1451,59 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      // Three ways out, because this sheet had none.
+      //
+      // `isScrollControlled` plus a child taller than the screen means the
+      // sheet fills the viewport: there is no scrim left to tap, and with
+      // no handle and no close button the only exit was the Android back
+      // button -- which is not an exit at all on iOS, and is not something
+      // a screen-reader user is told about anywhere.
+      //
+      // So: a drag handle, a named close button, and a cap on the height
+      // that keeps a strip of scrim reachable above it.
+      showDragHandle: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+      ),
       builder: (sheetContext) => SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: AiSettingsSection(
-            store: store,
-            onChanged: (option) {
-              runtime.applyBackend(option);
-              if (mounted) setState(() {});
-            },
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      // ponytail: literal, promote to AiChatLabels with
+                      // 'Change model' and 'AI settings' in one copy pass.
+                      'AI provider',
+                      style: Theme.of(sheetContext).textTheme.titleMedium,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: MaterialLocalizations.of(
+                      sheetContext,
+                    ).closeButtonTooltip,
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: AiSettingsSection(
+                  store: store,
+                  onChanged: (option) {
+                    runtime.applyBackend(option);
+                    if (mounted) setState(() {});
+                  },
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1325,6 +1513,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final canPickBackend = widget.runtime?.backendStore != null;
     return Padding(
       padding: EdgeInsets.only(
         left: 16,
@@ -1346,67 +1535,103 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                   const BackButton(
                     style: ButtonStyle(visualDensity: VisualDensity.compact),
                   ),
-                _AiPresenceAvatar(
-                  busy: _busy,
-                  local: widget.runtime?.usesLocalModel ?? false,
-                  avatar: widget.avatar,
-                ),
-                const SizedBox(width: 8),
+                // The threads live off the leading edge, so the affordance
+                // for them does too. It used to be a clock icon sitting in a
+                // rank of three on the right, which said "one more tool"
+                // when what it opens is the app's navigation.
+                //
+                // Full page only. In the embedded sheet the panel is a
+                // centred dialog, not a drawer, and a hamburger there would
+                // promise a drawer over the host app's own screen.
+                if (widget.fill && widget.store != null)
+                  IconButton(
+                    tooltip: widget.labels.historyTitle,
+                    icon: const Icon(Icons.menu_rounded),
+                    iconSize: 22,
+                    visualDensity: VisualDensity.compact,
+                    onPressed: _showHistory,
+                  ),
                 Expanded(
                   // Messenger-style stacked title: the name on one tight line
                   // with the backend underneath it, instead of a title row
                   // fighting an ActionChip for horizontal space.
-                  child: InkWell(
-                    onTap: widget.runtime?.backendStore == null
-                        ? null
-                        : _showBackendPicker,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 2,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.title,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              height: 1.1,
+                  //
+                  // The face lives INSIDE this tap target rather than beside
+                  // it. Outside, it was an unlabelled circle that looked
+                  // pressable and was not, sitting in a leading run that now
+                  // also carries a back button and a hamburger. Inside, the
+                  // face, the name and the backend are one named control
+                  // that does the obvious thing: change the model.
+                  child: _wrapPicker(
+                    canPickBackend,
+                    InkWell(
+                      onTap: canPickBackend ? _showBackendPicker : null,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 2,
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            _AiPresenceAvatar(
+                              busy: _busy,
+                              local: widget.runtime?.usesLocalModel ?? false,
+                              avatar: widget.avatar,
                             ),
-                            // Without these the row's fixed children (back
-                            // button, avatar, up to five icons) leave the
-                            // title a few logical pixels, and it wraps one
-                            // letter per line down the whole screen instead
-                            // of ellipsing.
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (widget.runtime != null)
-                            AnimatedCrossFade(
-                              duration: const Duration(milliseconds: 150),
-                              firstChild: const SizedBox(
-                                height: 0,
-                                width: double.infinity,
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.title,
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.1,
+                                    ),
+                                    // Without these the row's fixed children (back
+                                    // button, avatar, up to five icons) leave the
+                                    // title a few logical pixels, and it wraps one
+                                    // letter per line down the whole screen instead
+                                    // of ellipsing.
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (widget.runtime != null)
+                                    AnimatedCrossFade(
+                                      duration: const Duration(
+                                        milliseconds: 150,
+                                      ),
+                                      firstChild: const SizedBox(
+                                        height: 0,
+                                        width: double.infinity,
+                                      ),
+                                      secondChild: Text(
+                                        _busy
+                                            ? widget.labels.thinking
+                                            : widget.runtime!.backendLabel,
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(
+                                              color: theme
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
+                                              height: 1.1,
+                                            ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      crossFadeState: _collapsed
+                                          ? CrossFadeState.showFirst
+                                          : CrossFadeState.showSecond,
+                                    ),
+                                ],
                               ),
-                              secondChild: Text(
-                                _busy
-                                    ? widget.labels.thinking
-                                    : widget.runtime!.backendLabel,
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                  height: 1.1,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              crossFadeState: _collapsed
-                                  ? CrossFadeState.showFirst
-                                  : CrossFadeState.showSecond,
                             ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -1417,8 +1642,11 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                 // icons, which left the title nothing to render into.
                 if (_visibleTurns.isNotEmpty)
                   PopupMenuButton<_ChatMenuAction>(
-                    tooltip: widget.labels.share,
-                    icon: const Icon(Icons.more_vert),
+                    // No tooltip override: this menu holds find and two
+                    // copy formats, and calling it "Share" named it after
+                    // something it does not do. MaterialLocalizations'
+                    // "Show menu" is both correct and translated.
+                    icon: const Icon(Icons.more_vert_rounded),
                     iconSize: 20,
                     padding: EdgeInsets.zero,
                     onSelected: (action) => switch (action) {
@@ -1444,25 +1672,40 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                     ],
                   ),
                 if (widget.store != null) ...[
-                  IconButton(
-                    tooltip: widget.labels.historyTitle,
-                    icon: const Icon(Icons.history),
-                    iconSize: 20,
-                    visualDensity: VisualDensity.compact,
-                    onPressed: _showHistory,
-                  ),
+                  // Only where there is no hamburger to open it from.
+                  if (!widget.fill)
+                    IconButton(
+                      tooltip: widget.labels.historyTitle,
+                      icon: const Icon(Icons.history_rounded),
+                      iconSize: 20,
+                      visualDensity: VisualDensity.compact,
+                      onPressed: _showHistory,
+                    ),
+                  // New chat stays on the right, in every mode. It is not
+                  // navigation -- it makes the thing you are looking at --
+                  // and burying the one action people take most often
+                  // behind a panel is how a chat app feels slow.
                   IconButton(
                     tooltip: widget.labels.newChat,
-                    icon: const Icon(Icons.add_comment_outlined),
+                    icon: const Icon(Icons.add_comment_rounded),
                     iconSize: 20,
                     visualDensity: VisualDensity.compact,
                     onPressed: _newChat,
                   ),
                 ],
-                if (widget.onSettings != null)
+                // Configuration is not a peer of "new chat". On a full page
+                // it moves into the panel's footer; in the sheet there is no
+                // panel footer to move it to, so it stays.
+                // A fill host with settings but NO store has no panel to
+                // put them in -- _showHistory returns early without a store,
+                // so the hamburger never opens and the footer never renders.
+                // Gating the gear on !fill alone stranded those hosts with
+                // no route to settings at all.
+                if (widget.onSettings != null &&
+                    (!widget.fill || widget.store == null))
                   IconButton(
                     tooltip: 'AI settings',
-                    icon: const Icon(Icons.tune),
+                    icon: const Icon(Icons.tune_rounded),
                     iconSize: 20,
                     visualDensity: VisualDensity.compact,
                     onPressed: widget.onSettings,
@@ -1479,7 +1722,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                   decoration: InputDecoration(
                     isDense: true,
                     hintText: widget.labels.searchInChatHint,
-                    prefixIcon: const Icon(Icons.search, size: 18),
+                    prefixIcon: const Icon(Icons.search_rounded, size: 18),
                     border: const OutlineInputBorder(),
                   ),
                 ),
@@ -1488,252 +1731,315 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
           ],
           Flexible(
             fit: widget.fill ? FlexFit.tight : FlexFit.loose,
-            child: Stack(
-              children: [
-                SingleChildScrollView(
-                  controller: _scroll,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (_showingDeck) ...[
-                        if (widget.consent case final consent?
-                            when !consent.accepted)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            child: AiConsentCard(consent: consent),
-                          )
-                        else if (widget.labels.empty.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 24),
-                            child: Text(
-                              widget.labels.empty,
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodyMedium,
+            // The opening screen is centred, not top-aligned. A full-height
+            // page with a greeting and four cards pinned under the header
+            // leaves two thirds of the screen empty and reads as a list that
+            // failed to load. Giving the scroll view a minimum of one
+            // viewport lets the deck sit in the middle of it; the moment
+            // there is a transcript the alignment goes back to the top, so
+            // nothing jumps once the conversation starts.
+            child: LayoutBuilder(
+              builder: (context, constraints) => Stack(
+                children: [
+                  SingleChildScrollView(
+                    controller: _scroll,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: widget.fill && constraints.maxHeight.isFinite
+                            ? constraints.maxHeight
+                            : 0,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: _deckOnly
+                            ? MainAxisAlignment.center
+                            : MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (_showingDeck) ...[
+                            if (widget.consent case final consent?
+                                when !consent.accepted)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                child: AiConsentCard(consent: consent),
+                              )
+                            else if (widget.labels.empty.isNotEmpty) ...[
+                              // The mark, once, above the greeting -- the one
+                              // place in the app the assistant has a face large
+                              // enough to be a face. It is not repeated down the
+                              // transcript at this size.
+                              if (_deckOnly)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 20),
+                                  child: Center(
+                                    child: _AiPresenceAvatar(
+                                      busy: false,
+                                      local:
+                                          widget.runtime?.usesLocalModel ??
+                                          false,
+                                      avatar: widget.avatar,
+                                      size: 96,
+                                      showDot: false,
+                                    ),
+                                  ),
+                                ),
+                              Padding(
+                                padding: EdgeInsets.only(
+                                  top: _deckOnly ? 0 : 24,
+                                  bottom: _deckOnly ? 28 : 24,
+                                ),
+                                child: Text(
+                                  widget.labels.empty,
+                                  textAlign: TextAlign.center,
+                                  // A greeting, not body copy: at the centre of
+                                  // an otherwise empty screen bodyMedium reads as
+                                  // a caption that lost its content.
+                                  style: _deckOnly
+                                      ? theme.textTheme.headlineSmall
+                                      : theme.textTheme.bodyMedium,
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 8),
+                            AiSuggestionCards(
+                              suggestions: _rotator.visible,
+                              // Wrapped only on the opening screen; above a
+                              // transcript the strip is the right shape.
+                              wrap: _deckOnly,
+                              enabled: !_gated,
+                              onTap: (suggestion) {
+                                _input.text = suggestion.prompt;
+                                _send();
+                              },
+                              onShuffle: _rotator.canRotate
+                                  ? () => setState(_rotator.refresh)
+                                  : null,
+                              // Only offered when there is a model to ask and a
+                              // house style to imitate.
+                              onRefresh: widget.runtime == null
+                                  ? null
+                                  : _freshIdeas,
+                              refreshing: _loadingIdeas,
+                              shuffleLabel: widget.labels.shuffle,
+                              refreshLabel: widget.labels.moreIdeas,
                             ),
-                          ),
-                        const SizedBox(height: 8),
-                        AiSuggestionCards(
-                          suggestions: _rotator.visible,
-                          enabled: !_gated,
-                          onTap: (suggestion) {
-                            _input.text = suggestion.prompt;
-                            _send();
-                          },
-                          onShuffle: _rotator.canRotate
-                              ? () => setState(_rotator.refresh)
-                              : null,
-                          // Only offered when there is a model to ask and a
-                          // house style to imitate.
-                          onRefresh: widget.runtime == null
-                              ? null
-                              : _freshIdeas,
-                          refreshing: _loadingIdeas,
-                          shuffleLabel: widget.labels.shuffle,
-                          refreshLabel: widget.labels.moreIdeas,
-                        ),
-                      ],
-                      for (final (index, turn) in _shownTurns.indexed) ...[
-                        if (_thinkingOf(turn) case final thinking?)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: AiThinkingTile(
+                          ],
+                          for (final (index, turn) in _shownTurns.indexed) ...[
+                            if (_thinkingOf(turn) case final thinking?)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: AiThinkingTile(
+                                  thinking: thinking,
+                                  label: widget.labels.thinking,
+                                ),
+                              ),
+                            Padding(
+                              key: GlobalObjectKey(turn),
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: GestureDetector(
+                                onTap: _chatQuery.trim().isEmpty
+                                    ? null
+                                    : () => _revealTurn(turn),
+                                child: _TurnBubble(
+                                  turn: turn,
+                                  avatar: widget.avatar,
+                                  local:
+                                      widget.runtime?.usesLocalModel ?? false,
+                                  showAvatar: !_assistantFollows(index),
+                                  onCopy: () => _copyTurn(turn),
+                                  copyLabel: widget.labels.copy,
+                                  copiedLabel: widget.labels.copied,
+                                  youLabel: widget.labels.youSaid,
+                                  assistantLabel: widget.labels.assistantSaid,
+                                  // Any question can be reworked, not just the newest:
+                                  // the mistake worth fixing is often three turns back.
+                                  // Going back drops the answers after it, so
+                                  // _rewindTo asks before throwing away more than the
+                                  // last exchange.
+                                  onEdit: !_busy && _canRewind(turn)
+                                      ? () => _rewindTo(
+                                          _visibleTurns.indexOf(turn),
+                                        )
+                                      : null,
+                                  onDelete: !_busy && _canRewind(turn)
+                                      ? () => _rewindTo(
+                                          _visibleTurns.indexOf(turn),
+                                          refill: false,
+                                        )
+                                      : null,
+                                  editLabel: widget.labels.edit,
+                                  deleteLabel: widget.labels.delete,
+                                ),
+                              ),
+                            ),
+                            for (final block in _blocksOf(turn))
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: _blockView(block, theme),
+                              ),
+                          ],
+                          for (final step in _steps) _stepView(step, theme),
+                          if (_streamingReply case final partial?
+                              when partial.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Semantics(
+                                liveRegion: true,
+                                child: _assistantBubble(
+                                  context,
+                                  AiMarkdown(text: partial),
+                                  avatar: widget.avatar,
+                                  local:
+                                      widget.runtime?.usesLocalModel ?? false,
+                                ),
+                              ),
+                            ),
+                          if (_replyThinking case final thinking?)
+                            AiThinkingTile(
                               thinking: thinking,
                               label: widget.labels.thinking,
                             ),
-                          ),
-                        Padding(
-                          key: GlobalObjectKey(turn),
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: GestureDetector(
-                            onTap: _chatQuery.trim().isEmpty
-                                ? null
-                                : () => _revealTurn(turn),
-                            child: _TurnBubble(
-                              turn: turn,
-                              avatar: widget.avatar,
-                              local: widget.runtime?.usesLocalModel ?? false,
-                              showAvatar: !_assistantFollows(index),
-                              onCopy: () => _copyTurn(turn),
-                              copyLabel: widget.labels.copy,
-                              copiedLabel: widget.labels.copied,
-                              youLabel: widget.labels.youSaid,
-                              assistantLabel: widget.labels.assistantSaid,
-                              // Any question can be reworked, not just the newest:
-                              // the mistake worth fixing is often three turns back.
-                              // Going back drops the answers after it, so
-                              // _rewindTo asks before throwing away more than the
-                              // last exchange.
-                              onEdit: !_busy && _canRewind(turn)
-                                  ? () => _rewindTo(_visibleTurns.indexOf(turn))
-                                  : null,
-                              onDelete: !_busy && _canRewind(turn)
-                                  ? () => _rewindTo(
-                                      _visibleTurns.indexOf(turn),
-                                      refill: false,
-                                    )
-                                  : null,
-                              editLabel: widget.labels.edit,
-                              deleteLabel: widget.labels.delete,
-                            ),
-                          ),
-                        ),
-                        for (final block in _blocksOf(turn))
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: _blockView(block, theme),
-                          ),
-                      ],
-                      for (final step in _steps) _stepView(step, theme),
-                      if (_streamingReply case final partial?
-                          when partial.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Semantics(
-                            liveRegion: true,
-                            child: _assistantBubble(
-                              context,
-                              AiMarkdown(text: partial),
-                              avatar: widget.avatar,
-                              local: widget.runtime?.usesLocalModel ?? false,
-                            ),
-                          ),
-                        ),
-                      if (_replyThinking case final thinking?)
-                        AiThinkingTile(
-                          thinking: thinking,
-                          label: widget.labels.thinking,
-                        ),
-                      if (_reply != null)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: _assistantBubble(
-                            context,
-                            AiMarkdown(text: _reply!),
-                            avatar: widget.avatar,
-                            local: widget.runtime?.usesLocalModel ?? false,
-                          ),
-                        ),
-                      for (final proposal in _proposals)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: _ProposalCard(
-                            proposal: proposal,
-                            expanded: _expandedProposal == proposal.id,
-                            onTap: () => setState(
-                              () => _expandedProposal =
-                                  _expandedProposal == proposal.id
-                                  ? null
-                                  : proposal.id,
-                            ),
-                            onAccept: widget.onAcceptProposal == null
-                                ? null
-                                : () => _resolveProposal(
-                                    proposal,
-                                    widget.onAcceptProposal,
-                                  ),
-                            labels: widget.labels,
-                            onEdit: widget.onEditProposal == null
-                                ? null
-                                : () => widget.onEditProposal!(proposal),
-                            onDiscard: widget.onDiscardProposal == null
-                                ? null
-                                : () => _resolveProposal(
-                                    proposal,
-                                    widget.onDiscardProposal,
-                                  ),
-                          ),
-                        ),
-                      if (_pendingConfirm case final pending?)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: _ConfirmCard(
-                            pending: pending,
-                            onAccept: () => _answerConfirm(true),
-                            onDecline: () => _answerConfirm(false),
-                            onEdit: _canEdit(pending.call)
-                                ? () => _editPending(pending)
-                                : null,
-                          ),
-                        ),
-                      // A failure is part of the conversation, so it reads as one:
-                      // the assistant's own bubble shape in the error colours,
-                      // rather than loose red text that ran the width of the page
-                      // and pushed Retry off to the side.
-                      if (_error != null)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Container(
-                              constraints: BoxConstraints(
-                                maxWidth:
-                                    MediaQuery.sizeOf(context).width * 0.85,
+                          if (_reply != null)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: _assistantBubble(
+                                context,
+                                AiMarkdown(text: _reply!),
+                                avatar: widget.avatar,
+                                local: widget.runtime?.usesLocalModel ?? false,
                               ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 10,
+                            ),
+                          for (final proposal in _proposals)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _ProposalCard(
+                                proposal: proposal,
+                                expanded: _expandedProposal == proposal.id,
+                                onTap: () => setState(
+                                  () => _expandedProposal =
+                                      _expandedProposal == proposal.id
+                                      ? null
+                                      : proposal.id,
+                                ),
+                                onAccept: widget.onAcceptProposal == null
+                                    ? null
+                                    : () => _resolveProposal(
+                                        proposal,
+                                        widget.onAcceptProposal,
+                                      ),
+                                labels: widget.labels,
+                                onEdit: widget.onEditProposal == null
+                                    ? null
+                                    : () => widget.onEditProposal!(proposal),
+                                onDiscard: widget.onDiscardProposal == null
+                                    ? null
+                                    : () => _resolveProposal(
+                                        proposal,
+                                        widget.onDiscardProposal,
+                                      ),
                               ),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.errorContainer,
-                                borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(16),
-                                  topRight: Radius.circular(16),
-                                  bottomLeft: Radius.circular(4),
-                                  bottomRight: Radius.circular(16),
+                            ),
+                          if (_pendingConfirm case final pending?)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _ConfirmCard(
+                                pending: pending,
+                                onAccept: () => _answerConfirm(true),
+                                onDecline: () => _answerConfirm(false),
+                                onEdit: _canEdit(pending.call)
+                                    ? () => _editPending(pending)
+                                    : null,
+                              ),
+                            ),
+                          // A failure is part of the conversation, so it reads as one:
+                          // the assistant's own bubble shape in the error colours,
+                          // rather than loose red text that ran the width of the page
+                          // and pushed Retry off to the side.
+                          if (_error != null)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Container(
+                                  constraints: BoxConstraints(
+                                    maxWidth:
+                                        MediaQuery.sizeOf(context).width * 0.85,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.errorContainer,
+                                    borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(16),
+                                      topRight: Radius.circular(16),
+                                      bottomLeft: Radius.circular(4),
+                                      bottomRight: Radius.circular(16),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _error!,
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                              height: 1.45,
+                                              color: theme
+                                                  .colorScheme
+                                                  .onErrorContainer,
+                                            ),
+                                      ),
+                                      if (_lastUserTurn != null && !_busy)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 4,
+                                          ),
+                                          child: TextButton.icon(
+                                            onPressed: _retry,
+                                            icon: const Icon(
+                                              Icons.refresh_rounded,
+                                              size: 18,
+                                            ),
+                                            label: Text(widget.labels.retry),
+                                            style: TextButton.styleFrom(
+                                              foregroundColor: theme
+                                                  .colorScheme
+                                                  .onErrorContainer,
+                                              padding: EdgeInsets.zero,
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _error!,
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      height: 1.45,
-                                      color: theme.colorScheme.onErrorContainer,
-                                    ),
-                                  ),
-                                  if (_lastUserTurn != null && !_busy)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 4),
-                                      child: TextButton.icon(
-                                        onPressed: _retry,
-                                        icon: const Icon(
-                                          Icons.refresh,
-                                          size: 18,
-                                        ),
-                                        label: Text(widget.labels.retry),
-                                        style: TextButton.styleFrom(
-                                          foregroundColor: theme
-                                              .colorScheme
-                                              .onErrorContainer,
-                                          padding: EdgeInsets.zero,
-                                          visualDensity: VisualDensity.compact,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
                             ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                // Only while the newest turn is off screen: an always-there
-                // button sits on top of the answer you are reading.
-                if (_scrolledUp)
-                  Positioned(
-                    right: 0,
-                    bottom: 8,
-                    child: FloatingActionButton.small(
-                      heroTag: null,
-                      tooltip: widget.labels.jumpToLatest,
-                      onPressed: _followNewest,
-                      child: const Icon(Icons.arrow_downward),
+                        ],
+                      ),
                     ),
                   ),
-              ],
+                  // Only while the newest turn is off screen: an always-there
+                  // button sits on top of the answer you are reading.
+                  if (_scrolledUp)
+                    Positioned(
+                      right: 0,
+                      bottom: 8,
+                      child: FloatingActionButton.small(
+                        heroTag: null,
+                        tooltip: widget.labels.jumpToLatest,
+                        onPressed: _followNewest,
+                        child: const Icon(Icons.arrow_downward_rounded),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
           if (_proposals.isNotEmpty && widget.onAcceptProposal != null)
@@ -1973,67 +2279,37 @@ class _ProposalCard extends StatelessWidget {
   }
 }
 
-/// One side of the conversation.
-/// The assistant's side of the thread.
-///
-/// Left bare, a reply sat on the page's own background at the same tone as
-/// everything around it, so a thread read as one undifferentiated block. The
-/// outline is what guarantees an edge whatever surface the host app puts
-/// behind us -- surfaceContainerHigh alone can land a hair off a tinted
-/// background.
-///
-/// The avatar repeats beside every reply, as it does in Messenger: with a
-/// header that collapses on scroll, a thread read halfway down otherwise has
-/// nothing on screen saying who is talking.
+/// The assistant's shared chrome, over [PortalChatBubble]: the avatar gutter
+/// that repeats beside every reply (or a same-width placeholder when
+/// [showAvatar] is false, so a run of replies keeps one left edge instead of
+/// stepping out under the face). Used both for a finished turn (by
+/// [_TurnBubble], which adds its own long-press-free footer) and for the
+/// in-flight streaming reply and the not-yet-committed final reply, neither
+/// of which have a footer to show.
 Widget _assistantBubble(
   BuildContext context,
   Widget child, {
   Widget? avatar,
   bool local = false,
   bool showAvatar = true,
+  Widget? footer,
 }) {
-  final scheme = Theme.of(context).colorScheme;
-  return Row(
-    crossAxisAlignment: CrossAxisAlignment.end,
-    mainAxisAlignment: MainAxisAlignment.start,
-    children: [
-      if (showAvatar)
-        _AiPresenceAvatar(
-          busy: false,
-          local: local,
-          avatar: avatar,
-          size: 24,
-          // The dot is the header's status line. Repeated down the thread it
-          // would claim every past reply is live.
-          showDot: false,
-        )
-      else
-        // Same width as the avatar, so a run of replies keeps one left edge
-        // instead of stepping out under the face.
-        SizedBox(
-          width: 24 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.3),
-        ),
-      const SizedBox(width: 8),
-      Flexible(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerHigh,
-            border: Border.all(color: scheme.outlineVariant),
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(16),
-              topRight: Radius.circular(16),
-              bottomLeft: Radius.circular(4),
-              bottomRight: Radius.circular(16),
-            ),
-          ),
-          child: child,
-        ),
-      ),
-      // Keeps a short reply from stretching to the full width, the way the
-      // user's own bubble is capped at 85%.
-      const SizedBox(width: 40),
-    ],
+  final gutter = 24 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.3);
+  return PortalChatBubble(
+    author: PortalChatAuthor.assistant,
+    leading: showAvatar
+        ? _AiPresenceAvatar(
+            busy: false,
+            local: local,
+            avatar: avatar,
+            size: 24,
+            // The dot is the header's status line. Repeated down the thread
+            // it would claim every past reply is live.
+            showDot: false,
+          )
+        : SizedBox(width: gutter),
+    footer: footer,
+    child: child,
   );
 }
 
@@ -2097,21 +2373,22 @@ class _TurnBubble extends StatelessWidget {
       // is selectable text, and a long press there belongs to the selection.
       return Semantics(
         label: assistantLabel,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _assistantBubble(
-              context,
-              AiMarkdown(
-                text: turn.content,
-                copyCodeLabel: copyLabel,
-                copiedLabel: copiedLabel,
-              ),
-              avatar: avatar,
-              local: local,
-              showAvatar: showAvatar,
-            ),
-            Row(
+        child: _assistantBubble(
+          context,
+          AiMarkdown(
+            text: turn.content,
+            copyCodeLabel: copyLabel,
+            copiedLabel: copiedLabel,
+          ),
+          avatar: avatar,
+          local: local,
+          showAvatar: showAvatar,
+          footer: Padding(
+            // Line the timestamp up with the card above it, not with the
+            // face in the gutter. Under the avatar it read as a caption on
+            // the orb rather than on the reply.
+            padding: const EdgeInsets.only(left: 34),
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (meta != null) _metaText(theme, meta),
@@ -2119,7 +2396,7 @@ class _TurnBubble extends StatelessWidget {
                   IconButton(
                     onPressed: onCopy,
                     tooltip: copyLabel,
-                    icon: const Icon(Icons.copy_outlined, size: 16),
+                    icon: const Icon(Icons.copy_rounded, size: 16),
                     visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     constraints: const BoxConstraints(),
@@ -2127,79 +2404,55 @@ class _TurnBubble extends StatelessWidget {
                   ),
               ],
             ),
-          ],
+          ),
         ),
       );
     }
     final canAct = onEdit != null || onDelete != null || onCopy != null;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Flexible(
-          child: Semantics(
-            label: youLabel,
-            child: GestureDetector(
-              // Long-press for actions, like every other chat bubble on the
-              // platform -- a pencil icon sitting next to the bubble at all
-              // times was one more thing to explain for an action people only
-              // ever take right after sending.
-              onLongPressStart: canAct
-                  ? (details) =>
-                        _showActions(context, details.globalPosition, scheme)
-                  : null,
-              child: Container(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.sizeOf(context).width * 0.85,
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: scheme.primaryContainer,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                    bottomLeft: Radius.circular(16),
-                    bottomRight: Radius.circular(4),
-                  ),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      turn.content,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        height: 1.45,
-                        color: scheme.onPrimaryContainer,
-                      ),
-                    ),
-                    if (meta != null)
-                      _metaText(theme, meta, color: scheme.onPrimaryContainer),
-                  ],
-                ),
-              ),
-            ),
+    return Semantics(
+      label: youLabel,
+      child: PortalChatBubble(
+        author: PortalChatAuthor.user,
+        // Long-press for actions, like every other chat bubble on the
+        // platform -- a pencil icon sitting next to the bubble at all times
+        // was one more thing to explain for an action people only ever take
+        // right after sending.
+        onLongPress: canAct ? () => _showActions(context, scheme) : null,
+        footer: meta == null
+            ? null
+            : _metaText(theme, meta, color: scheme.onSurfaceVariant),
+        child: Text(
+          turn.content,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            height: 1.45,
+            // onSurface, not onPrimaryContainer. M3 pairs the container
+            // with its own "on" role, but that role is a tint of the accent
+            // -- so what the user typed came out violet on violet while the
+            // reply beside it was plain text, and the quieter of the two
+            // was the one they wrote. The tinted fill is enough to say
+            // whose turn it is; the words are words.
+            color: scheme.onSurface,
           ),
         ),
-      ],
+      ),
     );
   }
 
-  Future<void> _showActions(
-    BuildContext context,
-    Offset position,
-    ColorScheme scheme,
-  ) async {
+  // PortalChatBubble's onLongPress carries no press position, so the menu
+  // anchors to the bubble's own bounds instead of the exact finger position.
+  // ponytail: close enough that showMenu still lands on screen; an
+  // onLongPressStart(details) slot on PortalChatBubble is the upgrade path
+  // if pixel-exact anchoring matters later.
+  Future<void> _showActions(BuildContext context, ColorScheme scheme) async {
     HapticFeedback.selectionClick();
+    final theme = Theme.of(context);
+    final box = context.findRenderObject()! as RenderBox;
     final overlay =
         Overlay.of(context).context.findRenderObject()! as RenderBox;
     final action = await showMenu<VoidCallback>(
       context: context,
       position: RelativeRect.fromRect(
-        position & const Size(1, 1),
+        box.localToGlobal(Offset.zero, ancestor: overlay) & box.size,
         Offset.zero & overlay.size,
       ),
       items: [
@@ -2207,7 +2460,7 @@ class _TurnBubble extends StatelessWidget {
           PopupMenuItem(
             value: onCopy,
             child: ListTile(
-              leading: const Icon(Icons.copy_outlined),
+              leading: const Icon(Icons.copy_rounded),
               title: Text(copyLabel),
               contentPadding: EdgeInsets.zero,
               dense: true,
@@ -2228,7 +2481,12 @@ class _TurnBubble extends StatelessWidget {
             value: onDelete,
             child: ListTile(
               leading: Icon(Icons.delete_outline, color: scheme.error),
-              title: Text(deleteLabel, style: TextStyle(color: scheme.error)),
+              title: Text(
+                deleteLabel,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: scheme.error,
+                ),
+              ),
               contentPadding: EdgeInsets.zero,
               dense: true,
             ),
@@ -2481,19 +2739,34 @@ class _AiPresenceAvatarState extends State<_AiPresenceAvatar>
       height: box,
       child: Stack(
         children: [
-          CircleAvatar(
-            radius: box * 0.44,
-            backgroundColor: scheme.primaryContainer,
-            child: ClipOval(
-              child:
-                  widget.avatar ??
-                  Icon(
-                    widget.local ? Icons.offline_bolt : Icons.auto_awesome,
-                    size: box * 0.47,
-                    color: scheme.onPrimaryContainer,
-                  ),
+          // The default face is the orb, not a glyph. A flat sparkle is a
+          // logo; a drifting gradient reads as something that is running,
+          // which is what this widget is actually reporting. A host that
+          // passes its own [avatar] still wins -- portal_gym wants its own
+          // mark, not a generic presence.
+          if (widget.avatar case final avatar?)
+            CircleAvatar(
+              radius: box * 0.44,
+              backgroundColor: scheme.primaryContainer,
+              child: ClipOval(child: avatar),
+            )
+          else if (widget.local)
+            // On-device: a fixed glyph rather than the orb, so "this is
+            // running on your phone" is legible at a glance instead of
+            // being one more thing the orb could mean.
+            CircleAvatar(
+              radius: box * 0.44,
+              backgroundColor: scheme.primaryContainer,
+              child: Icon(
+                Icons.offline_bolt,
+                size: box * 0.47,
+                color: scheme.onPrimaryContainer,
+              ),
+            )
+          else
+            Center(
+              child: AiPresenceOrb(size: box * 0.88, busy: widget.busy),
             ),
-          ),
           if (widget.showDot)
             Positioned(
               right: 0,
@@ -2507,7 +2780,7 @@ class _AiPresenceAvatarState extends State<_AiPresenceAvatar>
                     shape: BoxShape.circle,
                     color: widget.busy
                         ? scheme.tertiary
-                        : const Color(0xFF31A24C),
+                        : PortalSemanticColors.of(context).success,
                     // The ring keeps the dot readable against a light avatar in
                     // either theme; without it the green sits on mint and reads
                     // as part of the icon.

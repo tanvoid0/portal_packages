@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 /// Replays a fixed script of model replies, one per turn.
 class _ScriptedClient implements AiCompletionClient {
@@ -108,6 +109,7 @@ void main() {
   Future<void> pumpSheet(WidgetTester tester, PortalAiRuntime runtime) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
         home: Scaffold(
           body: AiAssistantPage(
             runtime: runtime,
@@ -272,6 +274,7 @@ void main() {
     final tapped = <String>[];
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
         home: Scaffold(
           body: AiAssistantPage(
             runtime: runtimeWith(const [
@@ -301,6 +304,7 @@ void main() {
     final tapped = <String>[];
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
         home: Scaffold(
           body: AiAssistantPage(
             runtime: runtimeWith(const [
@@ -369,6 +373,7 @@ void main() {
       final client = _ScriptedClient(const []);
       await tester.pumpWidget(
         MaterialApp(
+          theme: buildPortalTheme(brightness: Brightness.light),
           home: Scaffold(
             body: AiAssistantPage(
               runtime: PortalAiRuntime(client: client),
@@ -399,6 +404,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
         home: Scaffold(
           body: AiAssistantPage(
             runtime: PortalAiRuntime(
@@ -434,6 +440,7 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          theme: buildPortalTheme(brightness: Brightness.light),
           home: Scaffold(
             body: AiAssistantPage(
               runtime: PortalAiRuntime(
@@ -473,6 +480,7 @@ void main() {
     ]);
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
         home: Scaffold(
           body: AiAssistantPage(
             runtime: PortalAiRuntime(client: client),
@@ -500,6 +508,7 @@ void main() {
     var accepted = false;
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
         home: Scaffold(
           body: StatefulBuilder(
             builder: (context, setState) => AiAssistantPage(
