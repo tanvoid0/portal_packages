@@ -21,7 +21,7 @@ void main() {
   testWidgets('scope enabled: badge id is shown', (t) async {
     await t.pumpWidget(_host(
       const PortalReviewScope(
-        initiallyEnabled: true,
+        enabled: true,
         child: PortalReviewTag(id: 'a.b', child: Text('Hello')),
       ),
     ));
@@ -29,18 +29,30 @@ void main() {
     expect(find.text('a.b'), findsOneWidget);
   });
 
-  testWidgets('toggling the pill off hides the badge', (t) async {
+  testWidgets('scope disabled: no badge, and the scope draws nothing', (t) async {
     await t.pumpWidget(_host(
       const PortalReviewScope(
-        initiallyEnabled: true,
+        enabled: false,
         child: PortalReviewTag(id: 'a.b', child: Text('Hello')),
       ),
     ));
+    expect(find.text('Hello'), findsOneWidget);
+    expect(find.text('a.b'), findsNothing);
+    // No on-canvas toggle: the demo's side panel owns the switch.
+    expect(find.byType(Tooltip), findsNothing);
+  });
+
+  testWidgets('flipping enabled hides the badge', (t) async {
+    Widget scope(bool enabled) => _host(
+          PortalReviewScope(
+            enabled: enabled,
+            child: const PortalReviewTag(id: 'a.b', child: Text('Hello')),
+          ),
+        );
+    await t.pumpWidget(scope(true));
     expect(find.text('a.b'), findsOneWidget);
 
-    await t.tap(find.byTooltip('Hide review badges'));
-    await t.pump();
-
+    await t.pumpWidget(scope(false));
     expect(find.text('a.b'), findsNothing);
   });
 }

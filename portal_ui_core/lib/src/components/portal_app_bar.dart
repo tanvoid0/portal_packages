@@ -69,6 +69,7 @@ class PortalAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.centerTitle,
     this.backgroundColor,
     this.bottom,
+    this.excludeHeaderSemantics = false,
   }) : assert((title == null) != (titleWidget == null),
             'Give exactly one of title or titleWidget');
 
@@ -96,6 +97,10 @@ class PortalAppBar extends StatelessWidget implements PreferredSizeWidget {
   /// Tabs or a filter row hung under the bar.
   final PreferredSizeWidget? bottom;
 
+  /// [AppBar.excludeHeaderSemantics]: true when [titleWidget] is a control
+  /// (a model switcher) rather than the page's heading.
+  final bool excludeHeaderSemantics;
+
   @override
   Size get preferredSize =>
       Size.fromHeight(kToolbarHeight + (bottom?.preferredSize.height ?? 0));
@@ -113,6 +118,7 @@ class PortalAppBar extends StatelessWidget implements PreferredSizeWidget {
       centerTitle: centerTitle,
       backgroundColor: backgroundColor,
       bottom: bottom,
+      excludeHeaderSemantics: excludeHeaderSemantics,
       actions: _barActions(
         context,
         actions: actions,
