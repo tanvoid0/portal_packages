@@ -66,6 +66,28 @@ void main() {
     expect(tapped, isTrue);
   });
 
+  testWidgets('empty state draws an example between the body and the action',
+      (t) async {
+    await t.pumpWidget(_host(PortalEmptyState(
+      icon: Icons.inbox,
+      title: 'Nothing yet',
+      message: 'Your first week will show up here.',
+      example: const Text('Mon · 3 sets'),
+      actionLabel: 'Add',
+      onAction: () {},
+    )));
+
+    expect(find.text('Mon · 3 sets'), findsOneWidget);
+    // What, why, the sample, then the one way forward — in that order.
+    final y = [
+      t.getCenter(find.text('Nothing yet')).dy,
+      t.getCenter(find.text('Your first week will show up here.')).dy,
+      t.getCenter(find.text('Mon · 3 sets')).dy,
+      t.getCenter(find.byType(PortalButton)).dy,
+    ];
+    expect(y, orderedEquals(List.of(y)..sort()));
+  });
+
   testWidgets('list skeleton renders one block per item', (t) async {
     await t.pumpWidget(_host(
       const PortalListSkeleton(itemCount: 4, itemHeight: 40),

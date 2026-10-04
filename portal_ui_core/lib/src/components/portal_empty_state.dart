@@ -6,7 +6,21 @@ import 'portal_card.dart';
 
 /// Nothing-here state — glyph, title, optional body, optional single action.
 ///
-/// The body is deliberately optional and the action deliberately singular: an
+/// Three parts, and an empty state is unfinished without the first two (F4):
+///
+/// 1. **What goes here** — [title].
+/// 2. **Why it is empty** — [message], and the three reasons read
+///    differently: nothing created yet, filtered to nothing, or cleared on
+///    purpose. "No results" does not say which.
+/// 3. **The one way forward** — either [actionLabel]/[onAction] or, where
+///    there is nothing to act on yet, an [example] of what will be here.
+///
+/// A filtered-to-nothing state offers *clear filters*, never *add*: the list
+/// is not empty, the filter is. Pass the filter-clearing callback as
+/// [onAction] and say so in the label.
+///
+/// The body is deliberately optional (a state on a page with its own
+/// explanation does not repeat it) and the action deliberately singular: an
 /// empty state that offers three ways forward is a menu, not an empty state.
 class PortalEmptyState extends StatelessWidget {
   const PortalEmptyState({
@@ -17,6 +31,7 @@ class PortalEmptyState extends StatelessWidget {
     this.actionLabel,
     this.onAction,
     this.actionIcon,
+    this.example,
     this.iconWellColor,
     this.inCard = true,
   });
@@ -29,6 +44,12 @@ class PortalEmptyState extends StatelessWidget {
   final String? actionLabel;
   final VoidCallback? onAction;
   final IconData? actionIcon;
+
+  /// What will be here, shown instead of (or beside) an action on a first-run
+  /// state — one sample row, card or chart, drawn at the size it will really
+  /// be. Dim or label it in the caller if it should read as a sample; this
+  /// slot only decides where it sits.
+  final Widget? example;
 
   /// Circular well painted behind the glyph. Omit for a bare icon.
   final Color? iconWellColor;
@@ -74,6 +95,10 @@ class PortalEmptyState extends StatelessWidget {
             style: tokens.textStyles.caption
                 .copyWith(color: portal.onSurfaceVariant),
           ),
+        ],
+        if (example != null) ...[
+          SizedBox(height: tokens.spacing.lg),
+          example!,
         ],
         if (actionLabel != null && onAction != null) ...[
           SizedBox(height: tokens.spacing.lg),
