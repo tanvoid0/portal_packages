@@ -80,6 +80,25 @@ void main() {
     });
   });
 
+  group('withPortalUi', () {
+    test('replaces the portal extension and keeps the others', () {
+      final base = buildPortalTheme(brightness: Brightness.light);
+      final tinted = base.withPortalUi(
+        (p) => p.copyWith(card: const Color(0xFF123456)),
+      );
+      expect(tinted.extension<PortalUiTheme>()!.card, const Color(0xFF123456));
+      // Everything else survives, and nothing is duplicated.
+      expect(tinted.extension<PortalSemanticColors>(),
+          base.extension<PortalSemanticColors>());
+      expect(tinted.extensions.length, base.extensions.length);
+    });
+
+    test('is a no-op on a theme without one', () {
+      final plain = ThemeData(colorScheme: const ColorScheme.light());
+      expect(plain.withPortalUi((p) => p.copyWith(card: Colors.red)), plain);
+    });
+  });
+
   group('PortalAppTheme', () {
     test('delegates to PortalThemeConfig', () {
       final modes = portalDefaultAppTheme.build();

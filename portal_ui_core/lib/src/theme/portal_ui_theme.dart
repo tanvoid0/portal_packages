@@ -235,3 +235,28 @@ class PortalUiTheme extends ThemeExtension<PortalUiTheme> {
     );
   }
 }
+
+/// Reaches the [PortalUiTheme] a built [ThemeData] already carries.
+extension PortalUiThemeOverride on ThemeData {
+  /// Replaces this theme's [PortalUiTheme] with `transform`'s result, leaving
+  /// every other extension alone.
+  ///
+  /// For a theme built by `buildPortalTheme`, which takes the colour scheme
+  /// and tokens but no hook into the extension it derives from them. A
+  /// `PortalThemeConfig` consumer has `portalUiThemeBuilder` instead, and a
+  /// hand-rolled [PortalUiTheme] needs neither.
+  ///
+  /// ```dart
+  /// buildPortalTheme(brightness: brightness, colorScheme: scheme)
+  ///     .withPortalUi((p) => p.copyWith(card: scheme.surfaceContainer));
+  /// ```
+  ThemeData withPortalUi(PortalUiTheme Function(PortalUiTheme portal) transform) {
+    final portal = extension<PortalUiTheme>();
+    if (portal == null) return this;
+    return copyWith(extensions: [
+      for (final e in extensions.values)
+        if (e is! PortalUiTheme) e,
+      transform(portal),
+    ]);
+  }
+}
