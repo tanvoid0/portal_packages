@@ -78,7 +78,12 @@ class PortalColorPalettes {
       trackBorder: Color(0xFFD4D4D8),
       nodePill: Color(0xFFE4E4E7),
       onSurface: Color(0xFF18181B),
-      onSurfaceMuted: Color(0xFF71717A),
+      // Zinc-500 (#71717A) is 4.40:1 on surfaceElevated / zinc-100, under AA
+      // for text, and it feeds onSurfaceVariant: placeholders, hints, source
+      // chips and muted text on a grouped page all failed on it, and a
+      // chevron mixed from it read 2.84:1 against the 3:1 a control needs.
+      // Stepped 12% toward onSurface — 5.15:1 (K9).
+      onSurfaceMuted: Color(0xFF66666F),
       navBar: Color(0xFFFFFFFF),
       navPill: Color(0xFFE4E4E7),
     ),
