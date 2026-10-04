@@ -68,4 +68,39 @@ void main() {
       expect(tapHeight(tester), paintedHeight(tester));
     }
   });
+  testWidgets('secondary takes the neutral fill, not the brand role',
+      (tester) async {
+    // K2: the secondary button took the scheme's secondary role, which is
+    // brand in some apps -- grey in assistant, blue in finance -- where the
+    // kit draws one neutral fill everywhere.
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light, tokens: tokens),
+        home: Scaffold(
+          body: Center(
+            child: PortalButton(
+              label: 'Cancel',
+              variant: PortalButtonVariant.secondary,
+              onPressed: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    final scheme = Theme.of(
+      tester.element(find.byType(PortalButton)),
+    ).colorScheme;
+    final decoration =
+        tester
+                .widget<Ink>(
+                  find.descendant(
+                    of: find.byType(PortalButton),
+                    matching: find.byType(Ink),
+                  ),
+                )
+                .decoration!
+            as BoxDecoration;
+    expect(decoration.color, scheme.surfaceContainerHigh);
+
+  });
 }

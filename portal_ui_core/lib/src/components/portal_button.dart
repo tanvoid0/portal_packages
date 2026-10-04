@@ -39,7 +39,7 @@ class PortalButton extends StatelessWidget {
     final (hPad, _, labelFontSize) = _metrics(tokens);
     final painted = _paintedHeight;
     final tap = painted < tokens.minTapTarget ? tokens.minTapTarget : painted;
-    final style = _styleFor(portal);
+    final style = _styleFor(portal, Theme.of(context).colorScheme);
     // Filled buttons are pills; tonal, outlined and ghost keep a soft corner.
     final radius = switch (variant) {
       PortalButtonVariant.primary ||
@@ -154,7 +154,7 @@ class PortalButton extends StatelessWidget {
     }
   }
 
-  _ButtonStyle _styleFor(PortalUiTheme portal) {
+  _ButtonStyle _styleFor(PortalUiTheme portal, ColorScheme scheme) {
     switch (variant) {
       case PortalButtonVariant.primary:
         return _ButtonStyle(
@@ -162,10 +162,15 @@ class PortalButton extends StatelessWidget {
           foreground: portal.onPrimary,
           border: null,
         );
+      // One neutral fill across the fleet (batch K, K2). The scheme's
+      // secondary role is brand in some apps -- grey in assistant, blue in
+      // finance -- so the secondary button changed colour app to app where
+      // the kit draws one. Read from the scheme rather than portal.accent,
+      // which an app skin may point somewhere else. Brand stays on primary.
       case PortalButtonVariant.secondary:
         return _ButtonStyle(
-          background: portal.secondary,
-          foreground: portal.onSecondary,
+          background: scheme.surfaceContainerHigh,
+          foreground: scheme.onSurface,
           border: null,
         );
       case PortalButtonVariant.outline:
