@@ -7,10 +7,13 @@ import 'package:material_color_utilities/material_color_utilities.dart';
 /// `onXContainer`), tones matching the scheme's own `error` set.
 ///
 /// Attached to [ThemeData.extensions] by `buildPortalTheme`; read with [of].
-/// Defaults come from [fromScheme]: fixed hues (green 145°, amber 40°, blue
-/// 215°) rotated up to 15° toward the scheme's primary by
-/// [Blend.harmonize], so status colours sit inside the brand instead of
-/// fighting it. Override per brightness through the existing
+/// Defaults come from [fromScheme]: fixed hues (green 145°, amber 65°, blue
+/// 215°). Success and info are rotated up to 15° toward the scheme's primary
+/// by [Blend.harmonize], so they sit inside the brand instead of fighting it.
+/// Warning is not harmonised and its hue is held at amber: a primary in
+/// blue/violet or red pulled it to within 20° of the app's error, and a
+/// warning that reads as negative is worse than one outside the brand (K3).
+/// Override per brightness through the existing
 /// `PortalThemeConfig.extensionsBuilder` — a later extension of the same type
 /// replaces the default:
 ///
@@ -50,14 +53,15 @@ class PortalSemanticColors extends ThemeExtension<PortalSemanticColors> {
     final (tone, onTone, container, onContainer) =
         dark ? (80, 20, 30, 90) : (40, 100, 90, 10);
 
-    TonalPalette palette(double hue) {
-      final seed = Hct.from(hue, _chroma, 40).toInt();
-      final hct = Hct.fromInt(Blend.harmonize(seed, primary));
+    TonalPalette palette(double hue, {bool harmonise = true}) {
+      final seed = Hct.from(hue, _chroma, 40);
+      if (!harmonise) return TonalPalette.of(seed.hue, seed.chroma);
+      final hct = Hct.fromInt(Blend.harmonize(seed.toInt(), primary));
       return TonalPalette.of(hct.hue, hct.chroma);
     }
 
     final green = palette(_greenHue);
-    final amber = palette(_amberHue);
+    final amber = palette(_amberHue, harmonise: false);
     final blue = palette(_blueHue);
 
     return PortalSemanticColors(
@@ -81,7 +85,12 @@ class PortalSemanticColors extends ThemeExtension<PortalSemanticColors> {
   }
 
   static const double _greenHue = 145;
-  static const double _amberHue = 40;
+
+  /// Amber, far enough from every app's error to never read as negative:
+  /// 65° clears the closest (journey/lifestyle, 36°) by 28° in HCT. Not
+  /// harmonised — see the class doc. Pinned by
+  /// `test/portal_semantic_colors_test.dart`.
+  static const double _amberHue = 65;
   static const double _blueHue = 215;
   static const double _chroma = 48;
 
