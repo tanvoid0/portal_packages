@@ -126,6 +126,64 @@ void main() {
     expect(haptics, isEmpty);
   });
 
+  testWidgets('a fling short of the threshold still triggers', (t) async {
+    var triggers = 0;
+    await t.pumpWidget(_Host(
+      row: (remove) => PortalSwipeRow(
+        key: const ValueKey('row'),
+        leading: PortalSwipeAction(
+          icon: Icons.delete_outline,
+          label: 'Delete',
+          foregroundColor: Colors.red,
+          onTrigger: () {
+            triggers++;
+            remove();
+          },
+        ),
+        child: _row,
+      ),
+    ));
+
+    // 120 of 800 px is 15%, well short of the 40% threshold — but thrown.
+    await t.fling(find.text('row'), const Offset(120, 0), 1200);
+    await t.pumpAndSettle();
+
+    expect(triggers, 1);
+  });
+
+  testWidgets('an interrupted drag leaves the row closed', (t) async {
+    var triggers = 0;
+    await t.pumpWidget(_Host(
+      row: (_) => PortalSwipeRow(
+        key: const ValueKey('row'),
+        leading: PortalSwipeAction(
+          icon: Icons.delete_outline,
+          label: 'Delete',
+          foregroundColor: Colors.red,
+          onTrigger: () => triggers++,
+        ),
+        child: _row,
+      ),
+    ));
+
+    final gesture = await t.startGesture(t.getCenter(find.text('row')));
+    await gesture.moveBy(const Offset(500, 0));
+    await t.pump();
+
+    final pulled = t.getTopLeft(find.text('row')).dx;
+    expect(pulled, greaterThan(0));
+    // Past the threshold the row resists: it never travels as far as the
+    // finger, and never further than its own width.
+    expect(pulled, lessThan(500));
+
+    // A second finger, a parent list taking over, the app backgrounded.
+    await gesture.cancel();
+    await t.pumpAndSettle();
+
+    expect(t.getTopLeft(find.text('row')).dx, 0);
+    expect(triggers, 0);
+  });
+
   testWidgets('actions are custom semantics actions the row answers',
       (t) async {
     final handle = t.ensureSemantics();
