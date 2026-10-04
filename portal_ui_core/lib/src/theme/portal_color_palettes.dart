@@ -12,6 +12,7 @@ class PortalColorPalettes {
     this.lightError = const Color(0xFFDC2626),
     this.darkError = const Color(0xFFEF4444),
     this.onError = Colors.white,
+    this.darkOnError = const Color(0xFF410002),
   });
 
   final PortalSurfacePalette light;
@@ -19,7 +20,13 @@ class PortalColorPalettes {
   final Color seedColor;
   final Color lightError;
   final Color darkError;
+
+  /// Foreground on [lightError].
   final Color onError;
+
+  /// Foreground on [darkError]. White on the dark red reads 3.76:1, under AA,
+  /// so the dark side takes M3's error ink instead (F2).
+  final Color darkOnError;
 
   PortalSurfacePalette forBrightness(Brightness brightness) =>
       brightness == Brightness.dark ? dark : light;
@@ -31,6 +38,7 @@ class PortalColorPalettes {
     Color? lightError,
     Color? darkError,
     Color? onError,
+    Color? darkOnError,
   }) {
     return PortalColorPalettes(
       light: light ?? this.light,
@@ -39,6 +47,7 @@ class PortalColorPalettes {
       lightError: lightError ?? this.lightError,
       darkError: darkError ?? this.darkError,
       onError: onError ?? this.onError,
+      darkOnError: darkOnError ?? this.darkOnError,
     );
   }
 
@@ -53,7 +62,8 @@ class PortalColorPalettes {
       seedColor: resolvedAccent,
       brightness: brightness,
     );
-    final error = brightness == Brightness.dark ? darkError : lightError;
+    final dark = brightness == Brightness.dark;
+    final error = dark ? darkError : lightError;
 
     return palette.applySurfacesTo(base).copyWith(
           primary: base.primary,
@@ -62,7 +72,7 @@ class PortalColorPalettes {
           onPrimaryContainer: base.onPrimaryContainer,
           tertiary: base.tertiary,
           error: error,
-          onError: onError,
+          onError: dark ? darkOnError : onError,
         );
   }
 
@@ -75,7 +85,10 @@ class PortalColorPalettes {
       surfacePanel: Color(0xFFEBEBED),
       track: Color(0xFFE4E4E7),
       trackMuted: Color(0xFFF4F4F5),
-      trackBorder: Color(0xFFD4D4D8),
+      // Reads as ColorScheme.outline, and task draws control borders from it
+      // directly. Zinc-300 was 1.39:1 on the page, under the 3:1 a border or
+      // icon needs; this is 3.06 on the page and 3.25 on the card (F2).
+      trackBorder: Color(0xFF8E8E96),
       nodePill: Color(0xFFE4E4E7),
       onSurface: Color(0xFF18181B),
       // Zinc-500 (#71717A) is 4.40:1 on surfaceElevated / zinc-100, under AA
@@ -94,7 +107,8 @@ class PortalColorPalettes {
       surfacePanel: Color(0xFF1F1F23),
       track: Color(0xFF3F3F46),
       trackMuted: Color(0xFF27272A),
-      trackBorder: Color(0xFF3F3F46),
+      // 1.91:1 on the page before; 4.12 now, 3.08 on the card (F2).
+      trackBorder: Color(0xFF71717A),
       nodePill: Color(0xFF3F3F46),
       onSurface: Color(0xFFFAFAFA),
       onSurfaceMuted: Color(0xFFA1A1AA),
@@ -113,10 +127,13 @@ class PortalColorPalettes {
       surfacePanel: Color(0xFFE2E8F0),
       track: Color(0xFFCBD5E1),
       trackMuted: Color(0xFFF1F5F9),
-      trackBorder: Color(0xFFCBD5E1),
+      // 1.42:1 before; 3.26 on the page, 3.41 on the card (F2).
+      trackBorder: Color(0xFF7D8CA3),
       nodePill: Color(0xFFE2E8F0),
       onSurface: Color(0xFF0F172A),
-      onSurfaceMuted: Color(0xFF64748B),
+      // Slate-500 was 4.34:1 on surfaceContainerHigh, the same defect zinc
+      // had (K9); stepped toward onSurface (F2).
+      onSurfaceMuted: Color(0xFF5B687E),
       navBar: Color(0xFFFFFFFF),
       navPill: Color(0xFFE2E8F0),
     ),
@@ -127,10 +144,13 @@ class PortalColorPalettes {
       surfacePanel: Color(0xFF334155),
       track: Color(0xFF475569),
       trackMuted: Color(0xFF1E293B),
-      trackBorder: Color(0xFF475569),
+      // 2.66:1 before; 4.24 on the page, 3.07 on the card (F2).
+      trackBorder: Color(0xFF64748B),
       nodePill: Color(0xFF334155),
       onSurface: Color(0xFFF8FAFC),
-      onSurfaceMuted: Color(0xFF94A3B8),
+      // Slate-400 was 4.04:1 on surfaceContainer, the grouped page's tone;
+      // stepped 12% toward onSurface — 4.55 there, 6.43 on the card (F2).
+      onSurfaceMuted: Color(0xFFA0ADC0),
       navBar: Color(0xFF020617),
       navPill: Color(0xFF334155),
       onAccentDark: Color(0xFF0F172A),
