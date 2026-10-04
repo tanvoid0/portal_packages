@@ -36,7 +36,9 @@ class PortalButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
-    final (hPad, vPad, labelFontSize) = _metrics(tokens);
+    final (hPad, _, labelFontSize) = _metrics(tokens);
+    final painted = _paintedHeight;
+    final tap = painted < tokens.minTapTarget ? tokens.minTapTarget : painted;
     final style = _styleFor(portal);
     // Filled buttons are pills; tonal, outlined and ghost keep a soft corner.
     final radius = switch (variant) {
@@ -93,7 +95,7 @@ class PortalButton extends StatelessWidget {
 
     // Ripple stays (it is what a button feels like); the press scale rides on
     // top. `Ink` rather than a DecoratedBox so the splash paints over the fill.
-    return PortalPressable(
+    final button = PortalPressable(
       onTap: onPressed,
       enabled: !isLoading,
       ripple: true,
@@ -107,24 +109,40 @@ class PortalButton extends StatelessWidget {
           border: style.border,
         ),
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: tokens.minTapTarget,
-              minWidth: tokens.minTapTarget,
-            ),
-            child: Align(
-              alignment: Alignment.center,
-              heightFactor: 1,
-              widthFactor: expand ? null : 1,
-              child: styled,
+          padding: EdgeInsets.symmetric(horizontal: hPad),
+          child: SizedBox(
+            height: painted,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: tokens.minTapTarget),
+              child: Align(
+                alignment: Alignment.center,
+                widthFactor: expand ? null : 1,
+                child: styled,
+              ),
             ),
           ),
         ),
       ),
     );
+
+    // A small button paints under the minimum tap target, so the hit area is
+    // a box around the paint rather than taller paint (`UI_PATTERNS.md`).
+    if (tap == painted) return button;
+    return SizedBox(height: tap, child: Center(child: button));
   }
 
+  /// The painted pill's height. The hit area is [DesignTokens.minTapTarget]
+  /// around this, never grown into the paint (`UI_PATTERNS.md`). The 44dp
+  /// box used to sit *inside* the padding, so md painted 68 and lg 76 where
+  /// the kit paints 48 and 56 (batch K, K1).
+  double get _paintedHeight => switch (size) {
+    PortalButtonSize.sm => 36,
+    PortalButtonSize.md => 48,
+    PortalButtonSize.lg => 56,
+  };
+
+  /// Horizontal padding, vertical padding (unused since K1 fixed the painted
+  /// height), and the label's size.
   (double, double, double) _metrics(DesignTokens tokens) {
     switch (size) {
       case PortalButtonSize.sm:

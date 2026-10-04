@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/portal_ui_theme.dart';
 import '../tokens/design_tokens.dart';
@@ -57,8 +58,8 @@ class _PortalReviewInherited extends InheritedWidget {
 
 /// Badges [child] with [id] when a [PortalReviewScope] ancestor is enabled;
 /// otherwise returns [child] unchanged -- no ancestor, no scope enabled, no
-/// extra pixel. The badge is [IgnorePointer] and never resizes [child]: it
-/// paints in the corner of a [Stack] sized by [child] alone.
+/// extra pixel. The badge never resizes [child]: it paints in the corner of a
+/// [Stack] sized by [child] alone. Tapping it copies [id] for a review comment.
 class PortalReviewTag extends StatelessWidget {
   const PortalReviewTag({super.key, required this.id, required this.child});
 
@@ -89,7 +90,16 @@ class PortalReviewTag extends StatelessWidget {
         Positioned(
           top: -tokens.spacing.xs,
           right: -tokens.spacing.xs,
-          child: IgnorePointer(
+          child: GestureDetector(
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: id));
+              ScaffoldMessenger.maybeOf(context)
+                ?..hideCurrentSnackBar()
+                ..showSnackBar(SnackBar(
+                  content: Text('Copied $id'),
+                  duration: const Duration(seconds: 1),
+                ));
+            },
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: bg,
