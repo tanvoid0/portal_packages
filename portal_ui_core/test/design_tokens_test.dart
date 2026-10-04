@@ -13,11 +13,11 @@ void main() {
       expect(d.radii.lg, 20);
       expect(d.radii.xl, 28);
       expect(d.typeScale.md, 14);
-      expect(d.minTapTarget, 44);
+      expect(d.minTapTarget, 48);
       expect(d.expressiveCorners, isTrue);
     });
 
-    test('compact tightens spacing, radii, type, and tap target', () {
+    test('compact tightens spacing, radii and type, never the tap target', () {
       const c = DesignTokens.compact;
       const d = DesignTokens.defaults;
       expect(c.spacing.lg, lessThan(d.spacing.lg));
@@ -26,7 +26,9 @@ void main() {
       expect(c.radii.md, lessThan(d.radii.md));
       expect(c.radii.xl, lessThan(d.radii.xl));
       expect(c.typeScale.md, lessThan(d.typeScale.md));
-      expect(c.minTapTarget, lessThan(d.minTapTarget));
+      // Density is the paint's business: the 48dp hit-area floor holds in
+      // every preset (F1).
+      expect(c.minTapTarget, 48);
     });
 
     test('rounded increases corner radii but keeps default spacing scale', () {

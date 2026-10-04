@@ -440,7 +440,7 @@ class DesignTokens {
     this.gradients = const PortalGradients(),
     this.layout = const PortalLayoutInsets(),
     this.avatarSizes = const PortalAvatarSizes(),
-    this.minTapTarget = 44,
+    this.minTapTarget = 48,
     this.borderWidth = 1,
     this.expressiveCorners = true,
   });
@@ -460,7 +460,9 @@ class DesignTokens {
   /// Avatar diameters; see [PortalAvatarSizes].
   final PortalAvatarSizes avatarSizes;
 
-  /// Minimum interactive dimension (accessibility).
+  /// Minimum interactive dimension: 48, the Android and M3 floor, in every
+  /// preset. It sizes the *hit area*, never the paint — put it in a
+  /// `SizedBox` around the painted box (see `UI_PATTERNS.md`).
   final double minTapTarget;
 
   final double borderWidth;
@@ -481,7 +483,10 @@ class DesignTokens {
     typeScale: PortalTypeScale(
       xs: 10, sm: 11, md: 13, lg: 15, xl: 17, xxl: 20,
     ),
-    minTapTarget: 40,
+    // 48 even here: Android and M3 both floor a hit area at 48×48dp with
+    // 8dp between targets, and density is the paint's business, not the hit
+    // area's (F1).
+    minTapTarget: 48,
   );
 
   static const DesignTokens rounded = DesignTokens(
