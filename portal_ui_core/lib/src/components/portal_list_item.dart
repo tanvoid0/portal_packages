@@ -334,6 +334,8 @@ class PortalListItem extends StatelessWidget {
     this.onLongPress,
     this.destructive = false,
     this.dimmed = false,
+    this.struck = false,
+    this.titleMaxLines = 1,
   })  : _skeleton = false,
         _skeletonLeading = null;
 
@@ -359,6 +361,8 @@ class PortalListItem extends StatelessWidget {
         onLongPress = null,
         destructive = false,
         dimmed = false,
+        struck = false,
+        titleMaxLines = 1,
         _skeleton = true,
         _skeletonLeading = leading;
 
@@ -404,6 +408,14 @@ class PortalListItem extends StatelessWidget {
   /// disabling it or changing what a screen reader says. A row that cannot be
   /// used is [disabledReason], not this.
   final bool dimmed;
+
+  /// Strikes the title through (a done task, a ticked item). Pair it with
+  /// [dimmed] if the whole row should recede; a screen reader still reads the
+  /// same label, so say "done" in [subtitle] or the accessory if it matters.
+  final bool struck;
+
+  /// Lines the title may take before it ellipsizes. Default 1.
+  final int titleMaxLines;
 
   final bool _skeleton;
   final PortalSkeletonLeading? _skeletonLeading;
@@ -461,9 +473,10 @@ class PortalListItem extends StatelessWidget {
     final heavy = isNew ? FontWeight.w700 : null;
     final titleText = Text(
       title,
-      maxLines: 1,
+      maxLines: titleMaxLines,
       overflow: TextOverflow.ellipsis,
       style: styles.body.copyWith(
+        decoration: struck ? TextDecoration.lineThrough : null,
         color: disabled
             ? cs.onSurface.withValues(alpha: 0.38)
             : destructive

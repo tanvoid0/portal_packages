@@ -67,4 +67,27 @@ void main() {
     expect(find.byType(PortalSkeleton), findsWidgets);
     await t.pumpWidget(const SizedBox());
   });
+
+  testWidgets('struck strikes the title; titleMaxLines lets it wrap',
+      (t) async {
+    const long = 'A very long title that cannot fit on a single line of the '
+        'narrow column it is given, so it must wrap onto more';
+    Future<Text> pump({bool struck = false, int lines = 1}) async {
+      await t.pumpWidget(host(SizedBox(
+        width: 200,
+        child: PortalListItem(
+            title: long, struck: struck, titleMaxLines: lines),
+      )));
+      return t.widget<Text>(find.text(long));
+    }
+
+    var title = await pump();
+    expect(title.style!.decoration, isNull);
+    expect(title.maxLines, 1);
+    final one = t.getSize(find.byType(PortalListItem)).height;
+
+    title = await pump(struck: true, lines: 3);
+    expect(title.style!.decoration, TextDecoration.lineThrough);
+    expect(t.getSize(find.byType(PortalListItem)).height, greaterThan(one));
+  });
 }
