@@ -21,13 +21,22 @@ class PortalButton extends StatelessWidget {
     this.backgroundColor,
     this.foregroundColor,
   })  : tooltip = null,
+        selected = null,
         _circular = false;
 
   /// A circular icon-only button, [size] across (36 / 48 / 56). [tooltip] is
   /// required: it is the only name a screen reader gets.
+  ///
+  /// The glyph is [icon] or, for a `FaIcon` / SVG, [iconWidget] (exactly one).
+  /// [selected] makes it a toggle (a favourite): true fills the glyph and
+  /// tints the button `primaryContainer`, and a screen reader hears the state;
+  /// null (default) is a plain button. Write [tooltip] for the action, not the
+  /// state, or flip it with the state ("Add to favourites" / "Remove ...").
   PortalButton.icon({
-    required IconData icon,
+    IconData? icon,
+    Widget? iconWidget,
     required String this.tooltip,
+    this.selected,
     super.key,
     this.onPressed,
     this.variant = PortalButtonVariant.secondary,
@@ -35,8 +44,10 @@ class PortalButton extends StatelessWidget {
     this.isLoading = false,
     this.backgroundColor,
     this.foregroundColor,
-  })  : label = '',
-        leading = Icon(icon),
+  })  : assert((icon == null) != (iconWidget == null),
+            'pass exactly one of icon and iconWidget'),
+        label = '',
+        leading = iconWidget ?? Icon(icon, fill: selected == true ? 1 : 0),
         expand = false,
         _circular = true;
 
@@ -59,6 +70,9 @@ class PortalButton extends StatelessWidget {
 
   /// The accessible name of the [PortalButton.icon] form.
   final String? tooltip;
+
+  /// Toggle state of the [PortalButton.icon] form; null when not a toggle.
+  final bool? selected;
   final bool _circular;
 
   @override
@@ -68,7 +82,13 @@ class PortalButton extends StatelessWidget {
     final (hPad, _, labelFontSize) = _metrics(tokens);
     final painted = _paintedHeight;
     final tap = painted < tokens.minTapTarget ? tokens.minTapTarget : painted;
-    final base = _styleFor(portal, Theme.of(context).colorScheme);
+    final scheme = Theme.of(context).colorScheme;
+    final base = selected == true
+        ? _ButtonStyle(
+            background: scheme.primaryContainer,
+            foreground: scheme.onPrimaryContainer,
+          )
+        : _styleFor(portal, scheme);
     final style = _ButtonStyle(
       background: backgroundColor ?? base.background,
       foreground: foregroundColor ?? base.foreground,
@@ -164,10 +184,13 @@ class PortalButton extends StatelessWidget {
     // A small button paints under the minimum tap target, so the hit area is
     // a box around the paint rather than taller paint (`UI_PATTERNS.md`).
     if (_circular) {
-      return Tooltip(
+      final target = Tooltip(
         message: tooltip!,
         child: SizedBox(width: tap, height: tap, child: Center(child: button)),
       );
+      return selected == null
+          ? target
+          : Semantics(selected: selected, child: target);
     }
     if (tap == painted) return button;
     return SizedBox(height: tap, child: Center(child: button));

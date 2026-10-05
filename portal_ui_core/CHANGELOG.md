@@ -1,5 +1,7 @@
 ## Unreleased
 
+- `PortalButton.icon(icon:, iconWidget:, selected:)`: `iconWidget` takes any glyph (a `FaIcon`, an SVG; exactly one of `icon` / `iconWidget`), and `selected` (bool?, null = plain button) makes it a toggle: filled glyph (IconData form), `primaryContainer` tint (explicit colours still win) and a selected semantic state. `tooltip` stays required. Not built: a separate unselected / selected glyph pair (pass the right `iconWidget` per state).
+
 - `PortalIconTile(shape: PortalIconTileShape.roundedSquare | circle)` (default unchanged), passed through `PortalListLeading.tile(shape:)` and `.tileBuilder(shape:)`.
 
 - `PortalNavBarTheme(backgroundColor:, borderColor:, markColor:, selectedWellColor:, selectedMarkColor:, boxShadow:)`: re-skins every `PortalBottomNavBar` through `extensionsBuilder`, so an app stops passing colours per call. Widget argument beats theme beats default. Not built: a custom indicator shape (the well is the indicator).

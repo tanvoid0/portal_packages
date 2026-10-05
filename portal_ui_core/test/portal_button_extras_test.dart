@@ -69,4 +69,42 @@ void main() {
     await t.pump();
     expect(find.text('Action 5').hitTestable(), findsOneWidget);
   });
+
+  testWidgets('icon button takes a widget glyph and a selected state',
+      (t) async {
+    final h = t.ensureSemantics();
+    await t.pumpWidget(host(PortalButton.icon(
+      iconWidget: const Text('FA', key: Key('g')),
+      tooltip: 'Favourite',
+      onPressed: () {},
+    )));
+    expect(find.byKey(const Key('g')), findsOneWidget);
+    expect(find.byType(Icon), findsNothing);
+
+    Future<void> toggle(bool on) => t.pumpWidget(host(PortalButton.icon(
+          icon: Icons.favorite,
+          tooltip: 'Favourite',
+          selected: on,
+          onPressed: () {},
+        )));
+    await toggle(false);
+    final off = (t.widget<Ink>(find.byType(Ink)).decoration! as BoxDecoration)
+        .color;
+    expect(t.widget<Icon>(find.byIcon(Icons.favorite)).fill, 0);
+
+    await toggle(true);
+    final on = (t.widget<Ink>(find.byType(Ink)).decoration! as BoxDecoration)
+        .color;
+    expect(on, isNot(off));
+    expect(t.widget<Icon>(find.byIcon(Icons.favorite)).fill, 1);
+    expect(find.byTooltip('Favourite'), findsOneWidget);
+    expect(
+        t.getSemantics(find.byTooltip('Favourite')),
+        isSemantics(
+            tooltip: 'Favourite',
+            isSelected: true,
+            hasSelectedState: true,
+            isButton: true));
+    h.dispose();
+  });
 }
