@@ -26,7 +26,8 @@ import 'portal_card.dart';
 class PortalEmptyState extends StatelessWidget {
   const PortalEmptyState({
     super.key,
-    required this.icon,
+    this.icon,
+    this.iconWidget,
     required this.title,
     this.message,
     this.actionLabel,
@@ -35,9 +36,13 @@ class PortalEmptyState extends StatelessWidget {
     this.example,
     this.iconWellColor,
     this.inCard = true,
-  });
+  }) : assert(icon != null || iconWidget != null, 'give an icon or iconWidget');
 
-  final IconData icon;
+  final IconData? icon;
+
+  /// Any glyph (a `FaIcon`, a logo) in place of [icon]; it paints its own
+  /// colour and size. Wins over [icon].
+  final Widget? iconWidget;
   final String title;
   final String? message;
 
@@ -68,16 +73,17 @@ class PortalEmptyState extends StatelessWidget {
     final iconColor = skin.iconColor ?? portal.onSurfaceVariant;
     final iconSize = skin.iconSize ?? tokens.spacing.xxl;
 
+    final glyph = iconWidget ?? Icon(icon, size: iconSize, color: iconColor);
     final content = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (well == null)
-          Icon(icon, size: iconSize, color: iconColor)
+          glyph
         else
           CircleAvatar(
             radius: iconSize * 1.5,
             backgroundColor: well,
-            child: Icon(icon, size: iconSize, color: iconColor),
+            child: glyph,
           ),
         SizedBox(height: tokens.spacing.md),
         Text(

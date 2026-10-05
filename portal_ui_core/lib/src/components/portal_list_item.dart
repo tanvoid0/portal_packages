@@ -4,6 +4,7 @@ import '../theme/portal_semantic_colors.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_avatar_mark.dart';
 import 'portal_pressable.dart';
+import 'portal_progress.dart';
 import 'portal_prompt.dart';
 import 'portal_section_header.dart';
 import 'portal_skeleton.dart';
@@ -26,19 +27,40 @@ class PortalListLeading {
   final double extent;
   final Widget Function(BuildContext) _build;
 
-  /// A bare 24 dp icon, for dense or utility lists.
-  factory PortalListLeading.icon(IconData icon) => PortalListLeading._(
+  /// A bare 24 dp icon, for dense or utility lists. [color] defaults to
+  /// `onSurfaceVariant`.
+  factory PortalListLeading.icon(IconData icon, {Color? color}) =>
+      PortalListLeading._(
         24,
         (c) => ExcludeSemantics(
           child: Icon(icon,
-              size: 24, color: Theme.of(c).colorScheme.onSurfaceVariant),
+              size: 24,
+              color: color ?? Theme.of(c).colorScheme.onSurfaceVariant),
         ),
       );
 
-  /// A 40 dp tonal tile holding an icon.
+  /// A 40 dp tonal tile holding an icon. [backgroundColor] and
+  /// [foregroundColor] replace the [tone]'s pair.
   factory PortalListLeading.tile(
     IconData icon, {
     PortalListTone tone = PortalListTone.primary,
+    Color? backgroundColor,
+    Color? foregroundColor,
+  }) =>
+      PortalListLeading.tileBuilder(
+        (c, color) => Icon(icon, size: 24, color: color),
+        tone: tone,
+        backgroundColor: backgroundColor,
+        foregroundColor: foregroundColor,
+      );
+
+  /// [PortalListLeading.tile] for any glyph: [iconBuilder] gets the ink to
+  /// paint with (a `FaIcon`, an SVG) and sizes it itself (24).
+  factory PortalListLeading.tileBuilder(
+    Widget Function(BuildContext context, Color color) iconBuilder, {
+    PortalListTone tone = PortalListTone.primary,
+    Color? backgroundColor,
+    Color? foregroundColor,
   }) =>
       PortalListLeading._(40, (c) {
         final cs = Theme.of(c).colorScheme;
@@ -57,15 +79,21 @@ class PortalListLeading {
           child: Container(
             width: 40,
             height: 40,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: bg,
+              color: backgroundColor ?? bg,
               borderRadius:
                   BorderRadius.circular(PortalUiTheme.of(c).tokens.radii.sm),
             ),
-            child: Icon(icon, size: 24, color: fg),
+            child: iconBuilder(c, foregroundColor ?? fg),
           ),
         );
       });
+
+  /// Any widget (a logo plate, a mark), [extent] wide. Decorative: it is
+  /// left out of the row's label.
+  factory PortalListLeading.custom(Widget child, {double extent = 40}) =>
+      PortalListLeading._(extent, (c) => ExcludeSemantics(child: child));
 
   /// A 40 dp avatar, or 56 dp for an account cell.
   factory PortalListLeading.avatar(
@@ -125,6 +153,23 @@ enum _Kind {
   button,
   value,
   meta,
+  custom,
+  iconButtons,
+}
+
+/// One icon button of [PortalListAccessory.iconButtons].
+class PortalListIconAction {
+  const PortalListIconAction({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+
+  /// The accessible name: write it from what the handler does.
+  final String tooltip;
+  final VoidCallback? onPressed;
 }
 
 /// The one trailing accessory a row carries.
@@ -144,6 +189,8 @@ class PortalListAccessory {
     this.tooltip,
     this.sentiment = PortalValueSentiment.neutral,
     this.unread = false,
+    this.child,
+    this.actions = const [],
   });
 
   final _Kind _kind;
@@ -156,6 +203,8 @@ class PortalListAccessory {
   final String? tooltip;
   final PortalValueSentiment sentiment;
   final bool unread;
+  final Widget? child;
+  final List<PortalListIconAction> actions;
 
   static const none = PortalListAccessory._(_Kind.none);
 
@@ -212,6 +261,17 @@ class PortalListAccessory {
     IconData? icon,
   }) : this._(_Kind.meta, text: time, unread: unread, icon: icon);
 
+  /// Any widget in the trailing slot (an amount over a badge). The row reads
+  /// as one label, so say what the widget shows in [semanticLabel].
+  const PortalListAccessory.widget(
+    Widget child, {
+    String? semanticLabel,
+  }) : this._(_Kind.custom, child: child, text: semanticLabel);
+
+  /// Several icon buttons side by side; each is its own target and name.
+  const PortalListAccessory.iconButtons(List<PortalListIconAction> actions)
+      : this._(_Kind.iconButtons, actions: actions);
+
   bool get _wholeRow =>
       _kind == _Kind.checkbox ||
       _kind == _Kind.radio ||
@@ -236,6 +296,13 @@ class PortalListItem extends StatelessWidget {
     this.onTap,
     this.disabledReason,
     this.isNew = false,
+    this.subtitleWidget,
+    this.metaWidget,
+    this.progress,
+    this.progressColor,
+    this.progressLabel,
+    this.onLongPress,
+    this.destructive = false,
   })  : _skeleton = false,
         _skeletonLeading = null;
 
@@ -253,6 +320,13 @@ class PortalListItem extends StatelessWidget {
         onTap = null,
         disabledReason = null,
         isNew = false,
+        subtitleWidget = null,
+        metaWidget = null,
+        progress = null,
+        progressColor = null,
+        progressLabel = null,
+        onLongPress = null,
+        destructive = false,
         _skeleton = true,
         _skeletonLeading = leading;
 
@@ -277,6 +351,22 @@ class PortalListItem extends StatelessWidget {
 
   /// Title and meta go to 700, and the label says "new" so colour is not alone.
   final bool isNew;
+
+  /// Replace [subtitle] / [meta] with any widget (a chip row, rich text with
+  /// inline amounts). A widget is not in the row's label.
+  final Widget? subtitleWidget;
+  final Widget? metaWidget;
+
+  /// 0..1: a track across the full row under the text, [progressColor] its
+  /// fill, [progressLabel] a line under it.
+  final double? progress;
+  final Color? progressColor;
+  final Widget? progressLabel;
+
+  final VoidCallback? onLongPress;
+
+  /// The title in the error colour, for a row that deletes or signs out.
+  final bool destructive;
 
   final bool _skeleton;
   final PortalSkeletonLeading? _skeletonLeading;
@@ -339,22 +429,25 @@ class PortalListItem extends StatelessWidget {
       style: styles.body.copyWith(
         color: disabled
             ? cs.onSurface.withValues(alpha: 0.38)
-            : detail
-                ? cs.onSurfaceVariant
-                : cs.onSurface,
+            : destructive
+                ? cs.error
+                : detail
+                    ? cs.onSurfaceVariant
+                    : cs.onSurface,
         fontWeight: heavy ?? (detail ? FontWeight.w400 : FontWeight.w500),
       ),
     );
-    final subtitleText = subtitle == null
-        ? null
-        : Text(
-            subtitle!,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: styles.caption.copyWith(
-              color: isNew ? cs.onSurface : cs.onSurfaceVariant,
-            ),
-          );
+    final subtitleText = subtitleWidget ??
+        (subtitle == null
+            ? null
+            : Text(
+                subtitle!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: styles.caption.copyWith(
+                  color: isNew ? cs.onSurface : cs.onSurfaceVariant,
+                ),
+              ));
     final textColumn = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -362,7 +455,9 @@ class PortalListItem extends StatelessWidget {
         if (inverted && subtitleText != null) subtitleText,
         titleText,
         if (!inverted && subtitleText != null) subtitleText,
-        if (meta != null)
+        if (metaWidget != null)
+          metaWidget!
+        else if (meta != null)
           Text(meta!,
               style: styles.caption.copyWith(color: cs.onSurfaceVariant)),
         if (disabled)
@@ -433,6 +528,17 @@ class PortalListItem extends StatelessWidget {
           tooltip: acc.tooltip,
           onPressed: disabled ? null : acc.onPressed,
         );
+      case _Kind.custom:
+        accessory = acc.child;
+      case _Kind.iconButtons:
+        accessory = Row(mainAxisSize: MainAxisSize.min, children: [
+          for (final a in acc.actions)
+            IconButton(
+              icon: Icon(a.icon),
+              tooltip: a.tooltip,
+              onPressed: disabled ? null : a.onPressed,
+            ),
+        ]);
       case _Kind.button:
         accessory = Tooltip(
           message: acc.tooltip ?? acc.text!,
@@ -512,7 +618,7 @@ class PortalListItem extends StatelessWidget {
     final labelParts = [
       title,
       if (acc._kind == _Kind.value) acc.text,
-      if (acc._kind == _Kind.navigate) acc.text,
+      if (acc._kind == _Kind.navigate || acc._kind == _Kind.custom) acc.text,
       subtitle,
       if (isNew) 'new',
     ].whereType<String>().where((s) => s.isNotEmpty);
@@ -524,35 +630,60 @@ class PortalListItem extends StatelessWidget {
         // A disabled row dims to 38% and top-aligns its leading and trailing to
         // the title line, so the reason under the subtitle reads at full
         // contrast.
-        child: Row(
-          crossAxisAlignment:
-              disabled ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (leading != null) ...[
-              Opacity(
-                opacity: disabled ? .38 : 1,
-                child: leading!._build(context),
+            Row(
+              crossAxisAlignment: disabled
+                  ? CrossAxisAlignment.start
+                  : CrossAxisAlignment.center,
+              children: [
+                if (leading != null) ...[
+                  Opacity(
+                    opacity: disabled ? .38 : 1,
+                    child: leading!._build(context),
+                  ),
+                  SizedBox(width: sp.lg),
+                ],
+                Expanded(child: textColumn),
+                if (accessory != null) ...[
+                  SizedBox(width: sp.md),
+                  Opacity(opacity: disabled ? .38 : 1, child: accessory),
+                ],
+              ],
+            ),
+            if (progress != null) ...[
+              SizedBox(height: sp.md),
+              PortalProgress(
+                value: progress!,
+                fillColor: progressColor,
+                height: sp.xs,
               ),
-              SizedBox(width: sp.lg),
-            ],
-            Expanded(child: textColumn),
-            if (accessory != null) ...[
-              SizedBox(width: sp.md),
-              Opacity(opacity: disabled ? .38 : 1, child: accessory),
+              if (progressLabel != null) ...[
+                SizedBox(height: sp.sm),
+                progressLabel!,
+              ],
             ],
           ],
         ),
       ),
     );
 
-    if (rowTap != null) {
-      row = PortalPressable(onTap: rowTap, child: row);
+    final rowLongPress = disabled ? null : onLongPress;
+    if (rowTap != null || rowLongPress != null) {
+      row = PortalPressable(
+        onTap: rowTap,
+        onLongPress: rowLongPress,
+        child: row,
+      );
     }
 
     return Semantics(
       container: true,
-      explicitChildNodes:
-          acc._kind == _Kind.iconButton || acc._kind == _Kind.button,
+      explicitChildNodes: acc._kind == _Kind.iconButton ||
+          acc._kind == _Kind.iconButtons ||
+          acc._kind == _Kind.button,
       button: rowTap != null && acc._kind == _Kind.navigate,
       checked: acc._kind == _Kind.checkbox || acc._kind == _Kind.radio
           ? acc.checked
@@ -562,8 +693,9 @@ class PortalListItem extends StatelessWidget {
       enabled: !disabled,
       label: labelParts.join(', '),
       onTap: rowTap,
-      excludeSemantics:
-          acc._kind != _Kind.iconButton && acc._kind != _Kind.button,
+      excludeSemantics: acc._kind != _Kind.iconButton &&
+          acc._kind != _Kind.iconButtons &&
+          acc._kind != _Kind.button,
       child: row,
     );
   }
