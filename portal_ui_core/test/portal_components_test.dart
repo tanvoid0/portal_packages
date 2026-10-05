@@ -485,4 +485,24 @@ void main() {
     )));
     expect(find.byType(CircleAvatar), findsOneWidget);
   });
+
+  testWidgets('PortalScrollPage hands its controller to the scroll view',
+      (t) async {
+    final c = ScrollController();
+    addTearDown(c.dispose);
+    await t.pumpWidget(MaterialApp(
+      theme: buildPortalTheme(brightness: Brightness.light),
+      home: PortalScrollPage(
+        title: 'Page',
+        controller: c,
+        children: [
+          for (var i = 0; i < 40; i++) SizedBox(height: 80, child: Text('r$i')),
+        ],
+      ),
+    ));
+    expect(c.hasClients, isTrue);
+    c.jumpTo(300);
+    await t.pump();
+    expect(c.offset, 300);
+  });
 }

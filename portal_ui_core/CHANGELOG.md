@@ -1,5 +1,7 @@
 ## Unreleased
 
+- `PortalScrollPage(controller:)`: a `ScrollController` for the page's scroll view; the caller disposes it. Default (none) unchanged.
+
 - `PortalFilterChip(onDeleted:, deleteTooltip:)`: a removable chip (input chip). A close glyph ends the chip; its hit area is `minTapTarget` square over the chip's end, even on a `compact` chip, and it announces as its own named button (`deleteTooltip` is required with `onDeleted`, asserted). The chip body keeps its own `onTap`. Not built: a separate `PortalInputChip` class.
 
 - `PortalListItem(struck: true, titleMaxLines: 1)`: `struck` draws the title with a line through it (a done task); `titleMaxLines` lets the title wrap before it ellipsizes. Defaults unchanged. Not built: a "done" semantic state (the label is unchanged; say it in `subtitle`).

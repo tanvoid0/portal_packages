@@ -28,6 +28,7 @@ class PortalScrollPage extends StatelessWidget {
     this.floatingActionButton,
     this.bottomNavigationBar,
     this.bottom,
+    this.controller,
   }) : assert(
           bottom == null || bottomNavigationBar == null,
           'a page has one bottom bar: pass bottom or bottomNavigationBar',
@@ -37,6 +38,10 @@ class PortalScrollPage extends StatelessWidget {
   /// draws its top rule only while content scrolls beneath it; this page
   /// tells it when.
   final Widget? bottom;
+
+  /// Drives the page's scroll view (jump to the new row, remember the
+  /// offset). The caller owns and disposes it.
+  final ScrollController? controller;
 
   /// Content slivers' children, laid out in a list under the app bar.
   final List<Widget> children;
@@ -89,6 +94,7 @@ class PortalScrollPage extends StatelessWidget {
               ));
 
     final scroll = CustomScrollView(
+      controller: controller,
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
       ),
