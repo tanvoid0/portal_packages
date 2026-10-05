@@ -34,6 +34,7 @@ class PortalPrompt extends StatefulWidget {
     this.size = PortalPromptSize.standard,
     this.icon,
     this.action,
+    this.secondaryAction,
     this.onDismiss,
     this.visible = true,
   })  : assert(
@@ -46,6 +47,11 @@ class PortalPrompt extends StatefulWidget {
               action == null ||
               onDismiss == null,
           'compact carries an action or a dismiss, never both',
+        ),
+        assert(
+          secondaryAction == null ||
+              (action != null && size == PortalPromptSize.standard),
+          'a secondary action needs an action and the standard size',
         );
 
   final String message;
@@ -58,6 +64,10 @@ class PortalPrompt extends StatefulWidget {
   /// Replaces the default glyph and keeps the disc.
   final IconData? icon;
   final PortalPromptAction? action;
+
+  /// A quieter second verb beside [action] ("Dismiss", "Not now"); standard
+  /// size only. The one-action default is unchanged.
+  final PortalPromptAction? secondaryAction;
 
   /// Shows the close button.
   final VoidCallback? onDismiss;
@@ -401,8 +411,33 @@ class _PromptBody extends StatelessWidget {
               if (p.action != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
-                  child: actionButton(
-                      height: 36, radius: tokens.radii.md, hPad: 16, size: 14),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      actionButton(
+                          height: 36,
+                          radius: tokens.radii.md,
+                          hPad: 16,
+                          size: 14),
+                      if (p.secondaryAction != null)
+                        TextButton(
+                          onPressed: p.secondaryAction!.onPressed,
+                          style: TextButton.styleFrom(
+                            foregroundColor: ink,
+                            minimumSize: const Size(0, 36),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            tapTargetSize: MaterialTapTargetSize.padded,
+                            shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.circular(tokens.radii.md)),
+                            textStyle: const TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w600),
+                          ),
+                          child: Text(p.secondaryAction!.label),
+                        ),
+                    ],
+                  ),
                 ),
             ],
           ),

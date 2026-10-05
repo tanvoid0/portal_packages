@@ -1,5 +1,7 @@
 ## Unreleased
 
+- `PortalListItem(dimmed: true)`: fades the whole row to 50% (archived, done, inactive) while it stays enabled and reads the same to a screen reader; no `disabledReason` needed. `PortalPrompt(secondaryAction:)`: a quieter second verb beside `action` (`({label, onPressed})`), standard size only (asserted: it needs an `action`); the one-action default is unchanged. Not built: a secondary action on compact / inline prompts (no room).
+
 - `PortalBadge(leading:)`: any widget glyph (a `FaIcon`, an SVG) in place of `icon`, tinted through `IconTheme` in the badge's ink. `outlined` (a hairline in the tone colour) already existed and is unchanged. `PortalFilterChipTheme(selectedColor:, onSelectedColor:, unselectedColor:, onUnselectedColor:, borderColor:, minHeight:)` re-skins every `PortalFilterChip` (widget argument beats theme beats default); `PortalFilterChip(compact: true)` paints 32 (or the theme's `minHeight`) and keeps the `minTapTarget` hit area in an outer box.
 
 - `PortalButton(backgroundColor:, foregroundColor:)` (widget beats the variant and theme) and `PortalButton.icon(icon:, tooltip:, onPressed:, variant: secondary, size:, ...)`: a circular icon-only button, 36 / 48 / 56 painted, `tooltip` required (it is the name), hit area `minTapTarget` around the paint. `PortalButtonDock.grid(flexes: [..], scrollable: true)`: per-action flex by index, and a single sideways-scrolling row of natural-width actions (`columns` / `flexes` ignored there). Supersedes the "per-action flex not built" note below.

@@ -328,6 +328,7 @@ class PortalListItem extends StatelessWidget {
     this.progressLabel,
     this.onLongPress,
     this.destructive = false,
+    this.dimmed = false,
   })  : _skeleton = false,
         _skeletonLeading = null;
 
@@ -352,6 +353,7 @@ class PortalListItem extends StatelessWidget {
         progressLabel = null,
         onLongPress = null,
         destructive = false,
+        dimmed = false,
         _skeleton = true,
         _skeletonLeading = leading;
 
@@ -392,6 +394,11 @@ class PortalListItem extends StatelessWidget {
 
   /// The title in the error colour, for a row that deletes or signs out.
   final bool destructive;
+
+  /// Fades the whole row to half (an archived, done or inactive row) without
+  /// disabling it or changing what a screen reader says. A row that cannot be
+  /// used is [disabledReason], not this.
+  final bool dimmed;
 
   final bool _skeleton;
   final PortalSkeletonLeading? _skeletonLeading;
@@ -718,6 +725,8 @@ class PortalListItem extends StatelessWidget {
         ),
       ),
     );
+
+    if (dimmed) row = Opacity(opacity: .5, child: row);
 
     final rowLongPress = disabled ? null : onLongPress;
     if (rowTap != null || rowLongPress != null) {
