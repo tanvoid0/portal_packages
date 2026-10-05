@@ -115,7 +115,10 @@ class _InputDialogState extends State<_InputDialog> {
               label: widget.label,
               hint: widget.hint,
               autofocus: true,
-              validator: widget.validator,
+              // The dialog returns the trimmed text, so that is what is checked.
+              validator: widget.validator == null
+                  ? null
+                  : (v) => widget.validator!(widget.trim ? v?.trim() : v),
               textCapitalization: widget.textCapitalization,
               keyboardType: widget.keyboardType,
               maxLines: widget.maxLines,
@@ -218,16 +221,19 @@ class PortalBlockingProgress extends StatelessWidget {
     String? message,
   }) async {
     final navigator = Navigator.of(context, rootNavigator: true);
-    showDialog<void>(
+    // Built by hand so the same route can be removed: a bare pop() would take
+    // whatever the task left on top.
+    final route = DialogRoute<void>(
       context: context,
       barrierDismissible: false,
-      useRootNavigator: true,
+      themes: InheritedTheme.capture(from: context, to: navigator.context),
       builder: (_) => PortalBlockingProgress(message: message),
     );
+    navigator.push(route);
     try {
       return await task();
     } finally {
-      navigator.pop();
+      if (route.isActive) navigator.removeRoute(route);
     }
   }
 

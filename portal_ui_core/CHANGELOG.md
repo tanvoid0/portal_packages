@@ -1,5 +1,7 @@
 ## Unreleased
 
+Fix: `portalInputDialog` validates the trimmed text it returns; `PortalBlockingProgress.run` removes its own route instead of popping whatever the task left on top.
+
 Fix: `PortalCalendar` day cells can be selected by a screen reader (the cell had a button role but no tap action); `PortalListItem` no longer reads the trailing text twice when only the leading is interactive, announces `disabledReason` as the row hint, and includes `meta` (and the `meta` accessory text) in the row label.
 
 Fix: `PortalFilterChip` compact hugs its label in a `Wrap` instead of filling the line, `compact` wins over a theme `minHeight`, and the delete target no longer covers the end of the label (the close glyph now owns a `minTapTarget`-wide box); `PortalButton` (and `PortalButton.icon`, so `PortalStepper(size: sm)`) hit area is `minTapTarget`, not the paint, and a null `onPressed` announces as a disabled button instead of plain content (`PortalPressable(button:)`).

@@ -112,4 +112,37 @@ void main() {
     expect(find.text('Saving'), findsNothing);
     expect(err, isA<StateError>());
   });
+
+  testWidgets('input dialog: the validator sees the trimmed text',
+      (t) async {
+    await host(t);
+    String? result = 'unset';
+    unawaited(portalInputDialog(
+      ctx,
+      title: 'Rename',
+      validator: (v) => v == 'x' ? null : 'Must be x',
+    ).then((v) => result = v));
+    await t.pumpAndSettle();
+    await t.enterText(find.byType(TextField), ' x ');
+    await t.tap(find.text('OK'));
+    await t.pumpAndSettle();
+    expect(result, 'x');
+  });
+
+  testWidgets('blocking progress closes its own route, not the top one',
+      (t) async {
+    await host(t);
+    final done = Completer<void>();
+    unawaited(PortalBlockingProgress.run(ctx, () async {
+      unawaited(Navigator.of(ctx).push(MaterialPageRoute<void>(
+        builder: (_) => const Scaffold(body: Text('on top')),
+      )));
+      await done.future;
+    }));
+    await t.pumpAndSettle();
+    done.complete();
+    await t.pumpAndSettle();
+    expect(find.text('on top'), findsOneWidget);
+    expect(find.byType(PortalBlockingProgress), findsNothing);
+  });
 }
