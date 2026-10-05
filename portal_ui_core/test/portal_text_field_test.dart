@@ -94,7 +94,7 @@ void main() {
       });
     }
 
-    walk(t.binding.rootPipelineOwner.semanticsOwner!.rootSemanticsNode!);
+    walk(t.binding.renderViews.first.owner!.semanticsOwner!.rootSemanticsNode!);
     expect(n, 1);
     h.dispose();
   });
