@@ -121,3 +121,113 @@ class PortalEmptyStateTheme extends ThemeExtension<PortalEmptyStateTheme> {
     );
   }
 }
+
+@immutable
+class PortalBadgeTheme extends ThemeExtension<PortalBadgeTheme> {
+  const PortalBadgeTheme({
+    this.padding,
+    this.textStyle,
+    this.tintAlpha,
+    this.borderRadius,
+  });
+
+  /// Defaults to `spacing.md` across, `spacing.xs` down.
+  final EdgeInsetsGeometry? padding;
+
+  /// Defaults to `textStyles.caption` at w600; colour is always the tone's.
+  final TextStyle? textStyle;
+
+  /// Opacity of the tone behind the label. Defaults to 0.14 light, 0.22 dark.
+  final double? tintAlpha;
+
+  /// Defaults to `radii.full`.
+  final BorderRadiusGeometry? borderRadius;
+
+  static PortalBadgeTheme of(BuildContext context) =>
+      Theme.of(context).extension<PortalBadgeTheme>() ??
+      const PortalBadgeTheme();
+
+  @override
+  PortalBadgeTheme copyWith({
+    EdgeInsetsGeometry? padding,
+    TextStyle? textStyle,
+    double? tintAlpha,
+    BorderRadiusGeometry? borderRadius,
+  }) =>
+      PortalBadgeTheme(
+        padding: padding ?? this.padding,
+        textStyle: textStyle ?? this.textStyle,
+        tintAlpha: tintAlpha ?? this.tintAlpha,
+        borderRadius: borderRadius ?? this.borderRadius,
+      );
+
+  @override
+  PortalBadgeTheme lerp(PortalBadgeTheme? other, double t) {
+    if (other == null) return this;
+    return PortalBadgeTheme(
+      padding: EdgeInsetsGeometry.lerp(padding, other.padding, t),
+      textStyle: TextStyle.lerp(textStyle, other.textStyle, t),
+      tintAlpha: lerpDouble(tintAlpha, other.tintAlpha, t),
+      borderRadius:
+          BorderRadiusGeometry.lerp(borderRadius, other.borderRadius, t),
+    );
+  }
+}
+
+@immutable
+class PortalProgressTheme extends ThemeExtension<PortalProgressTheme> {
+  const PortalProgressTheme({
+    this.height,
+    this.fillColor,
+    this.trackColor,
+    this.overflowColor,
+    this.doneColor,
+  });
+
+  /// Track thickness. Defaults to `spacing.sm`.
+  final double? height;
+
+  /// Defaults to the app's primary.
+  final Color? fillColor;
+
+  /// Defaults to `muted`.
+  final Color? trackColor;
+
+  /// Fill once a value passes 1. Defaults to `danger`.
+  final Color? overflowColor;
+
+  /// A completed step in `PortalStepProgress`. Defaults to `success`.
+  final Color? doneColor;
+
+  static PortalProgressTheme of(BuildContext context) =>
+      Theme.of(context).extension<PortalProgressTheme>() ??
+      const PortalProgressTheme();
+
+  @override
+  PortalProgressTheme copyWith({
+    double? height,
+    Color? fillColor,
+    Color? trackColor,
+    Color? overflowColor,
+    Color? doneColor,
+  }) =>
+      PortalProgressTheme(
+        height: height ?? this.height,
+        fillColor: fillColor ?? this.fillColor,
+        trackColor: trackColor ?? this.trackColor,
+        overflowColor: overflowColor ?? this.overflowColor,
+        doneColor: doneColor ?? this.doneColor,
+      );
+
+  @override
+  PortalProgressTheme lerp(PortalProgressTheme? other, double t) {
+    if (other == null) return this;
+    return PortalProgressTheme(
+      height: lerpDouble(height, other.height, t),
+      fillColor: Color.lerp(fillColor, other.fillColor, t),
+      trackColor: Color.lerp(trackColor, other.trackColor, t),
+      overflowColor: Color.lerp(overflowColor, other.overflowColor, t),
+      doneColor: Color.lerp(doneColor, other.doneColor, t),
+    );
+  }
+}
