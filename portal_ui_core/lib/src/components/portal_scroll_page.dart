@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/portal_ui_theme.dart';
 import 'portal_app_bar.dart';
+import 'portal_button_dock.dart';
 import 'portal_refresh.dart';
 
 /// Standard scrolling page: sliver app bar, gutter-aligned content, bottom
@@ -26,7 +27,16 @@ class PortalScrollPage extends StatelessWidget {
     this.backgroundColor,
     this.floatingActionButton,
     this.bottomNavigationBar,
-  });
+    this.bottom,
+  }) : assert(
+          bottom == null || bottomNavigationBar == null,
+          'a page has one bottom bar: pass bottom or bottomNavigationBar',
+        );
+
+  /// A [PortalButtonDock] (or any bar) pinned under the content. The dock
+  /// draws its top rule only while content scrolls beneath it; this page
+  /// tells it when.
+  final Widget? bottom;
 
   /// Content slivers' children, laid out in a list under the app bar.
   final List<Widget> children;
@@ -97,12 +107,12 @@ class PortalScrollPage extends StatelessWidget {
       ],
     );
 
-    return Scaffold(
+    Widget page(Widget Function(Widget) track) => Scaffold(
       backgroundColor: backgroundColor ?? portal.surface,
       floatingActionButton: floatingActionButton,
-      bottomNavigationBar: bottomNavigationBar,
+      bottomNavigationBar: bottom ?? bottomNavigationBar,
       body: onRefresh == null
-          ? scroll
+          ? track(scroll)
           : PortalRefresh(
               onRefresh: onRefresh!,
               // Under the bar, not over it. A custom [appBar] is assumed
@@ -111,8 +121,56 @@ class PortalScrollPage extends StatelessWidget {
                   ? 0
                   : PortalRefresh.belowBar(context,
                       large: appBar == null && header != null),
-              child: scroll,
+              child: track(scroll),
             ),
     );
+
+    return bottom == null
+        ? page((scroll) => scroll)
+        : _RuleHost(builder: page);
   }
+}
+
+/// Watches the page's scroll and tells a [PortalButtonDock] below it whether
+/// content still runs beneath.
+class _RuleHost extends StatefulWidget {
+  const _RuleHost({required this.builder});
+
+  final Widget Function(Widget Function(Widget scroll) track) builder;
+
+  @override
+  State<_RuleHost> createState() => _RuleHostState();
+}
+
+class _RuleHostState extends State<_RuleHost> {
+  bool _rule = false;
+
+  // ScrollMetricsNotification fires after layout, so a page that opens with
+  // more content than fits shows its rule before the first drag.
+  bool _onScroll(Notification n) {
+    final metrics = switch (n) {
+      ScrollNotification(depth: 0) => n.metrics,
+      ScrollMetricsNotification(depth: 0) => n.metrics,
+      _ => null,
+    };
+    if (metrics == null) return false;
+    final rule = metrics.extentAfter > 0;
+    if (rule != _rule) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _rule = rule);
+      });
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) => PortalDockRule(
+        showRule: _rule,
+        child: widget.builder(
+          (scroll) => NotificationListener<Notification>(
+            onNotification: _onScroll,
+            child: scroll,
+          ),
+        ),
+      );
 }
