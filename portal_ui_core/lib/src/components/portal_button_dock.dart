@@ -78,12 +78,13 @@ class PortalButtonDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final gap = PortalUiTheme.of(context).tokens.spacing.sm;
     final children = actions != null
-        ? _grid(actions!)
+        ? _grid(actions!, gap)
         : [
             primary!,
             if (secondary != null) ...[
-              const SizedBox(height: 8),
+              SizedBox(height: gap),
               secondary!,
             ],
           ];
@@ -123,14 +124,14 @@ class PortalButtonDock extends StatelessWidget {
     );
   }
 
-  List<Widget> _grid(List<Widget> items) {
+  List<Widget> _grid(List<Widget> items, double gap) {
     if (scrollable) {
       return [
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(children: [
             for (var j = 0; j < items.length; j++) ...[
-              if (j > 0) const SizedBox(width: 8),
+              if (j > 0) SizedBox(width: gap),
               items[j],
             ],
           ]),
@@ -140,11 +141,11 @@ class PortalButtonDock extends StatelessWidget {
     final per = (columns ?? math.min(items.length, 4)).clamp(1, 1 << 20);
     final rows = <Widget>[];
     for (var i = 0; i < items.length; i += per) {
-      if (rows.isNotEmpty) rows.add(const SizedBox(height: 8));
+      if (rows.isNotEmpty) rows.add(SizedBox(height: gap));
       final chunk = items.skip(i).take(per).toList();
       rows.add(Row(children: [
         for (var j = 0; j < per; j++) ...[
-          if (j > 0) const SizedBox(width: 8),
+          if (j > 0) SizedBox(width: gap),
           Expanded(
             flex: flexes != null && i + j < flexes!.length ? flexes![i + j] : 1,
             child: j < chunk.length ? chunk[j] : const SizedBox(),

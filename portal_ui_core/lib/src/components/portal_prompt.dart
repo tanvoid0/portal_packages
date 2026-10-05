@@ -425,14 +425,16 @@ class _PromptBody extends StatelessWidget {
                           onPressed: p.secondaryAction!.onPressed,
                           style: TextButton.styleFrom(
                             foregroundColor: ink,
-                            minimumSize: const Size(0, 36),
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            minimumSize: Size(0, tokens.minTapTarget),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: tokens.spacing.lg),
                             tapTargetSize: MaterialTapTargetSize.padded,
                             shape: RoundedRectangleBorder(
                                 borderRadius:
                                     BorderRadius.circular(tokens.radii.md)),
-                            textStyle: const TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w600),
+                            textStyle: TextStyle(
+                                fontSize: tokens.typeScale.md,
+                                fontWeight: FontWeight.w600),
                           ),
                           child: Text(p.secondaryAction!.label),
                         ),

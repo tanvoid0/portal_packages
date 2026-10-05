@@ -55,4 +55,24 @@ void main() {
       throwsAssertionError,
     );
   });
+
+  testWidgets('the secondary action takes its size from the tokens',
+      (t) async {
+    await t.pumpWidget(MaterialApp(
+      theme: buildPortalTheme(
+        brightness: Brightness.light,
+        tokens: const DesignTokens(minTapTarget: 56),
+      ),
+      home: Scaffold(
+        body: PortalPrompt(
+          title: 'Backup failed',
+          message: 'Check your connection.',
+          action: (label: 'Retry', onPressed: () {}),
+          secondaryAction: (label: 'Later', onPressed: () {}),
+        ),
+      ),
+    ));
+    await t.pumpAndSettle();
+    expect(t.getSize(find.byType(TextButton)).height, 56);
+  });
 }

@@ -1,5 +1,7 @@
 ## Unreleased
 
+Fix: `PortalButtonDock` gaps come from `tokens.spacing.sm`; the secondary action in `PortalPrompt` takes its height, padding and font size from `minTapTarget`, `spacing.lg` and `typeScale.md` instead of 36 / 16 / 14 (default tokens: 36 becomes 48 painted).
+
 Fix: `PortalStepProgress` announces a done step (`doneLabel`, default `done`) and draws done, current and upcoming bars at three heights; `PortalAppFeedback.messageFrom` shows a `String` error as it is and the fallback for any other (no raw `Exception.toString()`), and a resolver that throws falls back; the per-component theme extensions snap at the midpoint when one side leaves a colour or size unset, instead of blending it to transparent or zero.
 
 Fix: `portalInputDialog` validates the trimmed text it returns; `PortalBlockingProgress.run` removes its own route instead of popping whatever the task left on top.

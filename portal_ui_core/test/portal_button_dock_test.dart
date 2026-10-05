@@ -103,4 +103,25 @@ void main() {
         of: find.byType(PortalButtonDock),
         matching: find.byType(DecoratedBox)), findsNothing);
   });
+
+  testWidgets('dock gaps come from the spacing token', (t) async {
+    await t.pumpWidget(MaterialApp(
+      theme: buildPortalTheme(
+        brightness: Brightness.light,
+        tokens: const DesignTokens(spacing: PortalSpacing(sm: 20)),
+      ),
+      home: Scaffold(
+        body: PortalButtonDock.grid(
+          inline: true,
+          actions: [
+            PortalButton(label: 'A', expand: true, onPressed: () {}),
+            PortalButton(label: 'B', expand: true, onPressed: () {}),
+          ],
+        ),
+      ),
+    ));
+    final a = t.getRect(find.widgetWithText(PortalButton, 'A'));
+    final b = t.getRect(find.widgetWithText(PortalButton, 'B'));
+    expect(b.left - a.right, 20);
+  });
 }
