@@ -2,6 +2,7 @@ library portal_ui_core;
 
 export 'src/theme/portal_app_theme.dart';
 export 'src/theme/portal_color_palettes.dart';
+export 'src/theme/portal_component_extensions.dart';
 export 'src/theme/portal_component_themes.dart';
 export 'src/theme/portal_default_color_schemes.dart';
 export 'src/theme/portal_layout_insets.dart';

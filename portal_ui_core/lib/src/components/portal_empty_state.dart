@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/portal_component_extensions.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_button.dart';
 import 'portal_card.dart';
@@ -62,27 +63,28 @@ class PortalEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
+    final skin = PortalEmptyStateTheme.of(context);
+    final well = iconWellColor ?? skin.iconWellColor;
+    final iconColor = skin.iconColor ?? portal.onSurfaceVariant;
+    final iconSize = skin.iconSize ?? tokens.spacing.xxl;
 
     final content = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (iconWellColor == null)
-          Icon(icon, size: tokens.spacing.xxl, color: portal.onSurfaceVariant)
+        if (well == null)
+          Icon(icon, size: iconSize, color: iconColor)
         else
           CircleAvatar(
-            radius: tokens.spacing.xxl * 1.5,
-            backgroundColor: iconWellColor,
-            child: Icon(
-              icon,
-              size: tokens.spacing.xxl,
-              color: portal.onSurfaceVariant,
-            ),
+            radius: iconSize * 1.5,
+            backgroundColor: well,
+            child: Icon(icon, size: iconSize, color: iconColor),
           ),
         SizedBox(height: tokens.spacing.md),
         Text(
           title,
           textAlign: TextAlign.center,
-          style: tokens.textStyles.subtitle.copyWith(color: portal.onSurface),
+          style: tokens.textStyles.subtitle
+              .copyWith(color: skin.titleColor ?? portal.onSurface),
         ),
         if (message != null) ...[
           SizedBox(height: tokens.spacing.xs),
@@ -93,7 +95,7 @@ class PortalEmptyState extends StatelessWidget {
             // glass card lands wherever the backdrop does and stops clearing
             // 4.5:1.
             style: tokens.textStyles.caption
-                .copyWith(color: portal.onSurfaceVariant),
+                .copyWith(color: skin.messageColor ?? portal.onSurfaceVariant),
           ),
         ],
         if (example != null) ...[

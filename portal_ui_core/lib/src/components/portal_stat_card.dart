@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/portal_component_extensions.dart';
 import '../theme/portal_semantic_colors.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_card.dart';
@@ -49,11 +50,12 @@ class PortalStatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
-    final tint = accentColor ?? portal.primary;
+    final skin = PortalStatCardTheme.of(context);
+    final tint = accentColor ?? skin.accentColor ?? portal.primary;
 
     return PortalCard(
       onTap: onTap,
-      padding: EdgeInsets.all(tokens.spacing.md),
+      padding: skin.padding ?? EdgeInsets.all(tokens.spacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -62,7 +64,7 @@ class PortalStatCard extends StatelessWidget {
             Container(
               padding: EdgeInsets.all(tokens.spacing.sm),
               decoration: BoxDecoration(
-                color: tint.withValues(alpha: 0.18),
+                color: tint.withValues(alpha: skin.wellAlpha ?? 0.18),
                 borderRadius: BorderRadius.circular(tokens.radii.sm),
               ),
               child: Icon(icon, size: tokens.typeScale.lg, color: tint),
@@ -73,13 +75,13 @@ class PortalStatCard extends StatelessWidget {
             value,
             style: tokens.textStyles
                 .numeric(hero ? tokens.textStyles.hero : tokens.textStyles.title)
-                .copyWith(color: portal.onSurface),
+                .copyWith(color: skin.valueColor ?? portal.onSurface),
           ),
           SizedBox(height: tokens.spacing.xs),
           Text(
             label,
             style: tokens.textStyles.overline
-                .copyWith(color: portal.onSurfaceVariant),
+                .copyWith(color: skin.labelColor ?? portal.onSurfaceVariant),
           ),
           if (delta != null) ...[
             SizedBox(height: tokens.spacing.xs),
