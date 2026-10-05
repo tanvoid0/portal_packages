@@ -5,9 +5,9 @@ import 'package:portal_ui_core/portal_ui_core.dart';
 void main() {
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120">'
       '<rect fill="{{primary}}" stroke="{{surface}}" width="40" height="40"/>'
-      '<circle fill="#6FAE7D" r="5"/></svg>';
+      '<circle fill="{{secondary}}" r="5"/></svg>';
 
-  testWidgets('roles resolve from the theme, literals stay', (t) async {
+  testWidgets('every role resolves from the theme', (t) async {
     late String out;
     await t.pumpWidget(MaterialApp(
       theme: buildPortalTheme(brightness: Brightness.light),
@@ -17,7 +17,6 @@ void main() {
       }),
     ));
     expect(out, isNot(contains('{{')));
-    expect(out, contains('#6FAE7D'));
   });
 
   testWidgets('an unknown role fails loudly, not as a black shape', (t) async {
@@ -39,5 +38,26 @@ void main() {
       home: const PortalArt(svg, semanticLabel: 'Empty wardrobe'),
     ));
     expect(find.bySemanticsLabel('Empty wardrobe'), findsOneWidget);
+  });
+
+  testWidgets('a different seed changes the resolved art', (t) async {
+    Future<String> resolveWith(Color seed) async {
+      late String out;
+      await t.pumpWidget(MaterialApp(
+        theme: buildPortalTheme(
+          brightness: Brightness.light,
+          colorScheme: ColorScheme.fromSeed(seedColor: seed),
+        ),
+        home: Builder(builder: (c) {
+          out = PortalArt.resolve(c, svg);
+          return const SizedBox();
+        }),
+      ));
+      // MaterialApp animates a theme change; read the settled frame.
+      await t.pumpAndSettle();
+      return out;
+    }
+
+    expect(await resolveWith(Colors.red), isNot(await resolveWith(Colors.green)));
   });
 }

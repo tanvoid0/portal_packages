@@ -9,9 +9,10 @@ import '../theme/portal_ui_theme.dart';
 /// `scripts/export-art.py` from the kit viewer; pass the result to the art
 /// slot of `PortalEmptyState` or `PortalResultScreen`.
 ///
-/// Roles: primary, primaryContainer, surfaceContainerHigh, outlineVariant,
+/// Roles: primary, primaryContainer, secondary, surfaceContainerHigh, outlineVariant,
 /// card, onPrimary, surface, error, onError, onSurface, tertiary, outline,
-/// onSurfaceVariant. Anything else in the markup is a literal colour.
+/// onSurfaceVariant. Keep literals out of the drawing: they do not follow a
+/// changed primary.
 class PortalArt extends StatelessWidget {
   const PortalArt(
     this.svg, {
@@ -37,6 +38,7 @@ class PortalArt extends StatelessWidget {
     final colors = <String, Color>{
       'primary': cs.primary,
       'primaryContainer': cs.primaryContainer,
+      'secondary': cs.secondary,
       'surfaceContainerHigh': cs.surfaceContainerHigh,
       'outlineVariant': cs.outlineVariant,
       'card': PortalUiTheme.of(context).card,
