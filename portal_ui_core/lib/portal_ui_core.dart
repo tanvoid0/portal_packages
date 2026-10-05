@@ -58,6 +58,7 @@ export 'src/components/portal_pressable.dart';
 export 'src/components/portal_prompt.dart';
 export 'src/components/portal_prompt_card.dart';
 export 'src/components/portal_refresh.dart';
+export 'src/components/portal_result_screen.dart';
 export 'src/components/portal_scroll_page.dart';
 export 'src/components/portal_search_field.dart';
 export 'src/components/portal_section_header.dart';
