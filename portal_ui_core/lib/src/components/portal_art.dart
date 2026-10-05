@@ -11,7 +11,8 @@ import '../theme/portal_ui_theme.dart';
 ///
 /// Roles: primary, primaryContainer, secondary, surfaceContainerHigh, outlineVariant,
 /// card, onPrimary, surface, error, onError, onSurface, tertiary, outline,
-/// onSurfaceVariant. Keep literals out of the drawing: they do not follow a
+/// onSurfaceVariant, and artInk / artMuted / artOutline (the neutrals, 30%
+/// toward the primary). Keep literals out of the drawing: they do not follow a
 /// changed primary.
 class PortalArt extends StatelessWidget {
   const PortalArt(
@@ -47,6 +48,11 @@ class PortalArt extends StatelessWidget {
       'error': cs.error,
       'onError': cs.onError,
       'onSurface': cs.onSurface,
+      // The drawing's neutrals lean toward the primary, so a new seed tints
+      // the ink and the greys too instead of leaving them a fixed grey.
+      'artInk': Color.lerp(cs.onSurface, cs.primary, .3)!,
+      'artMuted': Color.lerp(cs.onSurfaceVariant, cs.primary, .3)!,
+      'artOutline': Color.lerp(cs.outline, cs.primary, .3)!,
       'tertiary': cs.tertiary,
       'outline': cs.outline,
       'onSurfaceVariant': cs.onSurfaceVariant,
