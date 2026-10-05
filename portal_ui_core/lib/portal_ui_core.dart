@@ -54,6 +54,7 @@ export 'src/components/portal_card.dart';
 export 'src/components/portal_chat_bubble.dart';
 export 'src/components/portal_composer.dart';
 export 'src/components/portal_confirm_dialog.dart';
+export 'src/components/portal_dialogs.dart';
 export 'src/components/portal_empty_state.dart';
 export 'src/components/portal_fab.dart';
 export 'src/components/portal_filter_chip.dart';

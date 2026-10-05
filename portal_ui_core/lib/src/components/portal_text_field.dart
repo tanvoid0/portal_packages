@@ -46,6 +46,7 @@ class PortalTextField extends StatefulWidget {
     this.prefixText,
     this.suffix,
     this.autofillHints,
+    this.textCapitalization = TextCapitalization.none,
   }) : _selectAllOnFocus = false;
 
   /// A money input. [currencySymbol] is drawn by the field so it is never
@@ -82,6 +83,7 @@ class PortalTextField extends StatefulWidget {
         prefix = null,
         prefixText = currencySymbol,
         autofillHints = null,
+        textCapitalization = TextCapitalization.none,
         _selectAllOnFocus = true;
 
   final TextEditingController? controller;
@@ -112,6 +114,9 @@ class PortalTextField extends StatefulWidget {
   final String? prefixText;
   final Widget? suffix;
   final Iterable<String>? autofillHints;
+
+  /// `words` for a name, `sentences` for prose; the amount form has none.
+  final TextCapitalization textCapitalization;
   final bool _selectAllOnFocus;
 
   static final _amountFormatters = <TextInputFormatter>[
@@ -238,6 +243,7 @@ class _PortalTextFieldState extends State<PortalTextField> {
         enabled: widget.enabled,
         autofocus: widget.autofocus,
         autofillHints: widget.autofillHints,
+        textCapitalization: widget.textCapitalization,
         style: tokens.textStyles.body,
         cursorColor: portal.primary,
         decoration: decoration,
