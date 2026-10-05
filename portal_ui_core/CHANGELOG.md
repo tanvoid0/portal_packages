@@ -1,5 +1,7 @@
 ## Unreleased
 
+- `PortalQuickAction(icon:, label:, onTap:, tone:, backgroundColor:, foregroundColor:, tooltip:)` / `.builder((context, color) => Widget, ...)`: a dashboard tile, glyph over a label on a tonal fill (`PortalListTone`), fills the width it is given, at least `minTapTarget` tall. The label is the accessible name; `tooltip` adds a tooltip (and replaces it for a screen reader) where the label is ambiguous. Not built: a badge or count on the tile.
+
 - `PortalListItem(dimmed: true)`: fades the whole row to 50% (archived, done, inactive) while it stays enabled and reads the same to a screen reader; no `disabledReason` needed. `PortalPrompt(secondaryAction:)`: a quieter second verb beside `action` (`({label, onPressed})`), standard size only (asserted: it needs an `action`); the one-action default is unchanged. Not built: a secondary action on compact / inline prompts (no room).
 
 - `PortalBadge(leading:)`: any widget glyph (a `FaIcon`, an SVG) in place of `icon`, tinted through `IconTheme` in the badge's ink. `outlined` (a hairline in the tone colour) already existed and is unchanged. `PortalFilterChipTheme(selectedColor:, onSelectedColor:, unselectedColor:, onUnselectedColor:, borderColor:, minHeight:)` re-skins every `PortalFilterChip` (widget argument beats theme beats default); `PortalFilterChip(compact: true)` paints 32 (or the theme's `minHeight`) and keeps the `minTapTarget` hit area in an outer box.
