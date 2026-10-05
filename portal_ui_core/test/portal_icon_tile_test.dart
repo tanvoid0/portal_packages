@@ -48,4 +48,26 @@ void main() {
     expect(find.bySemanticsLabel(RegExp('.+')), findsNothing);
     h.dispose();
   });
+
+  testWidgets('circle shape, also through PortalListLeading.tile', (t) async {
+    BoxDecoration deco() =>
+        t.widget<Container>(find.byType(Container).first).decoration!
+            as BoxDecoration;
+    await t.pumpWidget(host(const PortalIconTile(Icons.home)));
+    expect(deco().shape, BoxShape.rectangle);
+    expect(deco().borderRadius, isNotNull);
+
+    await t.pumpWidget(host(const PortalIconTile(Icons.home,
+        shape: PortalIconTileShape.circle)));
+    expect(deco().shape, BoxShape.circle);
+    expect(deco().borderRadius, isNull);
+
+    await t.pumpWidget(host(PortalListItem(
+      title: 'Row',
+      leading: PortalListLeading.tile(Icons.home,
+          shape: PortalIconTileShape.circle),
+    )));
+    final tile = t.widget<PortalIconTile>(find.byType(PortalIconTile));
+    expect(tile.shape, PortalIconTileShape.circle);
+  });
 }

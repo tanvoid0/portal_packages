@@ -7,8 +7,11 @@ import '../theme/portal_ui_theme.dart';
 /// secondary chip.
 enum PortalListTone { primary, tertiary, error }
 
+/// Outline of a [PortalIconTile].
+enum PortalIconTileShape { roundedSquare, circle }
+
 /// The tonal tile of `PortalListLeading.tile`, usable anywhere (a card header,
-/// a dashboard cell, a sheet row): a rounded square holding a glyph.
+/// a dashboard cell, a sheet row): a rounded square (or circle) holding a glyph.
 ///
 /// Decorative unless [semanticLabel] is set. [PortalIconTile.builder] takes any
 /// glyph (a `FaIcon`, an SVG) and hands it the ink to paint with.
@@ -18,6 +21,7 @@ class PortalIconTile extends StatelessWidget {
     super.key,
     this.tone = PortalListTone.primary,
     this.size = 40,
+    this.shape = PortalIconTileShape.roundedSquare,
     this.backgroundColor,
     this.foregroundColor,
     this.semanticLabel,
@@ -29,6 +33,7 @@ class PortalIconTile extends StatelessWidget {
     super.key,
     this.tone = PortalListTone.primary,
     this.size = 40,
+    this.shape = PortalIconTileShape.roundedSquare,
     this.backgroundColor,
     this.foregroundColor,
     this.semanticLabel,
@@ -38,6 +43,9 @@ class PortalIconTile extends StatelessWidget {
   final IconData? _icon;
   final Widget Function(BuildContext, Color)? _builder;
   final PortalListTone tone;
+
+  /// `roundedSquare` (default, `radii.sm`) or a `circle`.
+  final PortalIconTileShape shape;
 
   /// The painted square; the glyph is 60% of it (24 at the default 40).
   final double size;
@@ -64,8 +72,12 @@ class PortalIconTile extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: backgroundColor ?? bg,
-        borderRadius:
-            BorderRadius.circular(PortalUiTheme.of(context).tokens.radii.sm),
+        shape: shape == PortalIconTileShape.circle
+            ? BoxShape.circle
+            : BoxShape.rectangle,
+        borderRadius: shape == PortalIconTileShape.circle
+            ? null
+            : BorderRadius.circular(PortalUiTheme.of(context).tokens.radii.sm),
       ),
       child: _builder != null
           ? _builder(context, ink)

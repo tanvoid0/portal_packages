@@ -41,16 +41,19 @@ class PortalListLeading {
       );
 
   /// A 40 dp tonal tile holding an icon. [backgroundColor] and
-  /// [foregroundColor] replace the [tone]'s pair.
+  /// [foregroundColor] replace the [tone]'s pair; [shape] is a rounded square
+  /// or a circle.
   factory PortalListLeading.tile(
     IconData icon, {
     PortalListTone tone = PortalListTone.primary,
     Color? backgroundColor,
     Color? foregroundColor,
+    PortalIconTileShape shape = PortalIconTileShape.roundedSquare,
   }) =>
       PortalListLeading.tileBuilder(
         (c, color) => Icon(icon, size: 24, color: color),
         tone: tone,
+        shape: shape,
         backgroundColor: backgroundColor,
         foregroundColor: foregroundColor,
       );
@@ -62,12 +65,14 @@ class PortalListLeading {
     PortalListTone tone = PortalListTone.primary,
     Color? backgroundColor,
     Color? foregroundColor,
+    PortalIconTileShape shape = PortalIconTileShape.roundedSquare,
   }) =>
       PortalListLeading._(
         40,
         (c) => PortalIconTile.builder(
           iconBuilder,
           tone: tone,
+          shape: shape,
           backgroundColor: backgroundColor,
           foregroundColor: foregroundColor,
         ),
