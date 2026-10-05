@@ -1,5 +1,7 @@
 ## Unreleased
 
+- `PortalDateStyle.dayMonthUnpadded` (`5 Sep`), `.dayMonthYearUnpadded` (`5 Sep 2026`), `.monthDay` (`Oct 5`), `.weekdayMonthDay` (`Monday, Oct 5`) and `PortalDurationStyle.hoursMinutes` (`1h 30m`, `2h 0m`, `45m`), `.minutesSeconds` (`5m 0s`, `90m 20s`), `.minutesSpelled` (`45 min`, `90 min`): for the local date and duration helpers apps still keep. Defaults (`dd MMM`, spelled) unchanged. Month and weekday names follow the locale. Not built: a custom pattern string.
+
 - `PortalStepper(value:, onChanged:, min: 0, max: 999, step: 1, label:, unit:, valueStyle:, decreaseTooltip:, increaseTooltip:, size:, variant: ghost, foregroundColor:)`: `-  2 pcs  +` for a quantity or limit. Two `PortalButton.icon`s (hit area at least `minTapTarget`), a bound reached disables its button, the result is clamped, the text is a live region. Read from lifestyle's `_quantity` (`label: '2/4'`, `unit`), shopping's `QuantityCounter` (`valueStyle`, `foregroundColor`; the well and rule around it stay the app's) and task's energy limit (two `PortalButton.icon`s at `size: sm`; its icon and number beside them are a `Row` around the stepper). Not built: press-and-hold repeat, a typed-in number, a `double` value. The tooltips default to English `Decrease` / `Increase`; pass them localised.
 
 - `PortalSegmentedTabs(scrollable: true)`: more than four segments, each at its label's width in a row that scrolls sideways (the default is still equal shares, unchanged). Not built: auto-switching on overflow (a caller knows its label count).

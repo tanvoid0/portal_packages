@@ -13,7 +13,19 @@ enum PortalDateStyle {
   numeric('dd/MM/yyyy'),
 
   /// `05/09`.
-  numericDayMonth('dd/MM');
+  numericDayMonth('dd/MM'),
+
+  /// `5 Sep`: the day unpadded.
+  dayMonthUnpadded('d MMM'),
+
+  /// `5 Sep 2026`.
+  dayMonthYearUnpadded('d MMM yyyy'),
+
+  /// `Oct 5`: month first, the order en-US reads.
+  monthDay('MMM d'),
+
+  /// `Monday, Oct 5`.
+  weekdayMonthDay('EEEE, MMM d');
 
   const PortalDateStyle(this.pattern);
   final String pattern;
@@ -26,6 +38,16 @@ enum PortalDurationStyle {
 
   /// `1h 5m`, `1m 52s`, `42s`: for a dense value column.
   compact,
+
+  /// `1h 30m`, `2h 0m`, `45m`: hours and minutes, the minutes always shown
+  /// once there are hours. Seconds are dropped.
+  hoursMinutes,
+
+  /// `5m 0s`, `75m 30s`: total minutes and the seconds, both always shown.
+  minutesSeconds,
+
+  /// `45 min`, `90 min`: total minutes, spelled, seconds dropped.
+  minutesSpelled,
 }
 
 /// The one set of rules for money, numbers, dates and time (G2).
@@ -147,6 +169,16 @@ class PortalFormat {
   String duration(Duration d,
       {PortalDurationStyle style = PortalDurationStyle.spelled}) {
     final h = d.inHours, m = d.inMinutes % 60, s = d.inSeconds % 60;
+    switch (style) {
+      case PortalDurationStyle.hoursMinutes:
+        return h > 0 ? '${h}h ${m}m' : '${m}m';
+      case PortalDurationStyle.minutesSeconds:
+        return '${d.inMinutes}m ${s}s';
+      case PortalDurationStyle.minutesSpelled:
+        return '${d.inMinutes} min';
+      case PortalDurationStyle.spelled || PortalDurationStyle.compact:
+        break;
+    }
     if (style == PortalDurationStyle.compact) {
       if (h > 0) return m == 0 ? '${h}h' : '${h}h ${m}m';
       if (d.inMinutes > 0) return s == 0 ? '${m}m' : '${m}m ${s}s';

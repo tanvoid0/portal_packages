@@ -110,4 +110,31 @@ void main() {
             style: PortalDurationStyle.compact),
         '2m');
   });
+
+  test('dateAs: unpadded, month-first and weekday shapes', () {
+    final us = PortalFormat('en_US');
+    final d = DateTime(2026, 10, 5);
+    expect(us.dateAs(d, PortalDateStyle.dayMonthUnpadded), '5 Oct');
+    expect(us.dateAs(d, PortalDateStyle.dayMonthYearUnpadded), '5 Oct 2026');
+    expect(us.dateAs(d, PortalDateStyle.monthDay), 'Oct 5');
+    expect(us.dateAs(d, PortalDateStyle.weekdayMonthDay), 'Monday, Oct 5');
+    expect(us.dateAs(d, PortalDateStyle.dayMonth), '05 Oct');
+  });
+
+  test('duration: hoursMinutes, minutesSeconds, minutesSpelled', () {
+    String of(Duration d, PortalDurationStyle s) => f.duration(d, style: s);
+    const ninety = Duration(minutes: 90, seconds: 20);
+    expect(of(ninety, PortalDurationStyle.hoursMinutes), '1h 30m');
+    expect(of(const Duration(hours: 2), PortalDurationStyle.hoursMinutes),
+        '2h 0m');
+    expect(of(const Duration(minutes: 45), PortalDurationStyle.hoursMinutes),
+        '45m');
+    expect(of(const Duration(minutes: 5), PortalDurationStyle.minutesSeconds),
+        '5m 0s');
+    expect(of(ninety, PortalDurationStyle.minutesSeconds), '90m 20s');
+    expect(of(const Duration(minutes: 45), PortalDurationStyle.minutesSpelled),
+        '45 min');
+    expect(of(ninety, PortalDurationStyle.minutesSpelled), '90 min');
+    expect(f.duration(const Duration(minutes: 1, seconds: 5)), '1 min 5 s');
+  });
 }
