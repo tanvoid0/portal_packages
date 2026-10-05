@@ -1,5 +1,7 @@
 ## Unreleased
 
+- `PortalButtonDock(inline: true)` (also on `.grid`): the same actions with no surface, no rule and no padding, for a dock inside a scroll body; the body's padding places it. Default unchanged.
+
 - `PortalButton.icon(icon:, iconWidget:, selected:)`: `iconWidget` takes any glyph (a `FaIcon`, an SVG; exactly one of `icon` / `iconWidget`), and `selected` (bool?, null = plain button) makes it a toggle: filled glyph (IconData form), `primaryContainer` tint (explicit colours still win) and a selected semantic state. `tooltip` stays required. Not built: a separate unselected / selected glyph pair (pass the right `iconWidget` per state).
 
 - `PortalIconTile(shape: PortalIconTileShape.roundedSquare | circle)` (default unchanged), passed through `PortalListLeading.tile(shape:)` and `.tileBuilder(shape:)`.

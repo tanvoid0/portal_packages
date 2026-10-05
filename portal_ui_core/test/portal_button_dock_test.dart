@@ -75,4 +75,32 @@ void main() {
     expect(t.getRect(find.widgetWithText(PortalButton, 'A')).top,
         t.getRect(find.widgetWithText(PortalButton, 'D')).top);
   });
+
+  testWidgets('inline: no surface and no bottom padding', (t) async {
+    Widget host(bool inline) => MaterialApp(
+          theme: buildPortalTheme(brightness: Brightness.light),
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.topCenter,
+              child: PortalButtonDock(
+                inline: inline,
+                primary: PortalButton(label: 'Go', onPressed: () {}),
+              ),
+            ),
+          ),
+        );
+    await t.pumpWidget(host(false));
+    final pinned = t.getSize(find.byType(PortalButtonDock)).height;
+    expect(find.descendant(
+        of: find.byType(PortalButtonDock),
+        matching: find.byType(DecoratedBox)), findsOneWidget);
+
+    await t.pumpWidget(host(true));
+    final inline = t.getSize(find.byType(PortalButtonDock)).height;
+    expect(inline, t.getSize(find.byType(PortalButton)).height);
+    expect(inline, lessThan(pinned - 40));
+    expect(find.descendant(
+        of: find.byType(PortalButtonDock),
+        matching: find.byType(DecoratedBox)), findsNothing);
+  });
 }

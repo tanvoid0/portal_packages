@@ -32,6 +32,7 @@ class PortalButtonDock extends StatelessWidget {
     required this.primary,
     this.secondary,
     this.showRule,
+    this.inline = false,
   })  : actions = null,
         flexes = null,
         scrollable = false,
@@ -47,10 +48,16 @@ class PortalButtonDock extends StatelessWidget {
     this.showRule,
     this.flexes,
     this.scrollable = false,
+    this.inline = false,
   })  : primary = null,
         secondary = null;
 
   final Widget? primary;
+
+  /// For a dock that sits inside a scroll body: no surface, no rule, no
+  /// padding (the 12 16 32 above is for a pinned dock), so the body's own
+  /// padding places it. [showRule] is ignored.
+  final bool inline;
 
   /// Under the primary; a ghost or tonal `PortalButton`, 48 painted.
   final Widget? secondary;
@@ -71,6 +78,22 @@ class PortalButtonDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final children = actions != null
+        ? _grid(actions!)
+        : [
+            primary!,
+            if (secondary != null) ...[
+              const SizedBox(height: 8),
+              secondary!,
+            ],
+          ];
+    if (inline) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      );
+    }
     final portal = PortalUiTheme.of(context);
     final cs = Theme.of(context).colorScheme;
     final mq = MediaQuery.of(context);
@@ -94,15 +117,7 @@ class PortalButtonDock extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: actions != null
-              ? _grid(actions!)
-              : [
-                  primary!,
-                  if (secondary != null) ...[
-                    const SizedBox(height: 8),
-                    secondary!,
-                  ],
-                ],
+          children: children,
         ),
       ),
     );
