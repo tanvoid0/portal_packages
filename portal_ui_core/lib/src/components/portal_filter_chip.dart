@@ -25,7 +25,10 @@ class PortalFilterChip extends StatelessWidget {
     this.onUnselectedColor,
     this.borderColor,
     this.compact = false,
-  });
+    this.onDeleted,
+    this.deleteTooltip,
+  }) : assert(onDeleted == null || deleteTooltip != null,
+            'a delete control needs deleteTooltip: it is its only name');
 
   final String label;
   final bool selected;
@@ -61,6 +64,15 @@ class PortalFilterChip extends StatelessWidget {
   /// with [PortalFilterChipTheme].
   final bool compact;
 
+  /// Adds a trailing close glyph that calls this (an input chip: a tag, a
+  /// filter you can remove). The glyph's own hit area is `minTapTarget` wide
+  /// and tall, over the chip's end, whatever the painted height.
+  final VoidCallback? onDeleted;
+
+  /// Names the delete control, written from what it does ("Remove vegan").
+  /// Required with [onDeleted].
+  final String? deleteTooltip;
+
   @override
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
@@ -84,7 +96,8 @@ class PortalFilterChip extends StatelessWidget {
     // Selection has to reach a screen reader too: the pressable announces
     // the button, but the state the fill and border carry visually would
     // otherwise be invisible to TalkBack.
-    return Semantics(
+    final chip = Semantics(
+      container: onDeleted != null,
       selected: selected,
       child: PortalPressable(
         onTap: onTap,
@@ -98,7 +111,10 @@ class PortalFilterChip extends StatelessWidget {
             duration: duration,
             curve: tokens.motion.standard,
             constraints: BoxConstraints(minHeight: painted),
-            padding: EdgeInsets.symmetric(horizontal: tokens.spacing.md),
+            padding: EdgeInsetsDirectional.only(
+              start: tokens.spacing.md,
+              end: onDeleted == null ? tokens.spacing.md : tokens.spacing.sm,
+            ),
             decoration: BoxDecoration(
               color: fill,
               borderRadius: radius,
@@ -133,11 +149,43 @@ class PortalFilterChip extends StatelessWidget {
                   label,
                   style: tokens.textStyles.caption.copyWith(color: ink),
                 ),
+                if (onDeleted != null) ...[
+                  SizedBox(width: tokens.spacing.xs),
+                  Icon(Icons.close, size: tokens.typeScale.md, color: ink),
+                ],
               ],
             ),
           ),
         ),
       ),
+    );
+    if (onDeleted == null) return chip;
+
+    // The close glyph is painted by the chip; the target is laid over its end
+    // as a sibling, so the two buttons announce separately.
+    final tap = tokens.minTapTarget;
+    return Stack(
+      children: [
+        chip,
+        PositionedDirectional(
+          end: 0,
+          top: 0,
+          bottom: 0,
+          width: tap,
+          child: Semantics(
+            container: true,
+            child: Tooltip(
+              message: deleteTooltip!,
+              child: PortalPressable(
+                onTap: onDeleted,
+                haptic: PortalHapticKind.selection,
+                borderRadius: radius,
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

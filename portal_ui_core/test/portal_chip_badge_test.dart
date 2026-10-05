@@ -78,4 +78,35 @@ void main() {
     ));
     expect(t.getSize(find.byType(AnimatedContainer)).height, 36);
   });
+
+  testWidgets('onDeleted adds a named delete target apart from the chip',
+      (t) async {
+    final h = t.ensureSemantics();
+    var taps = 0, deletes = 0;
+    await t.pumpWidget(host(PortalFilterChip(
+      label: 'Vegan',
+      selected: true,
+      compact: true,
+      onTap: () => taps++,
+      onDeleted: () => deletes++,
+      deleteTooltip: 'Remove vegan',
+    )));
+    expect(find.byTooltip('Remove vegan'), findsOneWidget);
+    final del = t.getRect(find.byTooltip('Remove vegan'));
+    expect(del.width, greaterThanOrEqualTo(44));
+    expect(del.height, greaterThanOrEqualTo(44));
+
+    // Above the 32 dp paint, inside the 44+ target, at the close glyph.
+    await t.tapAt(Offset(del.center.dx, del.top + 3));
+    expect(deletes, 1);
+    expect(taps, 0);
+
+    await t.tap(find.text('Vegan'));
+    expect(taps, 1);
+    expect(deletes, 1);
+    expect(t.getSemantics(find.byTooltip('Remove vegan')),
+        isSemantics(
+            tooltip: 'Remove vegan', isButton: true, hasTapAction: true));
+    h.dispose();
+  });
 }
