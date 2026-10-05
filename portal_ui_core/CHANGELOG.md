@@ -1,6 +1,8 @@
 ## Unreleased
 
-- `PortalQuickAction(icon:, label:, onTap:, tone:, backgroundColor:, foregroundColor:, tooltip:)` / `.builder((context, color) => Widget, ...)`: a dashboard tile, glyph over a label on a tonal fill (`PortalListTone`), fills the width it is given, at least `minTapTarget` tall. The label is the accessible name; `tooltip` adds a tooltip (and replaces it for a screen reader) where the label is ambiguous. Not built: a badge or count on the tile.
+- Type scale and formats: `PortalTypeScale(emojiXs: 20, emojiSm: 24, emojiMd: 26, emojiLg: 28, displayMd: 40, displayLg: 48)` (read via `tokens.typeScale`; none collides with `xs`..`xxl` 11-22; for a glyph or figure, not copy). `PortalFormat.dateAs(date, PortalDateStyle.dayMonth | dayMonthYear | numeric | numericDayMonth)` -> `05 Sep`, `05 Sep 2026`, `05/09/2026`, `05/09` (never relative; en-GB month reads `Sept` per CLDR), and `PortalFormat.duration(d, style: PortalDurationStyle.spelled | compact)` -> `1 min 5 s` (default, unchanged) or `1m 5s`. Not built: a custom pattern string (add a named style instead).
+
+- `PortalQuickAction(icon:, label:, onTap:, tone:, backgroundColor:, foregroundColor:, tooltip:)` / `.builder((context, color) => Widget, ...)`: a dashboard tile, glyph over a label on a tonal fill (`PortalListTone`), fills the width it is given, at least `minTapTarget` tall. The label is the accessible name; `tooltip` adds a tooltip where the label is ambiguous out of context. Not built: a badge or count on the tile.
 
 - `PortalListItem(dimmed: true)`: fades the whole row to 50% (archived, done, inactive) while it stays enabled and reads the same to a screen reader; no `disabledReason` needed. `PortalPrompt(secondaryAction:)`: a quieter second verb beside `action` (`({label, onPressed})`), standard size only (asserted: it needs an `action`); the one-action default is unchanged. Not built: a secondary action on compact / inline prompts (no room).
 

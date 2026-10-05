@@ -9,7 +9,7 @@ import 'portal_pressable.dart';
 /// `GridView`; the tile fills the width it is given and is at least
 /// `minTapTarget` tall.
 ///
-/// The label is the accessible name; [tooltip] replaces it where the label is
+/// The label is the accessible name; [tooltip] adds a hover/long-press hint where the label is
 /// ambiguous out of context ("Add expense to Rent"). [PortalQuickAction.builder]
 /// takes any glyph (a `FaIcon`, an SVG).
 class PortalQuickAction extends StatelessWidget {

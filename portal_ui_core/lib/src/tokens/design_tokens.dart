@@ -152,6 +152,12 @@ class PortalTypeScale {
     this.lg = 16,
     this.xl = 18,
     this.xxl = 22,
+    this.emojiXs = 20,
+    this.emojiSm = 24,
+    this.emojiMd = 26,
+    this.emojiLg = 28,
+    this.displayMd = 40,
+    this.displayLg = 48,
     this.fontFamily = defaultFontFamily,
   });
 
@@ -167,6 +173,16 @@ class PortalTypeScale {
   final double lg;
   final double xl;
   final double xxl;
+
+  /// Glyph and figure sizes above the text ramp: an emoji or letter mark in a
+  /// tile (20 / 24 / 26 / 28) and a display figure or hero emoji (40 / 48).
+  /// Sized for a glyph, not for reading text; a line of copy takes `xs`..`xxl`.
+  final double emojiXs;
+  final double emojiSm;
+  final double emojiMd;
+  final double emojiLg;
+  final double displayMd;
+  final double displayLg;
 
   /// Typeface [buildPortalTheme] sets on [ThemeData.fontFamily]. Fills every
   /// text style that does not name its own family, so a per-style override

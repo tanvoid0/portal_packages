@@ -13,6 +13,17 @@ void main() {
       expect(d.radii.lg, 20);
       expect(d.radii.xl, 28);
       expect(d.typeScale.md, 14);
+      expect(
+        [
+          d.typeScale.emojiXs,
+          d.typeScale.emojiSm,
+          d.typeScale.emojiMd,
+          d.typeScale.emojiLg,
+          d.typeScale.displayMd,
+          d.typeScale.displayLg,
+        ],
+        [20, 24, 26, 28, 40, 48],
+      );
       expect(d.minTapTarget, 48);
       expect(d.expressiveCorners, isTrue);
     });

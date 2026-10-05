@@ -64,7 +64,8 @@ void main() {
     expect(f.bytes(1.6e9), '1.6 GB');
   });
 
-  testWidgets('PortalAmount scales a long value to fit, never wraps', (t) async {
+  testWidgets('PortalAmount scales a long value to fit, never wraps',
+      (t) async {
     await t.pumpWidget(MaterialApp(
       theme: buildPortalTheme(brightness: Brightness.light),
       home: const Scaffold(
@@ -81,5 +82,32 @@ void main() {
     expect(find.text('£1,284,390.75'), findsOneWidget);
     expect(t.takeException(), isNull);
     expect(t.getSize(find.byType(FittedBox)).width, lessThanOrEqualTo(120));
+  });
+
+  test('dateAs: named day-month and numeric shapes, zero padded', () {
+    final us = PortalFormat('en_US');
+    final d = DateTime(2026, 9, 5);
+    expect(us.dateAs(d, PortalDateStyle.dayMonth), '05 Sep');
+    expect(us.dateAs(d, PortalDateStyle.dayMonthYear), '05 Sep 2026');
+    expect(us.dateAs(d, PortalDateStyle.numeric), '05/09/2026');
+    expect(us.dateAs(d, PortalDateStyle.numericDayMonth), '05/09');
+  });
+
+  test('duration: spelled stays the default, compact drops the spaces', () {
+    const d = Duration(minutes: 1, seconds: 5);
+    expect(f.duration(d), '1 min 5 s');
+    expect(f.duration(d, style: PortalDurationStyle.compact), '1m 5s');
+    expect(
+        f.duration(const Duration(hours: 1, minutes: 5),
+            style: PortalDurationStyle.compact),
+        '1h 5m');
+    expect(
+        f.duration(const Duration(seconds: 42),
+            style: PortalDurationStyle.compact),
+        '42s');
+    expect(
+        f.duration(const Duration(minutes: 2),
+            style: PortalDurationStyle.compact),
+        '2m');
   });
 }

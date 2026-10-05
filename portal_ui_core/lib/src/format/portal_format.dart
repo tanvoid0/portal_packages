@@ -1,6 +1,33 @@
 import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 
+/// A named date pattern for [PortalFormat.dateAs].
+enum PortalDateStyle {
+  /// `05 Sep`.
+  dayMonth('dd MMM'),
+
+  /// `05 Sep 2026`.
+  dayMonthYear('dd MMM yyyy'),
+
+  /// `05/09/2026`.
+  numeric('dd/MM/yyyy'),
+
+  /// `05/09`.
+  numericDayMonth('dd/MM');
+
+  const PortalDateStyle(this.pattern);
+  final String pattern;
+}
+
+/// How [PortalFormat.duration] spells a length of time.
+enum PortalDurationStyle {
+  /// `1 h 5 min`, `1 min 52 s`, `42 s`: the kit's rule, and the default.
+  spelled,
+
+  /// `1h 5m`, `1m 52s`, `42s`: for a dense value column.
+  compact,
+}
+
 /// The one set of rules for money, numbers, dates and time (G2).
 ///
 /// Locale comes from the context ([PortalFormat.of]), `intl` underneath.
@@ -107,12 +134,24 @@ class PortalFormat {
     return f.format(d);
   }
 
+  /// A date in a fixed shape, never relative: see [PortalDateStyle]. Zero
+  /// padded; the month name follows the locale (en-GB reads `Sept`).
+  String dateAs(DateTime d, PortalDateStyle style) =>
+      DateFormat(style.pattern, locale).format(d);
+
   /// `18:42` or `6:42 PM`, by locale. Never seconds.
   String time(DateTime t) => DateFormat.jm(locale).format(t);
 
   /// `1 h 5 min`, `1 min 52 s`, `42 s`. Never `65 min` or `1:05:00`.
-  String duration(Duration d) {
+  /// [style] `compact` drops the spaces and spells the units `h`, `m`, `s`.
+  String duration(Duration d,
+      {PortalDurationStyle style = PortalDurationStyle.spelled}) {
     final h = d.inHours, m = d.inMinutes % 60, s = d.inSeconds % 60;
+    if (style == PortalDurationStyle.compact) {
+      if (h > 0) return m == 0 ? '${h}h' : '${h}h ${m}m';
+      if (d.inMinutes > 0) return s == 0 ? '${m}m' : '${m}m ${s}s';
+      return '${s}s';
+    }
     if (h > 0) return m == 0 ? '$h h' : '$h h $m min';
     if (d.inMinutes > 0) return s == 0 ? '$m min' : '$m min $s s';
     return '$s s';
