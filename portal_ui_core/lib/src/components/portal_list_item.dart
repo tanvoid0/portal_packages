@@ -4,6 +4,7 @@ import '../theme/portal_semantic_colors.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_avatar_mark.dart';
 import 'portal_pressable.dart';
+import 'portal_prompt.dart';
 import 'portal_section_header.dart';
 import 'portal_skeleton.dart';
 
@@ -271,8 +272,7 @@ class PortalListItem extends StatelessWidget {
   /// handler.
   final VoidCallback? onTap;
 
-  /// Disables the row and says why, under the subtitle. G3's inline prompt
-  /// replaces this plain line when it lands.
+  /// Disables the row and says why, under the subtitle, as an inline prompt.
   final String? disabledReason;
 
   /// Title and meta go to 700, and the label says "new" so colour is not alone.
@@ -367,10 +367,13 @@ class PortalListItem extends StatelessWidget {
               style: styles.caption.copyWith(color: cs.onSurfaceVariant)),
         if (disabled)
           Padding(
-            padding: EdgeInsets.only(top: sp.xs),
-            child: Text(
-              disabledReason!,
-              style: styles.caption.copyWith(color: cs.onSurfaceVariant),
+            padding: EdgeInsets.only(top: sp.xs + 2),
+            // The row's hint carries it, so it is not a live region of its own.
+            child: ExcludeSemantics(
+              child: PortalPrompt(
+                message: disabledReason!,
+                size: PortalPromptSize.inline,
+              ),
             ),
           ),
       ],

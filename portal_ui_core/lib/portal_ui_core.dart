@@ -54,6 +54,7 @@ export 'src/components/portal_filter_chip.dart';
 export 'src/components/portal_list_item.dart';
 export 'src/components/portal_list_skeleton.dart';
 export 'src/components/portal_pressable.dart';
+export 'src/components/portal_prompt.dart';
 export 'src/components/portal_prompt_card.dart';
 export 'src/components/portal_refresh.dart';
 export 'src/components/portal_scroll_page.dart';
