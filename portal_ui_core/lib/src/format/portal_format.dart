@@ -93,9 +93,11 @@ class PortalFormat {
   /// weekday, otherwise as above. Never `5m`, which reads as a duration.
   String date(DateTime d, {bool short = false}) {
     final now = _now();
-    final today = DateTime(now.year, now.month, now.day);
-    final day = DateTime(d.year, d.month, d.day);
-    final diff = today.difference(day).inDays;
+    // UTC midnights: two local ones either side of a DST change are 23h apart
+    // and `inDays` would truncate that to a day short.
+    final diff = DateTime.utc(now.year, now.month, now.day)
+        .difference(DateTime.utc(d.year, d.month, d.day))
+        .inDays;
     if (diff == 0) return short ? time(d) : 'Today';
     if (diff == 1) return 'Yesterday';
     if (diff > 1 && diff < 7) {

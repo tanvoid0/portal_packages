@@ -44,6 +44,16 @@ void main() {
     expect(f.time(DateTime(2026, 1, 1, 18, 42)), '18:42');
   });
 
+  test('relative days are calendar days across a spring-forward', () {
+    // 2026-03-29 is the UK clock change: local midnights either side are 23h
+    // apart, which a Duration-based count reads as Today.
+    final g = PortalFormat('en_GB', now: () => DateTime(2026, 3, 30, 10));
+    expect(g.date(DateTime(2026, 3, 29, 23)), 'Yesterday');
+    expect(g.date(DateTime(2026, 3, 29)), 'Yesterday');
+    expect(g.date(DateTime(2026, 3, 30)), 'Today');
+    expect(g.date(DateTime(2026, 3, 27)), 'Friday');
+  });
+
   test('duration, range, bytes', () {
     expect(f.duration(const Duration(minutes: 65)), '1 h 5 min');
     expect(f.duration(const Duration(minutes: 1, seconds: 52)), '1 min 52 s');
