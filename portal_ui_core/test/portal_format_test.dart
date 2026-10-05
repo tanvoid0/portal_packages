@@ -137,4 +137,34 @@ void main() {
     expect(of(ninety, PortalDurationStyle.minutesSpelled), '90 min');
     expect(f.duration(const Duration(minutes: 1, seconds: 5)), '1 min 5 s');
   });
+
+  test('rounds to the shown precision before choosing sign and tone', () {
+    expect(f.signed(-0.004, 'GBP'), '£0.00');
+    expect(f.signed(5.5e-17, 'GBP'), '£0.00');
+    expect(f.money(-0.004, 'GBP'), '£0');
+    expect(f.signed(0.00004, null, true), '0.0%');
+  });
+
+  test('compact re-picks the unit when rounding reaches 1000', () {
+    expect(f.compact(999960), '1M');
+    expect(f.compact(999960000), '1B');
+    expect(f.compact(-999960, currency: 'GBP'), '-£1M');
+  });
+
+  test('negative durations keep their sign', () {
+    expect(f.duration(const Duration(minutes: -5, seconds: -30)),
+        '-5 min 30 s');
+    expect(f.duration(const Duration(seconds: -42)), '-42 s');
+    expect(
+        f.duration(const Duration(minutes: -90),
+            style: PortalDurationStyle.hoursMinutes),
+        '-1h 30m');
+  });
+
+  test('date and time read the local calendar day of a UTC value', () {
+    final local = DateTime(2026, 9, 16, 0, 30);
+    final utc = local.toUtc();
+    expect(f.date(utc), 'Today');
+    expect(f.time(utc), f.time(local));
+  });
 }

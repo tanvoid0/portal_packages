@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 
@@ -75,6 +77,7 @@ class PortalFormat {
   /// `£1,200`, or with [padded] `£1,200.00`. A non-whole amount always keeps
   /// its two decimals (`£24.60`): only a whole one drops them in prose.
   String money(num amount, String currency, {bool padded = false}) {
+    amount = _round(amount, 2);
     final whole = amount == amount.roundToDouble();
     final f = NumberFormat.simpleCurrency(
       locale: locale,
@@ -89,15 +92,19 @@ class PortalFormat {
   /// the result a whole number, one decimal only under 1%: `+6%`, `+0.4%`.
   /// Zero carries no sign.
   String signed(num value, [String? currency, bool percent = false]) {
-    final sign = value > 0 ? '+' : (value < 0 ? '-' : '');
-    final abs = value.abs();
+    // Round to the shown precision first: -0.004 reads `£0.00`, not `-£0.00`.
+    final digits = percent
+        ? (value.abs() * 100 < 1 ? 1 : 0)
+        : (currency == null ? 3 : 2);
+    final v = _round(percent ? value * 100 : value, digits);
+    final sign = v > 0 ? '+' : (v < 0 ? '-' : '');
+    final abs = v.abs();
     if (percent) {
-      final pct = abs * 100;
       final f = NumberFormat.decimalPatternDigits(
         locale: locale,
-        decimalDigits: pct < 1 && pct != 0 ? 1 : 0,
+        decimalDigits: digits,
       );
-      return '$sign${f.format(pct)}%';
+      return '$sign${f.format(abs)}%';
     }
     final body = currency == null
         ? NumberFormat.decimalPattern(locale).format(abs)
@@ -110,13 +117,21 @@ class PortalFormat {
   /// `12.4K`, `£1.2M`: one decimal, a trailing `.0` dropped.
   String compact(num value, {String? currency}) {
     final abs = value.abs();
-    final (div, suffix) = abs >= 1e9
+    var (div, suffix) = abs >= 1e9
         ? (1e9, 'B')
         : abs >= 1e6
             ? (1e6, 'M')
             : abs >= 1e3
                 ? (1e3, 'K')
                 : (1.0, '');
+    // 999,960 scales to 999.96 -> `1,000K`: step up a unit once it rounds there.
+    if (_round(abs / div, 1) >= 1000 && suffix != 'B') {
+      (div, suffix) = suffix == 'M'
+          ? (1e9, 'B')
+          : suffix == 'K'
+              ? (1e6, 'M')
+              : (1e3, 'K');
+    }
     final scaled = NumberFormat.decimalPatternDigits(
       locale: locale,
       decimalDigits: 1,
@@ -141,6 +156,7 @@ class PortalFormat {
   /// With [short] (a row's value column): the time today, `Wed` for a
   /// weekday, otherwise as above. Never `5m`, which reads as a duration.
   String date(DateTime d, {bool short = false}) {
+    d = d.toLocal();
     final now = _now();
     // UTC midnights: two local ones either side of a DST change are 23h apart
     // and `inDays` would truncate that to a day short.
@@ -162,12 +178,15 @@ class PortalFormat {
       DateFormat(style.pattern, locale).format(d);
 
   /// `18:42` or `6:42 PM`, by locale. Never seconds.
-  String time(DateTime t) => DateFormat.jm(locale).format(t);
+  String time(DateTime t) => DateFormat.jm(locale).format(t.toLocal());
 
   /// `1 h 5 min`, `1 min 52 s`, `42 s`. Never `65 min` or `1:05:00`.
   /// [style] `compact` drops the spaces and spells the units `h`, `m`, `s`.
   String duration(Duration d,
       {PortalDurationStyle style = PortalDurationStyle.spelled}) {
+    if (d.isNegative) {
+      return '-${duration(-d, style: style)}';
+    }
     final h = d.inHours, m = d.inMinutes % 60, s = d.inSeconds % 60;
     switch (style) {
       case PortalDurationStyle.hoursMinutes:
@@ -211,6 +230,12 @@ class PortalFormat {
       decimalDigits: v < 10 && i > 0 ? 1 : 0,
     );
     return '${value < 0 ? '-' : ''}${_trimZero(f.format(v))} ${units[i]}';
+  }
+
+  static double _round(num v, int digits) {
+    final k = pow(10, digits);
+    final r = (v * k).round() / k;
+    return r == 0 ? 0 : r; // no negative zero
   }
 
   static String _trimZero(String s) =>

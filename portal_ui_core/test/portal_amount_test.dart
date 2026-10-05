@@ -80,4 +80,12 @@ void main() {
     expect(textOf(await pump(t, const PortalAmount(-412, 'GBP', compact: true))),
         '-£412');
   });
+
+  testWidgets('a sub-penny value is neither signed nor success-coloured',
+      (t) async {
+    final w = await pump(t, const PortalAmount(5.5e-17, 'GBP', signed: true));
+    final cs = Theme.of(t.element(find.byType(Scaffold))).colorScheme;
+    expect(textOf(w), '£0.00');
+    expect(w.style!.color, cs.onSurface);
+  });
 }

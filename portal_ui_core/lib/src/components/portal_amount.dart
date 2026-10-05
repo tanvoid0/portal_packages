@@ -96,7 +96,8 @@ class PortalAmount extends StatelessWidget {
     final success = PortalSemanticColors.of(context).success;
     final f = PortalFormat.of(context);
     final hero = size == PortalAmountSize.hero;
-    final v = decimals ? value : value.roundToDouble();
+    // Rounded to what is shown, so a sub-penny value is neither signed nor green.
+    final v = decimals ? (value * 100).round() / 100 : value.roundToDouble();
     final text = compact
         ? (signed && v > 0 ? '+' : '') + f.compact(v, currency: currency)
         : signed
@@ -117,7 +118,7 @@ class PortalAmount extends StatelessWidget {
             fontWeight: FontWeight.w500,
           );
     final toneColor = switch (tone) {
-      PortalAmountTone.neutral => signed && value > 0 ? success : cs.onSurface,
+      PortalAmountTone.neutral => signed && v > 0 ? success : cs.onSurface,
       PortalAmountTone.credit => success,
       PortalAmountTone.alert => cs.error,
       PortalAmountTone.muted => cs.onSurfaceVariant,
