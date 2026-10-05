@@ -372,6 +372,30 @@ void main() {
     expect(picked, 2);
   });
 
+  testWidgets('scrollable segmented tabs hold six segments and scroll to one',
+      (t) async {
+    int? picked;
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Saturday', 'Sunday'];
+    await t.pumpWidget(_host(SizedBox(
+      width: 300,
+      child: PortalSegmentedTabs(
+        labels: labels,
+        index: 0,
+        scrollable: true,
+        onChanged: (i) => picked = i,
+      ),
+    )));
+    expect(find.byType(SingleChildScrollView), findsOneWidget);
+    expect(t.takeException(), isNull);
+    // Natural width: wider than the 300 it is given, so the last is off screen.
+    expect(t.getTopLeft(find.text('Sunday')).dx, greaterThan(300));
+
+    await t.ensureVisible(find.text('Sunday'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Sunday'));
+    expect(picked, 6);
+  });
+
   testWidgets('scroll page insets content to the layout gutter and clearance',
       (t) async {
     await t.pumpWidget(_host(const PortalScrollPage(

@@ -1,5 +1,7 @@
 ## Unreleased
 
+- `PortalSegmentedTabs(scrollable: true)`: more than four segments, each at its label's width in a row that scrolls sideways (the default is still equal shares, unchanged). Not built: auto-switching on overflow (a caller knows its label count).
+
 - `PortalSelect<T>(items: [PortalSelectItem(value:, label:, icon:)], onChanged:, value:, label:, hint:, helper:, errorText:, required:)`: the dropdown, on `PortalFormField` like `PortalTextField` (label above, hint until chosen, error beats helper), fill and borders from the theme's `InputDecorationTheme`, at least `minTapTarget` tall, label as the control's semantic name, a null `onChanged` disables it. Wraps Material's `DropdownButtonFormField` for the menu. Not built: a `validator` / `Form` integration (pass `errorText`), a searchable or multi-select menu.
 
 - `PortalScrollPage(controller:)`: a `ScrollController` for the page's scroll view; the caller disposes it. Default (none) unchanged.

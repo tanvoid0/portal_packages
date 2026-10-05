@@ -14,6 +14,7 @@ class PortalSegmentedTabs extends StatelessWidget {
     required this.index,
     required this.onChanged,
     this.accentColor,
+    this.scrollable = false,
   }) : assert(labels.length >= 2, 'A segmented control needs two segments');
 
   final List<String> labels;
@@ -23,6 +24,10 @@ class PortalSegmentedTabs extends StatelessWidget {
   /// Selected segment tint. Defaults to the app's primary.
   final Color? accentColor;
 
+  /// Segments at their natural width in a sideways-scrolling row, instead of
+  /// equal shares of the width. The default look is unchanged.
+  final bool scrollable;
+
   @override
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
@@ -30,11 +35,13 @@ class PortalSegmentedTabs extends StatelessWidget {
     final tint = accentColor ?? portal.primary;
     final radius = BorderRadius.circular(tokens.radii.md);
 
-    return Row(
+    Widget share({required Widget child}) => scrollable ? child : Expanded(child: child);
+
+    final row = Row(
       children: [
         for (var i = 0; i < labels.length; i++) ...[
           if (i > 0) SizedBox(width: tokens.spacing.sm),
-          Expanded(
+          share(
             // Fill under, ink over: a Material paints its ink features before
             // its child, so the tint must sit outside the InkWell's Material
             // or the ripple is hidden by the (opaque) segment colour.
@@ -59,8 +66,9 @@ class PortalSegmentedTabs extends StatelessWidget {
                     constraints:
                         BoxConstraints(minHeight: tokens.minTapTarget),
                     alignment: Alignment.center,
-                    padding:
-                        EdgeInsets.symmetric(horizontal: tokens.spacing.sm),
+                    padding: EdgeInsets.symmetric(
+                        horizontal:
+                            scrollable ? tokens.spacing.lg : tokens.spacing.sm),
                     child: Text(
                       labels[i],
                       textAlign: TextAlign.center,
@@ -78,5 +86,11 @@ class PortalSegmentedTabs extends StatelessWidget {
         ],
       ],
     );
+    return scrollable
+        ? SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: row,
+          )
+        : row;
   }
 }
