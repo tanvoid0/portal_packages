@@ -44,6 +44,7 @@ export 'src/components/portal_amount.dart';
 export 'src/components/portal_app_bar.dart';
 export 'src/components/portal_art.dart';
 export 'src/components/portal_avatar_mark.dart';
+export 'src/components/portal_back_to_root_button.dart';
 export 'src/components/portal_badge.dart';
 export 'src/components/portal_bottom_nav_bar.dart';
 export 'src/components/portal_button.dart';

@@ -13,23 +13,26 @@ import '../motion/portal_haptics.dart';
 Future<bool> portalConfirm(
   BuildContext context, {
   required String title,
-  required String message,
+  String? message,
   String confirmLabel = 'Confirm',
-  String cancelLabel = 'Cancel',
+  String? cancelLabel = 'Cancel',
   bool isDestructive = false,
+  bool barrierDismissible = true,
 }) async {
   final confirmed = await showDialog<bool>(
     context: context,
+    barrierDismissible: barrierDismissible,
     builder: (ctx) {
       final scheme = Theme.of(ctx).colorScheme;
       return AlertDialog(
         title: Text(title),
-        content: Text(message),
+        content: message == null ? null : Text(message),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(cancelLabel),
-          ),
+          if (cancelLabel != null)
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(cancelLabel),
+            ),
           TextButton(
             onPressed: () {
               PortalHaptics.medium();
