@@ -1,5 +1,7 @@
 ## Unreleased
 
+- `PortalButtonDock.grid(actions:, columns:, showRule:)`: N equal actions (task's detail bars use 3-4) in rows of `columns` (default all, at most 4), 8 apart; primary + secondary stays the default constructor. Not built: per-action flex (all cells are equal).
+
 - `PortalListLeading.tile(..., backgroundColor:, foregroundColor:)`, `.tileBuilder((context, color) => Widget, ...)` (a `FaIcon` or SVG on the tile, no font dependency here), `.custom(Widget, extent:)` (logo plates) and `.icon(icon, color:)`; `PortalEmptyState(iconWidget:)` (`icon` is now optional, one of the two is required). `PortalListItem(subtitleWidget:, metaWidget:, progress:, progressColor:, progressLabel:, onLongPress:, destructive:)` and `PortalListAccessory.widget(child, semanticLabel:)` / `.iconButtons([PortalListIconAction(icon:, tooltip:, onPressed:)])`. Read from finance's `LedgerRow` / `AccountRow` and task's `AppListTile`. Not built: `LedgerRow`'s uppercase overline above the title (use `subtitleWidget`), task's external-link glyph and FA chevron (`.widget`), a chevron under a custom accessory.
 
 - `PortalStatCard(valueColor:, backgroundColor:, margin:)` and `PortalStatCardTheme(backgroundColor:)`: a figure that carries a state (value ink, tinted card). Widget beats theme beats the card's own tone. Not built: finance's label-first layout with a small mark and a caption line (a different arrangement, kept in the app; `footer` carries a caption).

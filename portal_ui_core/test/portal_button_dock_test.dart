@@ -40,4 +40,39 @@ void main() {
     await t.pumpAndSettle();
     expect(rule(t), Colors.transparent);
   });
+
+  testWidgets('grid: N actions in rows, a short last row keeps cell width',
+      (t) async {
+    await t.pumpWidget(MaterialApp(
+      theme: buildPortalTheme(brightness: Brightness.light),
+      home: Scaffold(
+        bottomNavigationBar: PortalButtonDock.grid(
+          columns: 2,
+          actions: [
+            for (final l in ['A', 'B', 'C'])
+              PortalButton(label: l, onPressed: () {}),
+          ],
+        ),
+      ),
+    ));
+    final a = t.getRect(find.widgetWithText(PortalButton, 'A'));
+    final b = t.getRect(find.widgetWithText(PortalButton, 'B'));
+    final c = t.getRect(find.widgetWithText(PortalButton, 'C'));
+    expect(a.top, b.top);
+    expect(c.top, greaterThan(a.bottom));
+    expect(c.left, a.left);
+    expect(c.width, a.width);
+
+    await t.pumpWidget(MaterialApp(
+      theme: buildPortalTheme(brightness: Brightness.light),
+      home: Scaffold(
+        bottomNavigationBar: PortalButtonDock.grid(actions: [
+          for (final l in ['A', 'B', 'C', 'D'])
+            PortalButton(label: l, onPressed: () {}),
+        ]),
+      ),
+    ));
+    expect(t.getRect(find.widgetWithText(PortalButton, 'A')).top,
+        t.getRect(find.widgetWithText(PortalButton, 'D')).top);
+  });
 }
