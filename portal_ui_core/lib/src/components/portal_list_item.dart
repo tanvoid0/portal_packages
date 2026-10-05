@@ -521,14 +521,27 @@ class PortalListItem extends StatelessWidget {
       constraints: BoxConstraints(minHeight: tapTarget + sp.md),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: sp.lg, vertical: sp.sm),
-        child: Row(children: [
-          if (leading != null) ...[
-            leading!._build(context),
-            SizedBox(width: sp.lg),
+        // A disabled row dims to 38% and top-aligns its leading and trailing to
+        // the title line, so the reason under the subtitle reads at full
+        // contrast.
+        child: Row(
+          crossAxisAlignment:
+              disabled ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+          children: [
+            if (leading != null) ...[
+              Opacity(
+                opacity: disabled ? .38 : 1,
+                child: leading!._build(context),
+              ),
+              SizedBox(width: sp.lg),
+            ],
+            Expanded(child: textColumn),
+            if (accessory != null) ...[
+              SizedBox(width: sp.md),
+              Opacity(opacity: disabled ? .38 : 1, child: accessory),
+            ],
           ],
-          Expanded(child: textColumn),
-          if (accessory != null) ...[SizedBox(width: sp.md), accessory],
-        ]),
+        ),
       ),
     );
 

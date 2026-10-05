@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:portal_ui_core/portal_ui_core.dart';
 
+import 'screens.dart';
+
 /// Component gallery: every ui_core component on one scrolling page, with
 /// brightness and preset switches in the app bar. Also the source of the
 /// screenshots in the README.
@@ -73,6 +75,13 @@ class _GalleryPageState extends State<GalleryPage> {
         title: 'portal_ui_core',
         subtitle: widget.preset.name,
         actions: [
+          PortalAction(
+            icon: Symbols.web_asset_rounded,
+            label: 'Screens',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const ScreensPage()),
+            ),
+          ),
           PortalAction(
             icon: widget.dark ? Symbols.light_mode_rounded : Symbols.dark_mode_rounded,
             label: widget.dark ? 'Light theme' : 'Dark theme',

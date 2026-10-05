@@ -1,5 +1,7 @@
 ## Unreleased
 
+- G6: the example app has a Screens page (transactions, settings, edit-profile form, result) built from G1-G5, and `example/test/screens_golden_test.dart` draws each in light and dark at 1.0 and 1.3 text scale with the real typeface and icon fonts loaded. `flutter test --update-goldens` in `example/` regenerates them. A disabled `PortalListItem` now dims its leading and trailing to 38% and top-aligns them to the title line.
+
 - G5: `PortalResultScreen(state:, title:, body:, art:, dock:, onClose:)` (`PortalResultState` success / error / pending): art, title and body centred above the dock; the page keeps only a Close; an error is a live region. The form, settings, detail and start recipes are in `docs/UI_PATTERNS.md`, not classes.
 
 - G4: `PortalButtonDock(primary:, secondary:, showRule:)` and `PortalScrollPage(bottom:)`. The dock is full width on the page tone, padding 12 16 32 (12 at the bottom with the keyboard open), 8 between buttons, with a 1 dp top rule only while content scrolls beneath it; `PortalScrollPage` reports that through `PortalDockRule`, a dock elsewhere passes `showRule`. The buttons are the caller's `PortalButton`s (large primary, ghost or tonal secondary).
