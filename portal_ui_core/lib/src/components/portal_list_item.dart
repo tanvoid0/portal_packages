@@ -686,6 +686,8 @@ class PortalListItem extends StatelessWidget {
           (acc._kind == _Kind.custom && !acc.interactive))
         acc.text,
       subtitle,
+      meta,
+      if (acc._kind == _Kind.meta) acc.text,
       if (isNew) 'new',
     ].whereType<String>().where((s) => s.isNotEmpty);
 
@@ -723,7 +725,14 @@ class PortalListItem extends StatelessWidget {
                 ),
                 if (accessory != null) ...[
                   SizedBox(width: sp.md),
-                  Opacity(opacity: disabled ? .38 : 1, child: accessory),
+                  Opacity(
+                    opacity: disabled ? .38 : 1,
+                    // Only the leading is interactive: the row's label already
+                    // reads this accessory's text, so it must not read twice.
+                    child: keepsSemantics && !acc._keepsSemantics
+                        ? ExcludeSemantics(child: accessory)
+                        : accessory,
+                  ),
                 ],
               ],
             ),
@@ -766,6 +775,7 @@ class PortalListItem extends StatelessWidget {
       inMutuallyExclusiveGroup: acc._kind == _Kind.radio ? true : null,
       enabled: !disabled,
       label: labelParts.join(', '),
+      hint: disabledReason,
       onTap: rowTap,
       excludeSemantics: !keepsSemantics,
       child: row,

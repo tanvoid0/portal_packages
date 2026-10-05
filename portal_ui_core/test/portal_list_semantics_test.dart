@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ui_core/portal_ui_core.dart';
 
@@ -67,6 +68,50 @@ void main() {
     expect(t.getSemantics(find.byType(IconButton)).tooltip, 'Mark rent paid');
     await t.tap(find.byIcon(Icons.check));
     expect(taps, 1);
+    h.dispose();
+  });
+
+  int labelled(WidgetTester t, String text) {
+    var n = 0;
+    void walk(SemanticsNode node) {
+      if (node.label.contains(text)) n++;
+      node.visitChildren((c) {
+        walk(c);
+        return true;
+      });
+    }
+
+    walk(t.binding.renderViews.first.owner!.semanticsOwner!.rootSemanticsNode!);
+    return n;
+  }
+
+  testWidgets('an interactive leading does not make the trailing read twice',
+      (t) async {
+    final h = t.ensureSemantics();
+    await t.pumpWidget(host(PortalListItem(
+      title: 'Milk',
+      leading: PortalListLeading.interactive(Semantics(
+        label: 'Bought',
+        child: Checkbox(value: false, onChanged: (v) {}),
+      )),
+      trailing: const PortalListAccessory.value('£5'),
+    )));
+    expect(labelled(t, '£5'), 1);
+    h.dispose();
+  });
+
+  testWidgets('a disabled reason is the hint and meta is in the label',
+      (t) async {
+    final h = t.ensureSemantics();
+    await t.pumpWidget(host(PortalListItem(
+      title: 'Sync',
+      meta: 'Last run 2h ago',
+      disabledReason: 'Sign in first',
+      onTap: () {},
+    )));
+    final node = t.getSemantics(find.text('Sync'));
+    expect(node.hint, 'Sign in first');
+    expect(node.label, contains('Last run 2h ago'));
     h.dispose();
   });
 }

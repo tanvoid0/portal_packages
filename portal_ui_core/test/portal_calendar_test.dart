@@ -44,4 +44,17 @@ void main() {
     final cell = find.ancestor(of: find.text('14'), matching: find.byType(InkWell));
     expect(t.getSize(cell.first).height, tokens.minTapTarget);
   });
+
+  testWidgets('a screen reader can select a day', (t) async {
+    final h = t.ensureSemantics();
+    DateTime? picked;
+    await t.pumpWidget(host(PortalCalendar(
+      initialMonth: DateTime(2026, 2),
+      onSelected: (d) => picked = d,
+    )));
+    t.semantics.tap(find.semantics.byLabel(RegExp('February 14')));
+    await t.pump();
+    expect(picked, DateTime(2026, 2, 14));
+    h.dispose();
+  });
 }

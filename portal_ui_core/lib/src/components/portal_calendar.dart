@@ -190,6 +190,7 @@ class _PortalCalendarState extends State<PortalCalendar> {
       label: marked
           ? '${loc.formatFullDate(day)}, ${widget.markedLabel}'
           : loc.formatFullDate(day),
+      onTap: widget.onSelected == null ? null : () => widget.onSelected!(day),
       excludeSemantics: true,
       child: InkWell(
         onTap: widget.onSelected == null ? null : () => widget.onSelected!(day),
