@@ -68,4 +68,39 @@ void main() {
     expect(find.bySemanticsLabel(RegExp('Repeats')), findsWidgets);
     h.dispose();
   });
+
+  testWidgets('a value matching no item or two shows the hint, no assert',
+      (t) async {
+    await t.pumpWidget(host(value: 9, onChanged: (_) {}));
+    expect(find.text('Choose one'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('focus survives a pick', (t) async {
+    int? picked;
+    Widget build() => MaterialApp(
+          theme: buildPortalTheme(brightness: Brightness.light),
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (c, set) => PortalSelect<int>(
+                label: 'Repeats',
+                value: picked,
+                items: items,
+                onChanged: (v) => set(() => picked = v),
+              ),
+            ),
+          ),
+        );
+    await t.pumpWidget(build());
+    final before = t.state(find.byType(DropdownButtonFormField<int>));
+    final field = find.byType(DropdownButton<int>);
+    await t.tap(field);
+    await t.pumpAndSettle();
+    await t.tap(find.text('Monthly').last);
+    await t.pumpAndSettle();
+    expect(picked, 2);
+    expect(find.text('Monthly'), findsOneWidget);
+    // The same state lives on, so the focus it holds does too.
+    expect(t.state(find.byType(DropdownButtonFormField<int>)), same(before));
+  });
 }

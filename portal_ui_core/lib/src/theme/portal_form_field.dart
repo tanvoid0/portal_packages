@@ -13,6 +13,7 @@ class PortalFormField extends StatelessWidget {
     this.description,
     this.error,
     this.required = false,
+    this.excludeLabelSemantics = false,
   });
 
   final Widget child;
@@ -20,6 +21,10 @@ class PortalFormField extends StatelessWidget {
   final String? description;
   final String? error;
   final bool required;
+
+  /// For a [child] that names itself with [label]: the visible label is then
+  /// not read a second time.
+  final bool excludeLabelSemantics;
 
   @override
   Widget build(BuildContext context) {
@@ -32,21 +37,25 @@ class PortalFormField extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (label != null) ...[
-          Row(
-            children: [
-              Text(
-                label!,
-                style: textTheme.labelLarge?.copyWith(
-                  color: portal.foreground,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              if (required)
+          ExcludeSemantics(
+            excluding: excludeLabelSemantics,
+            child: Row(
+              children: [
                 Text(
-                  ' *',
-                  style: textTheme.labelLarge?.copyWith(color: portal.destructive),
+                  label!,
+                  style: textTheme.labelLarge?.copyWith(
+                    color: portal.foreground,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-            ],
+                if (required)
+                  Text(
+                    ' *',
+                    style: textTheme.labelLarge
+                        ?.copyWith(color: portal.destructive),
+                  ),
+              ],
+            ),
           ),
           SizedBox(height: t.spacing.sm),
         ],

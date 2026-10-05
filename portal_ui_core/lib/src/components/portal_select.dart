@@ -65,12 +65,14 @@ class PortalSelect<T> extends StatelessWidget {
       description: helper,
       error: errorText,
       required: required,
+      excludeLabelSemantics: true,
       child: Semantics(
         label: label,
         child: DropdownButtonFormField<T>(
-          initialValue: value,
-          // The field keeps its own copy of the value; a new one rebuilds it.
-          key: ValueKey(value),
+          // The field asserts on a value that is not exactly one item; it takes
+          // a changed one itself, so no key (a key rebuilt it and dropped focus).
+          initialValue:
+              items.where((i) => i.value == value).length == 1 ? value : null,
           isExpanded: true,
           onChanged: onChanged,
           hint: hint == null

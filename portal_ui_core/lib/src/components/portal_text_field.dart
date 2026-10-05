@@ -119,11 +119,17 @@ class PortalTextField extends StatefulWidget {
   final TextCapitalization textCapitalization;
   final bool _selectAllOnFocus;
 
+  // Reject an edit that is not a whole amount rather than truncating it to the
+  // longest matching prefix, which ate the tail of `1234.56` on a stray dot.
+  static TextInputFormatter _amountFormatter(RegExp whole) =>
+      TextInputFormatter.withFunction(
+        (old, value) => whole.hasMatch(value.text) ? value : old,
+      );
   static final _amountFormatters = <TextInputFormatter>[
-    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+    _amountFormatter(RegExp(r'^\d*[.,]?\d{0,2}$')),
   ];
   static final _signedFormatters = <TextInputFormatter>[
-    FilteringTextInputFormatter.allow(RegExp(r'^-?\d*\.?\d{0,2}')),
+    _amountFormatter(RegExp(r'^-?\d*[.,]?\d{0,2}$')),
   ];
 
   /// `12.5` becomes `12.50`, `12.0` becomes `12`, null or zero becomes empty:
@@ -227,26 +233,30 @@ class _PortalTextFieldState extends State<PortalTextField> {
       description: widget.helper,
       error: widget.errorText,
       required: widget.required,
-      child: TextFormField(
-        controller: widget.controller,
-        focusNode: _focus,
-        initialValue: widget.controller == null ? widget.initialValue : null,
-        obscureText: widget.obscureText,
-        keyboardType: widget.keyboardType,
-        textInputAction: widget.textInputAction,
-        onChanged: widget.onChanged,
-        onFieldSubmitted: widget.onSubmitted,
-        validator: widget.validator,
-        inputFormatters: widget.inputFormatters,
-        maxLines: widget.maxLines,
-        minLines: widget.minLines,
-        enabled: widget.enabled,
-        autofocus: widget.autofocus,
-        autofillHints: widget.autofillHints,
-        textCapitalization: widget.textCapitalization,
-        style: tokens.textStyles.body,
-        cursorColor: portal.primary,
-        decoration: decoration,
+      excludeLabelSemantics: true,
+      child: Semantics(
+        label: widget.label,
+        child: TextFormField(
+          controller: widget.controller,
+          focusNode: _focus,
+          initialValue: widget.controller == null ? widget.initialValue : null,
+          obscureText: widget.obscureText,
+          keyboardType: widget.keyboardType,
+          textInputAction: widget.textInputAction,
+          onChanged: widget.onChanged,
+          onFieldSubmitted: widget.onSubmitted,
+          validator: widget.validator,
+          inputFormatters: widget.inputFormatters,
+          maxLines: widget.maxLines,
+          minLines: widget.minLines,
+          enabled: widget.enabled,
+          autofocus: widget.autofocus,
+          autofillHints: widget.autofillHints,
+          textCapitalization: widget.textCapitalization,
+          style: tokens.textStyles.body,
+          cursorColor: portal.primary,
+          decoration: decoration,
+        ),
       ),
     );
   }

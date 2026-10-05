@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ui_core/portal_ui_core.dart';
 
@@ -55,10 +56,47 @@ void main() {
     await t.pump();
     expect(c.selection, const TextSelection(baseOffset: 0, extentOffset: 2));
 
+    await t.enterText(find.byType(TextField), '1.23');
     await t.enterText(find.byType(TextField), '1.234');
     expect(c.text, '1.23');
     await t.enterText(find.byType(TextField), '1.2.');
-    expect(c.text, '1.2');
+    expect(c.text, '1.23');
+  });
+
+  testWidgets('amount: rejects a bad edit whole instead of truncating it',
+      (t) async {
+    final c = TextEditingController(text: '1234.56');
+    await t.pumpWidget(host(PortalTextField.amount(controller: c)));
+    // A dot typed after `12` of `1234.56`.
+    await t.enterText(find.byType(TextField), '12.34.56');
+    expect(c.text, '1234.56');
+    await t.enterText(find.byType(TextField), '12,5');
+    expect(c.text, '12,5');
+
+    final s = TextEditingController(text: '-5');
+    await t.pumpWidget(host(PortalTextField.amount(controller: s, signed: true)));
+    await t.enterText(find.byType(TextField), '-5.5.');
+    expect(s.text, '-5');
+    await t.enterText(find.byType(TextField), '-5,25');
+    expect(s.text, '-5,25');
+  });
+
+  testWidgets('the label names the field once', (t) async {
+    final h = t.ensureSemantics();
+    await t.pumpWidget(host(const PortalTextField(label: 'Name')));
+    expect(t.getSemantics(find.byType(TextField)).label, contains('Name'));
+    var n = 0;
+    void walk(SemanticsNode node) {
+      if (node.label.contains('Name')) n++;
+      node.visitChildren((c) {
+        walk(c);
+        return true;
+      });
+    }
+
+    walk(t.binding.rootPipelineOwner.semanticsOwner!.rootSemanticsNode!);
+    expect(n, 1);
+    h.dispose();
   });
 
   test('amount format and parse', () {

@@ -1,5 +1,7 @@
 ## Unreleased
 
+Fix: `PortalTextField.amount` rejects an edit that is not a whole amount instead of truncating it (`1234.56` plus a stray dot stays `1234.56`) and accepts a comma decimal; `PortalTextField` and `PortalSelect` name the control by its label and no longer read the visible label a second time (`PortalFormField(excludeLabelSemantics:)`); `PortalSelect` shows the hint for a value matching no item or two instead of asserting, and no longer rebuilds (dropping focus) on a pick.
+
 Fix: `PortalFormat` rounds to the shown precision before choosing sign (`signed(-0.004)` is `£0.00`, not `-£0.00`; `PortalAmount` no longer tints it success), `compact(999960)` is `1M` not `1,000K`, a negative `duration` keeps its sign, and `date` / `time` read a UTC value in local time.
 
 - `PortalDateStyle.dayMonthUnpadded` (`5 Sep`), `.dayMonthYearUnpadded` (`5 Sep 2026`), `.monthDay` (`Oct 5`), `.weekdayMonthDay` (`Monday, Oct 5`) and `PortalDurationStyle.hoursMinutes` (`1h 30m`, `2h 0m`, `45m`), `.minutesSeconds` (`5m 0s`, `90m 20s`), `.minutesSpelled` (`45 min`, `90 min`): for the local date and duration helpers apps still keep. Defaults (`dd MMM`, spelled) unchanged. Month and weekday names follow the locale. Not built: a custom pattern string.
