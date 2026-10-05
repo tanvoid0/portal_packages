@@ -67,6 +67,80 @@ class PortalAvatarSizes {
   final double lg;
 }
 
+/// Glyph sizes for an `Icon` that is not a component's own. The defaults are
+/// finance's `AppIconSize` (`xs`..`xxxl`) plus the two steps task uses that
+/// it lacks: `xxs` (12, a tag or a chevron) and `dense` (20, a row glyph).
+@immutable
+class PortalIconSizes {
+  const PortalIconSizes({
+    this.xxs = 12,
+    this.xs = 14,
+    this.sm = 16,
+    this.md = 18,
+    this.dense = 20,
+    this.lg = 22,
+    this.xl = 28,
+    this.xxl = 36,
+    this.xxxl = 44,
+  });
+
+  final double xxs;
+  final double xs;
+  final double sm;
+  final double md;
+  final double dense;
+  final double lg;
+  final double xl;
+  final double xxl;
+  final double xxxl;
+}
+
+/// Fixed component dimensions: control heights, card padding, the tile an
+/// icon sits in, a progress track. The defaults are finance's `AppSizes`.
+/// Hit areas are `minTapTarget`, never these: they size the paint.
+@immutable
+class PortalComponentSizes {
+  const PortalComponentSizes({
+    this.buttonHeightSm = 36,
+    this.buttonHeightMd = 44,
+    this.buttonHeightLg = 52,
+    this.inputHeightMd = 48,
+    this.inputHeightLg = 56,
+    this.cardPaddingSm = 14,
+    this.cardPaddingMd = 18,
+    this.cardPaddingLg = 22,
+    this.iconContainerSm = 36,
+    this.iconContainerMd = 44,
+    this.iconContainerLg = 52,
+    this.iconContainerXl = 60,
+    this.trackHeight = 6,
+    this.trackHeightSm = 4,
+    this.dotSm = 6,
+  });
+
+  final double buttonHeightSm;
+  final double buttonHeightMd;
+  final double buttonHeightLg;
+  final double inputHeightMd;
+  final double inputHeightLg;
+  final double cardPaddingSm;
+  final double cardPaddingMd;
+  final double cardPaddingLg;
+
+  /// The tile an icon sits in (an index tab, a list leading).
+  final double iconContainerSm;
+  final double iconContainerMd;
+  final double iconContainerLg;
+  final double iconContainerXl;
+
+  /// A progress track; `trackHeightSm` for a thin meter inside a row.
+  final double trackHeight;
+  final double trackHeightSm;
+
+  /// A legend mark: the dot before a series label.
+  final double dotSm;
+}
+
 /// Typography scale (font sizes and typeface). Pair with [TextTheme] in
 /// [buildPortalTheme].
 @immutable
@@ -440,6 +514,8 @@ class DesignTokens {
     this.gradients = const PortalGradients(),
     this.layout = const PortalLayoutInsets(),
     this.avatarSizes = const PortalAvatarSizes(),
+    this.iconSizes = const PortalIconSizes(),
+    this.componentSizes = const PortalComponentSizes(),
     this.minTapTarget = 48,
     this.borderWidth = 1,
     this.expressiveCorners = true,
@@ -459,6 +535,13 @@ class DesignTokens {
 
   /// Avatar diameters; see [PortalAvatarSizes].
   final PortalAvatarSizes avatarSizes;
+
+  /// Icon glyph sizes; see [PortalIconSizes].
+  final PortalIconSizes iconSizes;
+
+  /// Control heights, card padding, icon tiles, tracks; see
+  /// [PortalComponentSizes].
+  final PortalComponentSizes componentSizes;
 
   /// Minimum interactive dimension: 48, the Android and M3 floor, in every
   /// preset. It sizes the *hit area*, never the paint — put it in a
