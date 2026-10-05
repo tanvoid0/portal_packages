@@ -22,6 +22,8 @@ dependencies:
   # IconThemeData. Const `Symbols.*_rounded` only, so release builds tree-shake
   # the three fonts down to the glyphs in use.
   material_symbols_icons: ^4.2960.0
+  # PortalFormat (G2): number, currency and date patterns per locale.
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:
