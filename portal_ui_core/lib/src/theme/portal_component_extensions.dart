@@ -4,6 +4,14 @@ import 'package:flutter/material.dart';
 
 import '../components/portal_card.dart' show PortalCardElevation;
 
+// A field one side leaves unset has nothing to blend from: lerping it to 0 or
+// transparent flashes a colour that neither theme asked for, so it snaps at the
+// midpoint instead.
+Color? _lerpColor(Color? a, Color? b, double t) =>
+    a != null && b != null ? Color.lerp(a, b, t) : (t < .5 ? a : b);
+double? _lerpNum(double? a, double? b, double t) =>
+    a != null && b != null ? lerpDouble(a, b, t) : (t < .5 ? a : b);
+
 /// Per-component re-skin hooks.
 ///
 /// Each class is a [ThemeExtension] whose every field is nullable: null means
@@ -67,7 +75,7 @@ class PortalCardTheme extends ThemeExtension<PortalCardTheme> {
     return PortalCardTheme(
       padding: EdgeInsetsGeometry.lerp(padding, other.padding, t),
       borderRadius: BorderRadius.lerp(borderRadius, other.borderRadius, t),
-      backgroundColor: Color.lerp(backgroundColor, other.backgroundColor, t),
+      backgroundColor: _lerpColor(backgroundColor, other.backgroundColor, t),
       border: t < 0.5 ? border : other.border,
       elevation: t < 0.5 ? elevation : other.elevation,
     );
@@ -125,12 +133,12 @@ class PortalStatCardTheme extends ThemeExtension<PortalStatCardTheme> {
   PortalStatCardTheme lerp(PortalStatCardTheme? other, double t) {
     if (other == null) return this;
     return PortalStatCardTheme(
-      accentColor: Color.lerp(accentColor, other.accentColor, t),
-      valueColor: Color.lerp(valueColor, other.valueColor, t),
-      labelColor: Color.lerp(labelColor, other.labelColor, t),
+      accentColor: _lerpColor(accentColor, other.accentColor, t),
+      valueColor: _lerpColor(valueColor, other.valueColor, t),
+      labelColor: _lerpColor(labelColor, other.labelColor, t),
       padding: EdgeInsetsGeometry.lerp(padding, other.padding, t),
-      wellAlpha: lerpDouble(wellAlpha, other.wellAlpha, t),
-      backgroundColor: Color.lerp(backgroundColor, other.backgroundColor, t),
+      wellAlpha: _lerpNum(wellAlpha, other.wellAlpha, t),
+      backgroundColor: _lerpColor(backgroundColor, other.backgroundColor, t),
     );
   }
 }
@@ -180,11 +188,11 @@ class PortalEmptyStateTheme extends ThemeExtension<PortalEmptyStateTheme> {
   PortalEmptyStateTheme lerp(PortalEmptyStateTheme? other, double t) {
     if (other == null) return this;
     return PortalEmptyStateTheme(
-      iconColor: Color.lerp(iconColor, other.iconColor, t),
-      iconWellColor: Color.lerp(iconWellColor, other.iconWellColor, t),
-      iconSize: lerpDouble(iconSize, other.iconSize, t),
-      titleColor: Color.lerp(titleColor, other.titleColor, t),
-      messageColor: Color.lerp(messageColor, other.messageColor, t),
+      iconColor: _lerpColor(iconColor, other.iconColor, t),
+      iconWellColor: _lerpColor(iconWellColor, other.iconWellColor, t),
+      iconSize: _lerpNum(iconSize, other.iconSize, t),
+      titleColor: _lerpColor(titleColor, other.titleColor, t),
+      messageColor: _lerpColor(messageColor, other.messageColor, t),
     );
   }
 }
@@ -234,7 +242,7 @@ class PortalBadgeTheme extends ThemeExtension<PortalBadgeTheme> {
     return PortalBadgeTheme(
       padding: EdgeInsetsGeometry.lerp(padding, other.padding, t),
       textStyle: TextStyle.lerp(textStyle, other.textStyle, t),
-      tintAlpha: lerpDouble(tintAlpha, other.tintAlpha, t),
+      tintAlpha: _lerpNum(tintAlpha, other.tintAlpha, t),
       borderRadius:
           BorderRadiusGeometry.lerp(borderRadius, other.borderRadius, t),
     );
@@ -290,11 +298,11 @@ class PortalProgressTheme extends ThemeExtension<PortalProgressTheme> {
   PortalProgressTheme lerp(PortalProgressTheme? other, double t) {
     if (other == null) return this;
     return PortalProgressTheme(
-      height: lerpDouble(height, other.height, t),
-      fillColor: Color.lerp(fillColor, other.fillColor, t),
-      trackColor: Color.lerp(trackColor, other.trackColor, t),
-      overflowColor: Color.lerp(overflowColor, other.overflowColor, t),
-      doneColor: Color.lerp(doneColor, other.doneColor, t),
+      height: _lerpNum(height, other.height, t),
+      fillColor: _lerpColor(fillColor, other.fillColor, t),
+      trackColor: _lerpColor(trackColor, other.trackColor, t),
+      overflowColor: _lerpColor(overflowColor, other.overflowColor, t),
+      doneColor: _lerpColor(doneColor, other.doneColor, t),
     );
   }
 }
@@ -336,7 +344,7 @@ class PortalTextFieldTheme extends ThemeExtension<PortalTextFieldTheme> {
   PortalTextFieldTheme lerp(PortalTextFieldTheme? other, double t) {
     if (other == null) return this;
     return PortalTextFieldTheme(
-      filledColor: Color.lerp(filledColor, other.filledColor, t),
+      filledColor: _lerpColor(filledColor, other.filledColor, t),
       contentPadding:
           EdgeInsetsGeometry.lerp(contentPadding, other.contentPadding, t),
       borderRadius: BorderRadius.lerp(borderRadius, other.borderRadius, t),
@@ -381,9 +389,9 @@ class PortalCalendarTheme extends ThemeExtension<PortalCalendarTheme> {
   PortalCalendarTheme lerp(PortalCalendarTheme? other, double t) {
     if (other == null) return this;
     return PortalCalendarTheme(
-      selectedColor: Color.lerp(selectedColor, other.selectedColor, t),
-      onSelectedColor: Color.lerp(onSelectedColor, other.onSelectedColor, t),
-      markerColor: Color.lerp(markerColor, other.markerColor, t),
+      selectedColor: _lerpColor(selectedColor, other.selectedColor, t),
+      onSelectedColor: _lerpColor(onSelectedColor, other.onSelectedColor, t),
+      markerColor: _lerpColor(markerColor, other.markerColor, t),
     );
   }
 }
@@ -444,13 +452,13 @@ class PortalFilterChipTheme extends ThemeExtension<PortalFilterChipTheme> {
   PortalFilterChipTheme lerp(PortalFilterChipTheme? other, double t) {
     if (other == null) return this;
     return PortalFilterChipTheme(
-      selectedColor: Color.lerp(selectedColor, other.selectedColor, t),
-      onSelectedColor: Color.lerp(onSelectedColor, other.onSelectedColor, t),
-      unselectedColor: Color.lerp(unselectedColor, other.unselectedColor, t),
+      selectedColor: _lerpColor(selectedColor, other.selectedColor, t),
+      onSelectedColor: _lerpColor(onSelectedColor, other.onSelectedColor, t),
+      unselectedColor: _lerpColor(unselectedColor, other.unselectedColor, t),
       onUnselectedColor:
-          Color.lerp(onUnselectedColor, other.onUnselectedColor, t),
-      borderColor: Color.lerp(borderColor, other.borderColor, t),
-      minHeight: lerpDouble(minHeight, other.minHeight, t),
+          _lerpColor(onUnselectedColor, other.onUnselectedColor, t),
+      borderColor: _lerpColor(borderColor, other.borderColor, t),
+      minHeight: _lerpNum(minHeight, other.minHeight, t),
     );
   }
 }
@@ -510,13 +518,13 @@ class PortalNavBarTheme extends ThemeExtension<PortalNavBarTheme> {
   PortalNavBarTheme lerp(PortalNavBarTheme? other, double t) {
     if (other == null) return this;
     return PortalNavBarTheme(
-      backgroundColor: Color.lerp(backgroundColor, other.backgroundColor, t),
-      borderColor: Color.lerp(borderColor, other.borderColor, t),
-      markColor: Color.lerp(markColor, other.markColor, t),
+      backgroundColor: _lerpColor(backgroundColor, other.backgroundColor, t),
+      borderColor: _lerpColor(borderColor, other.borderColor, t),
+      markColor: _lerpColor(markColor, other.markColor, t),
       selectedWellColor:
-          Color.lerp(selectedWellColor, other.selectedWellColor, t),
+          _lerpColor(selectedWellColor, other.selectedWellColor, t),
       selectedMarkColor:
-          Color.lerp(selectedMarkColor, other.selectedMarkColor, t),
+          _lerpColor(selectedMarkColor, other.selectedMarkColor, t),
       boxShadow: t < 0.5 ? boxShadow : other.boxShadow,
     );
   }

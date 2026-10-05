@@ -16,7 +16,7 @@ abstract final class PortalAppFeedback {
   /// Lets an app teach [messageFrom] its own error types without ui_core
   /// depending on them: `PortalAppFeedback.errorMessageResolver = (e) =>
   /// e is ApiException ? e.message : null;` once at startup. Return null to
-  /// fall through to `toString()`.
+  /// fall through: a `String` error is shown as it is, anything else gets the fallback (an `Exception`'s `toString()` is not user text).
   static String? Function(Object error)? errorMessageResolver;
 
   /// User-facing text for a thrown [error]; [fallback] for null or empty.
@@ -25,7 +25,13 @@ abstract final class PortalAppFeedback {
     String fallback = 'Something went wrong.',
   }) {
     if (error == null) return fallback;
-    final text = (errorMessageResolver?.call(error) ?? error.toString()).trim();
+    String? resolved;
+    try {
+      resolved = errorMessageResolver?.call(error);
+    } catch (_) {
+      // A resolver that throws must not turn one error into another.
+    }
+    final text = (resolved ?? (error is String ? error : '')).trim();
     return text.isEmpty ? fallback : text;
   }
 

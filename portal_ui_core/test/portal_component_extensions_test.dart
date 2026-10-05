@@ -55,4 +55,17 @@ void main() {
     expect(mid.valueColor, isNull);
     expect(a.copyWith(wellAlpha: .5).accentColor, Colors.black);
   });
+
+  test('lerp snaps at the midpoint when one side leaves a field unset', () {
+    const a = PortalFilterChipTheme(selectedColor: Colors.red, minHeight: 40);
+    const b = PortalFilterChipTheme();
+    final early = a.lerp(b, .25);
+    expect(early.selectedColor, Colors.red);
+    expect(early.minHeight, 40);
+    final late = a.lerp(b, .75);
+    expect(late.selectedColor, isNull);
+    expect(late.minHeight, isNull);
+    final both = a.lerp(const PortalFilterChipTheme(minHeight: 20), .5);
+    expect(both.minHeight, 30);
+  });
 }

@@ -38,10 +38,19 @@ void main() {
     expect(undone, isTrue);
   });
 
-  test('messageFrom: null and blank fall back, others use toString', () {
+  test('messageFrom: null and blank fall back, a String is shown', () {
     expect(PortalAppFeedback.messageFrom(null, fallback: 'x'), 'x');
     expect(PortalAppFeedback.messageFrom(' '), 'Something went wrong.');
     expect(PortalAppFeedback.messageFrom('boom'), 'boom');
+  });
+
+  test('messageFrom: no raw toString of an exception, a throwing resolver', () {
+    expect(PortalAppFeedback.messageFrom(Exception('db at 10.0.0.4')),
+        'Something went wrong.');
+    PortalAppFeedback.errorMessageResolver = (e) => throw StateError('bad');
+    expect(PortalAppFeedback.messageFrom(StateError('x'), fallback: 'f'), 'f');
+    PortalAppFeedback.errorMessageResolver = (e) => 'resolved';
+    expect(PortalAppFeedback.messageFrom(StateError('x')), 'resolved');
   });
 
   testWidgets('back button: named, pops the route by default', (t) async {

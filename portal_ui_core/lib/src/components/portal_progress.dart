@@ -139,9 +139,8 @@ class PortalSegmentedProgress extends StatelessWidget {
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
-    final h = height ??
-        PortalProgressTheme.of(context).height ??
-        tokens.spacing.sm;
+    final h =
+        height ?? PortalProgressTheme.of(context).height ?? tokens.spacing.sm;
 
     final visible =
         segments.where((s) => s.value.isFinite && s.value > 0).toList();
@@ -224,8 +223,9 @@ class PortalSegmentedProgress extends StatelessWidget {
 
 /// One bar per step (cook mode, onboarding): done, current, upcoming.
 ///
-/// The current bar is taller as well as coloured, so position never reads by
-/// colour alone. With [onStepTap] each bar's hit area is `minTapTarget` tall
+/// The current bar is taller as well as coloured, and an upcoming one is
+/// thinner, so position never reads by colour alone; a done bar announces
+/// [doneLabel] as its value. With [onStepTap] each bar's hit area is `minTapTarget` tall
 /// around the painted bar.
 class PortalStepProgress extends StatelessWidget {
   const PortalStepProgress({
@@ -234,7 +234,11 @@ class PortalStepProgress extends StatelessWidget {
     required this.current,
     this.isDone,
     this.onStepTap,
+    this.doneLabel = 'done',
   });
+
+  /// The semantic value of a completed step; pass it localised.
+  final String doneLabel;
 
   final int count;
   final int current;
@@ -250,6 +254,7 @@ class PortalStepProgress extends StatelessWidget {
     final skin = PortalProgressTheme.of(context);
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     final base = skin.height ?? tokens.spacing.xs;
+    bool done(int i) => isDone?.call(i) ?? i < current;
 
     return Row(
       children: [
@@ -257,6 +262,7 @@ class PortalStepProgress extends StatelessWidget {
           Expanded(
             child: Semantics(
               label: 'Step ${i + 1} of $count',
+              value: done(i) ? doneLabel : null,
               selected: i == current,
               button: onStepTap != null,
               onTap: onStepTap == null ? null : () => onStepTap!(i),
@@ -273,9 +279,11 @@ class PortalStepProgress extends StatelessWidget {
                       child: AnimatedContainer(
                         duration:
                             reduceMotion ? Duration.zero : tokens.motion.fast,
-                        height: i == current ? base * 1.5 : base,
+                        height: i == current
+                            ? base * 1.5
+                            : (done(i) ? base : base * .5),
                         decoration: BoxDecoration(
-                          color: (isDone?.call(i) ?? i < current)
+                          color: done(i)
                               ? (skin.doneColor ??
                                   PortalSemanticColors.of(context).success)
                               : i == current

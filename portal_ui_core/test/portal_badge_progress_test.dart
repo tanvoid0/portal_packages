@@ -85,4 +85,16 @@ void main() {
     await t.tap(find.byType(GestureDetector).at(2));
     expect(tapped, 2);
   });
+
+  testWidgets('steps: done is announced and drawn apart from upcoming',
+      (t) async {
+    final h = t.ensureSemantics();
+    await t.pumpWidget(host(const PortalStepProgress(count: 3, current: 1)));
+    final bars = find.byType(AnimatedContainer);
+    expect(t.getSemantics(bars.at(0)).value, 'done');
+    expect(t.getSemantics(bars.at(2)).value, isEmpty);
+    expect(t.getSize(bars.at(0)).height,
+        greaterThan(t.getSize(bars.at(2)).height));
+    h.dispose();
+  });
 }

@@ -1,5 +1,7 @@
 ## Unreleased
 
+Fix: `PortalStepProgress` announces a done step (`doneLabel`, default `done`) and draws done, current and upcoming bars at three heights; `PortalAppFeedback.messageFrom` shows a `String` error as it is and the fallback for any other (no raw `Exception.toString()`), and a resolver that throws falls back; the per-component theme extensions snap at the midpoint when one side leaves a colour or size unset, instead of blending it to transparent or zero.
+
 Fix: `portalInputDialog` validates the trimmed text it returns; `PortalBlockingProgress.run` removes its own route instead of popping whatever the task left on top.
 
 Fix: `PortalCalendar` day cells can be selected by a screen reader (the cell had a button role but no tap action); `PortalListItem` no longer reads the trailing text twice when only the leading is interactive, announces `disabledReason` as the row hint, and includes `meta` (and the `meta` accessory text) in the row label.
