@@ -21,11 +21,15 @@ enum PortalValueSentiment { neutral, positive, negative, dim, meta }
 /// What leads a row. One size per page: when any section has a 40 leading,
 /// icon rows take [PortalListLeading.tile].
 class PortalListLeading {
-  const PortalListLeading._(this.extent, this._build);
+  const PortalListLeading._(this.extent, this._build,
+      {this.interactive = false});
 
   /// The painted width; [PortalListSection] insets its dividers by it.
   final double extent;
   final Widget Function(BuildContext) _build;
+
+  /// True when the child is a control that keeps its own semantics.
+  final bool interactive;
 
   /// A bare 24 dp icon, for dense or utility lists. [color] defaults to
   /// `onSurfaceVariant`.
@@ -95,6 +99,13 @@ class PortalListLeading {
   factory PortalListLeading.custom(Widget child, {double extent = 40}) =>
       PortalListLeading._(extent, (c) => ExcludeSemantics(child: child));
 
+  /// A control in the leading slot (a checkbox, a button). Unlike every other
+  /// leading it is *not* decorative: it keeps its own semantics, so give it a
+  /// name (`Semantics(label:)`, `tooltip:`) and the row stops reading as one
+  /// merged label.
+  factory PortalListLeading.interactive(Widget child, {double extent = 40}) =>
+      PortalListLeading._(extent, (c) => child, interactive: true);
+
   /// A 40 dp avatar, or 56 dp for an account cell.
   factory PortalListLeading.avatar(
     String initials, {
@@ -155,6 +166,7 @@ enum _Kind {
   meta,
   custom,
   iconButtons,
+  valueAndAction,
 }
 
 /// One icon button of [PortalListAccessory.iconButtons].
@@ -191,6 +203,7 @@ class PortalListAccessory {
     this.unread = false,
     this.child,
     this.actions = const [],
+    this.interactive = false,
   });
 
   final _Kind _kind;
@@ -205,6 +218,9 @@ class PortalListAccessory {
   final bool unread;
   final Widget? child;
   final List<PortalListIconAction> actions;
+
+  /// A custom [child] that is a control and keeps its own semantics.
+  final bool interactive;
 
   static const none = PortalListAccessory._(_Kind.none);
 
@@ -262,11 +278,33 @@ class PortalListAccessory {
   }) : this._(_Kind.meta, text: time, unread: unread, icon: icon);
 
   /// Any widget in the trailing slot (an amount over a badge). The row reads
-  /// as one label, so say what the widget shows in [semanticLabel].
+  /// as one label, so say what the widget shows in [semanticLabel]. A
+  /// decorative child is left out of semantics; an [interactive] one (a
+  /// button, a checkbox) keeps its own and is *not* part of the row's label.
   const PortalListAccessory.widget(
     Widget child, {
     String? semanticLabel,
-  }) : this._(_Kind.custom, child: child, text: semanticLabel);
+    bool interactive = false,
+  }) : this._(_Kind.custom,
+            child: child, text: semanticLabel, interactive: interactive);
+
+  /// A right-column [value] plus an icon button beside it (an amount and a
+  /// "mark paid" action). The value is in the row's label, the button is its
+  /// own target named by [tooltip].
+  const PortalListAccessory.valueAndAction(
+    String value, {
+    String? unit,
+    PortalValueSentiment sentiment = PortalValueSentiment.neutral,
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback? onPressed,
+  }) : this._(_Kind.valueAndAction,
+            text: value,
+            unit: unit,
+            sentiment: sentiment,
+            icon: icon,
+            tooltip: tooltip,
+            onPressed: onPressed);
 
   /// Several icon buttons side by side; each is its own target and name.
   const PortalListAccessory.iconButtons(List<PortalListIconAction> actions)
@@ -276,6 +314,14 @@ class PortalListAccessory {
       _kind == _Kind.checkbox ||
       _kind == _Kind.radio ||
       _kind == _Kind.switchControl;
+
+  /// Keeps its own semantics instead of merging into the row's label.
+  bool get _keepsSemantics =>
+      _kind == _Kind.iconButton ||
+      _kind == _Kind.iconButtons ||
+      _kind == _Kind.button ||
+      _kind == _Kind.valueAndAction ||
+      (_kind == _Kind.custom && interactive);
 }
 
 /// The list row: leading, text, one trailing accessory.
@@ -477,6 +523,38 @@ class PortalListItem extends StatelessWidget {
     final acc = trailing;
     final tapTarget = tokens.minTapTarget;
     Widget? accessory;
+    Widget valueRow({bool withIcon = true}) {
+      final sem = PortalSemanticColors.of(context);
+      final color = switch (acc.sentiment) {
+        PortalValueSentiment.positive => sem.success,
+        PortalValueSentiment.negative => cs.error,
+        PortalValueSentiment.dim ||
+        PortalValueSentiment.meta =>
+          cs.onSurfaceVariant,
+        PortalValueSentiment.neutral => cs.onSurface,
+      };
+      final base = acc.sentiment == PortalValueSentiment.meta
+          ? styles.caption
+          : styles.body;
+      return Row(mainAxisSize: MainAxisSize.min, children: [
+        if (withIcon && acc.icon != null) ...[
+          Icon(acc.icon, size: 18, color: color),
+          SizedBox(width: sp.xs),
+        ],
+        Text(
+          acc.unit == null ? acc.text! : '${acc.text} ${acc.unit}',
+          softWrap: false,
+          style: base.copyWith(
+            color: color,
+            fontWeight: acc.sentiment == PortalValueSentiment.dim
+                ? FontWeight.w400
+                : FontWeight.w500,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ]);
+    }
+
     switch (acc._kind) {
       case _Kind.none:
         break;
@@ -553,33 +631,14 @@ class PortalListItem extends StatelessWidget {
           ),
         );
       case _Kind.value:
-        final sem = PortalSemanticColors.of(context);
-        final color = switch (acc.sentiment) {
-          PortalValueSentiment.positive => sem.success,
-          PortalValueSentiment.negative => cs.error,
-          PortalValueSentiment.dim ||
-          PortalValueSentiment.meta =>
-            cs.onSurfaceVariant,
-          PortalValueSentiment.neutral => cs.onSurface,
-        };
-        final base = acc.sentiment == PortalValueSentiment.meta
-            ? styles.caption
-            : styles.body;
+        accessory = valueRow();
+      case _Kind.valueAndAction:
         accessory = Row(mainAxisSize: MainAxisSize.min, children: [
-          if (acc.icon != null) ...[
-            Icon(acc.icon, size: 18, color: color),
-            SizedBox(width: sp.xs),
-          ],
-          Text(
-            acc.unit == null ? acc.text! : '${acc.text} ${acc.unit}',
-            softWrap: false,
-            style: base.copyWith(
-              color: color,
-              fontWeight: acc.sentiment == PortalValueSentiment.dim
-                  ? FontWeight.w400
-                  : FontWeight.w500,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
+          ExcludeSemantics(child: valueRow(withIcon: false)),
+          IconButton(
+            icon: Icon(acc.icon),
+            tooltip: acc.tooltip,
+            onPressed: disabled ? null : acc.onPressed,
           ),
         ]);
       case _Kind.meta:
@@ -617,11 +676,16 @@ class PortalListItem extends StatelessWidget {
 
     final labelParts = [
       title,
-      if (acc._kind == _Kind.value) acc.text,
-      if (acc._kind == _Kind.navigate || acc._kind == _Kind.custom) acc.text,
+      if (acc._kind == _Kind.value || acc._kind == _Kind.valueAndAction)
+        acc.text,
+      if (acc._kind == _Kind.navigate ||
+          (acc._kind == _Kind.custom && !acc.interactive))
+        acc.text,
       subtitle,
       if (isNew) 'new',
     ].whereType<String>().where((s) => s.isNotEmpty);
+
+    final keepsSemantics = acc._keepsSemantics || leading?.interactive == true;
 
     Widget row = ConstrainedBox(
       constraints: BoxConstraints(minHeight: tapTarget + sp.md),
@@ -646,7 +710,13 @@ class PortalListItem extends StatelessWidget {
                   ),
                   SizedBox(width: sp.lg),
                 ],
-                Expanded(child: textColumn),
+                Expanded(
+                  // The row's label already says it; a control beside it
+                  // keeps its own node, so the text must not read twice.
+                  child: keepsSemantics
+                      ? ExcludeSemantics(child: textColumn)
+                      : textColumn,
+                ),
                 if (accessory != null) ...[
                   SizedBox(width: sp.md),
                   Opacity(opacity: disabled ? .38 : 1, child: accessory),
@@ -681,9 +751,7 @@ class PortalListItem extends StatelessWidget {
 
     return Semantics(
       container: true,
-      explicitChildNodes: acc._kind == _Kind.iconButton ||
-          acc._kind == _Kind.iconButtons ||
-          acc._kind == _Kind.button,
+      explicitChildNodes: keepsSemantics,
       button: rowTap != null && acc._kind == _Kind.navigate,
       checked: acc._kind == _Kind.checkbox || acc._kind == _Kind.radio
           ? acc.checked
@@ -693,9 +761,7 @@ class PortalListItem extends StatelessWidget {
       enabled: !disabled,
       label: labelParts.join(', '),
       onTap: rowTap,
-      excludeSemantics: acc._kind != _Kind.iconButton &&
-          acc._kind != _Kind.iconButtons &&
-          acc._kind != _Kind.button,
+      excludeSemantics: !keepsSemantics,
       child: row,
     );
   }
