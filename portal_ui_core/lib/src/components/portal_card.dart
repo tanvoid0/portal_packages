@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import '../theme/portal_component_extensions.dart';
 import '../theme/portal_ui_theme.dart';
 import '../tokens/design_tokens.dart';
 import '../tokens/portal_radii_utils.dart';
@@ -37,7 +38,7 @@ class PortalCard extends StatelessWidget {
     this.margin,
     this.onTap,
     this.variant = PortalCardVariant.tonal,
-    this.elevation = PortalCardElevation.flat,
+    this.elevation,
     this.clipBehavior = Clip.antiAlias,
     this.heroAccent,
     this.heroOffset = const Offset(12, 12),
@@ -53,7 +54,9 @@ class PortalCard extends StatelessWidget {
   final EdgeInsetsGeometry? margin;
   final VoidCallback? onTap;
   final PortalCardVariant variant;
-  final PortalCardElevation elevation;
+
+  /// Defaults to [PortalCardTheme.elevation], then flat.
+  final PortalCardElevation? elevation;
   final Clip clipBehavior;
 
   /// Decorative widget behind content (hero variant), e.g. illustration.
@@ -78,23 +81,27 @@ class PortalCard extends StatelessWidget {
     final portal = PortalUiTheme.of(context);
     final t = portal.tokens;
     final brightness = Theme.of(context).brightness;
-    final radius = borderRadius ?? _borderRadius(t.radii, variant);
-    final borderSide = BorderSide(
-      color: portal.outline
-          .withValues(alpha: variant == PortalCardVariant.glass ? 0.2 : 0.65),
-      width: t.borderWidth,
-    );
+    final skin = PortalCardTheme.of(context);
+    final radius =
+        borderRadius ?? skin.borderRadius ?? _borderRadius(t.radii, variant);
+    final fillColor = backgroundColor ?? skin.backgroundColor;
+    final borderSide = skin.border ??
+        BorderSide(
+          color: portal.outline.withValues(
+              alpha: variant == PortalCardVariant.glass ? 0.2 : 0.65),
+          width: t.borderWidth,
+        );
+    final level = elevation ?? skin.elevation ?? PortalCardElevation.flat;
     final shadows = _shadows(
       t.elevation,
-      variant == PortalCardVariant.elevated &&
-              elevation == PortalCardElevation.flat
+      variant == PortalCardVariant.elevated && level == PortalCardElevation.flat
           ? PortalCardElevation.card
-          : elevation,
+          : level,
       brightness,
     );
 
     final inner = Padding(
-      padding: padding ?? EdgeInsets.all(t.spacing.lg),
+      padding: padding ?? skin.padding ?? EdgeInsets.all(t.spacing.lg),
       child: child,
     );
 
@@ -132,7 +139,7 @@ class PortalCard extends StatelessWidget {
             filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
             child: _surfaceBox(
               radius: radius,
-              color: (backgroundColor ?? portal.surface).withValues(alpha: 0.4),
+              color: (fillColor ?? portal.surface).withValues(alpha: 0.4),
               border: borderSide,
               shadows: shadows,
               gradient: gradient,
@@ -152,7 +159,7 @@ class PortalCard extends StatelessWidget {
           borderRadius: radius,
           child: _surfaceBox(
             radius: radius,
-            color: backgroundColor ?? portal.surface,
+            color: fillColor ?? portal.surface,
             border: borderSide,
             shadows: shadows,
             gradient: gradient,
@@ -166,7 +173,7 @@ class PortalCard extends StatelessWidget {
         );
         decorated = Material(
           color: gradient == null
-              ? (backgroundColor ?? portal.surface)
+              ? (fillColor ?? portal.surface)
               : Colors.transparent,
           elevation: 0,
           shadowColor: Colors.transparent,
@@ -186,14 +193,15 @@ class PortalCard extends StatelessWidget {
       case PortalCardVariant.elevated:
       case PortalCardVariant.standard:
         final tonal = variant == PortalCardVariant.tonal;
-        final side = tonal || variant == PortalCardVariant.elevated
-            ? BorderSide.none
-            : borderSide;
+        final side = skin.border ??
+            (tonal || variant == PortalCardVariant.elevated
+                ? BorderSide.none
+                : borderSide);
         final shape = t.expressiveCorners
             ? t.radii.continuousBorder(borderRadius: radius, side: side)
             : t.radii.roundedBorder(borderRadius: radius, side: side);
         final theme = Theme.of(context);
-        final fill = backgroundColor ??
+        final fill = fillColor ??
             (tonal
                 ? theme.cardTheme.color ?? theme.colorScheme.surfaceContainerLow
                 : portal.surface);

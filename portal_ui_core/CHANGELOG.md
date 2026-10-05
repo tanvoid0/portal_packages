@@ -1,5 +1,7 @@
 ## Unreleased
 
+- `PortalCardTheme(padding:, borderRadius:, backgroundColor:, border:, elevation:)`: re-skins every `PortalCard` (and the stat card and empty state built on it) through `PortalThemeConfig.extensionsBuilder`. Widget argument beats theme beats the variant's default; a set `border` also draws on `tonal` and `elevated`. `PortalCard.elevation` is now nullable (null reads the theme, then flat).
+
 - Dialogs on `portalConfirm`'s chrome: `portalInputDialog(context, title:, message:, label:, hint:, initialValue:, confirmLabel:, cancelLabel:, validator:, textCapitalization:, keyboardType:, maxLines:, trim:)` -> `Future<String?>` (a validator error keeps it open; done submits a single line), `portalChoiceDialog<T>(context, title:, choices: [PortalChoice(value:, label:, icon:, isDestructive:)], message:, cancelLabel:)` -> `Future<T?>`, and `PortalBlockingProgress.run(context, task, message:)` (a non-dismissible spinner modal that closes whether the task returns or throws, and rethrows). `PortalTextField(textCapitalization:)` added for the input dialog. Not built: a multi-field form dialog (use a sheet).
 
 - `PortalButtonDock.grid(actions:, columns:, showRule:)`: N equal actions (task's detail bars use 3-4) in rows of `columns` (default all, at most 4), 8 apart; primary + secondary stays the default constructor. Not built: per-action flex (all cells are equal).

@@ -2,6 +2,8 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
 
+import '../components/portal_card.dart' show PortalCardElevation;
+
 /// Per-component re-skin hooks.
 ///
 /// Each class is a [ThemeExtension] whose every field is nullable: null means
@@ -14,6 +16,64 @@ import 'package:flutter/material.dart';
 ///   PortalStatCardTheme(accentColor: ctx.colorScheme.tertiary),
 /// ],
 /// ```
+@immutable
+class PortalCardTheme extends ThemeExtension<PortalCardTheme> {
+  const PortalCardTheme({
+    this.padding,
+    this.borderRadius,
+    this.backgroundColor,
+    this.border,
+    this.elevation,
+  });
+
+  /// Defaults to `spacing.lg` all round.
+  final EdgeInsetsGeometry? padding;
+
+  /// Defaults to the variant's radius (`radii.lg` for most).
+  final BorderRadius? borderRadius;
+
+  /// Fill of every variant that has one. Defaults to the card tone.
+  final Color? backgroundColor;
+
+  /// Replaces the variant's border, and also draws on `tonal` and `elevated`,
+  /// which have none by default.
+  final BorderSide? border;
+
+  /// Shadow level when the widget passes none. Defaults to flat.
+  final PortalCardElevation? elevation;
+
+  static PortalCardTheme of(BuildContext context) =>
+      Theme.of(context).extension<PortalCardTheme>() ?? const PortalCardTheme();
+
+  @override
+  PortalCardTheme copyWith({
+    EdgeInsetsGeometry? padding,
+    BorderRadius? borderRadius,
+    Color? backgroundColor,
+    BorderSide? border,
+    PortalCardElevation? elevation,
+  }) =>
+      PortalCardTheme(
+        padding: padding ?? this.padding,
+        borderRadius: borderRadius ?? this.borderRadius,
+        backgroundColor: backgroundColor ?? this.backgroundColor,
+        border: border ?? this.border,
+        elevation: elevation ?? this.elevation,
+      );
+
+  @override
+  PortalCardTheme lerp(PortalCardTheme? other, double t) {
+    if (other == null) return this;
+    return PortalCardTheme(
+      padding: EdgeInsetsGeometry.lerp(padding, other.padding, t),
+      borderRadius: BorderRadius.lerp(borderRadius, other.borderRadius, t),
+      backgroundColor: Color.lerp(backgroundColor, other.backgroundColor, t),
+      border: t < 0.5 ? border : other.border,
+      elevation: t < 0.5 ? elevation : other.elevation,
+    );
+  }
+}
+
 @immutable
 class PortalStatCardTheme extends ThemeExtension<PortalStatCardTheme> {
   const PortalStatCardTheme({
