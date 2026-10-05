@@ -24,6 +24,8 @@ dependencies:
   material_symbols_icons: ^4.2960.0
   # PortalFormat (G2): number, currency and date patterns per locale.
   intl: ^0.20.2
+  # PortalArt (G8): the per-app spot illustrations are SVG strings.
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:

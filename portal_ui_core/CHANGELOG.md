@@ -1,5 +1,7 @@
 ## Unreleased
 
+- G8: `PortalArt(svg, width:, semanticLabel:)` renders a spot illustration whose `{{role}}` placeholders (primary, primaryContainer, surfaceContainerHigh, outlineVariant, card, onPrimary, surface, error, onError, onSurface, tertiary, outline, onSurfaceVariant) are filled from the live theme, so one drawing follows light, dark and the seed. New dependency: `flutter_svg ^2.3.0`. An unknown role throws instead of painting black. The art itself is generated per app by `scripts/export-art.py` from the kit viewer.
+
 - G6: the example app has a Screens page (transactions, settings, edit-profile form, result) built from G1-G5, and `example/test/screens_golden_test.dart` draws each in light and dark at 1.0 and 1.3 text scale with the real typeface and icon fonts loaded. `flutter test --update-goldens` in `example/` regenerates them. A disabled `PortalListItem` now dims its leading and trailing to 38% and top-aligns them to the title line.
 
 - G5: `PortalResultScreen(state:, title:, body:, art:, dock:, onClose:)` (`PortalResultState` success / error / pending): art, title and body centred above the dock; the page keeps only a Close; an error is a live region. The form, settings, detail and start recipes are in `docs/UI_PATTERNS.md`, not classes.
