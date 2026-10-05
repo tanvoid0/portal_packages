@@ -28,6 +28,7 @@ class PortalBadge extends StatelessWidget {
     required this.label,
     this.tone = PortalBadgeTone.neutral,
     this.icon,
+    this.leading,
     this.outlined = false,
     this.foregroundColor,
     this.backgroundColor,
@@ -36,6 +37,10 @@ class PortalBadge extends StatelessWidget {
   final String label;
   final PortalBadgeTone tone;
   final IconData? icon;
+
+  /// Any glyph (a `FaIcon`, an SVG) in place of [icon]; it paints itself, so
+  /// size and tint it with the ink [PortalBadge] sets through `IconTheme`.
+  final Widget? leading;
   final bool outlined;
 
   /// Replaces the tone's colour, for a domain hue the semantic set lacks
@@ -88,7 +93,13 @@ class PortalBadge extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (icon != null) ...[
+            if (leading != null) ...[
+              IconTheme.merge(
+                data: IconThemeData(color: fg, size: tokens.typeScale.sm),
+                child: leading!,
+              ),
+              SizedBox(width: tokens.spacing.xs),
+            ] else if (icon != null) ...[
               Icon(icon, size: tokens.typeScale.sm, color: fg),
               SizedBox(width: tokens.spacing.xs),
             ],

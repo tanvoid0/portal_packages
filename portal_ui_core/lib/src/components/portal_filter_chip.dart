@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../motion/portal_haptics.dart';
+import '../theme/portal_component_extensions.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_pressable.dart';
 
@@ -23,6 +24,7 @@ class PortalFilterChip extends StatelessWidget {
     this.unselectedColor,
     this.onUnselectedColor,
     this.borderColor,
+    this.compact = false,
   });
 
   final String label;
@@ -54,17 +56,26 @@ class PortalFilterChip extends StatelessWidget {
 
   final Color? borderColor;
 
+  /// A 32 dp painted chip for dense rows. The hit area stays `minTapTarget`
+  /// (an outer box, not taller paint). Re-skin colours and height app-wide
+  /// with [PortalFilterChipTheme].
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
 
+    final skin = PortalFilterChipTheme.of(context);
     final fill = selected
-        ? (selectedColor ?? portal.primary)
-        : (unselectedColor ?? portal.surfaceVariant);
+        ? (selectedColor ?? skin.selectedColor ?? portal.primary)
+        : (unselectedColor ?? skin.unselectedColor ?? portal.surfaceVariant);
     final ink = selected
-        ? (onSelectedColor ?? portal.onPrimary)
-        : (onUnselectedColor ?? portal.onSurfaceVariant);
+        ? (onSelectedColor ?? skin.onSelectedColor ?? portal.onPrimary)
+        : (onUnselectedColor ??
+            skin.onUnselectedColor ??
+            portal.onSurfaceVariant);
+    final painted = skin.minHeight ?? (compact ? 32.0 : tokens.minTapTarget);
     final radius = BorderRadius.circular(tokens.radii.full);
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
@@ -80,49 +91,60 @@ class PortalFilterChip extends StatelessWidget {
         onLongPress: onLongPress,
         haptic: PortalHapticKind.selection,
         borderRadius: radius,
-        child: AnimatedContainer(
-          duration: duration,
-          curve: tokens.motion.standard,
-          constraints: BoxConstraints(minHeight: tokens.minTapTarget),
-          padding: EdgeInsets.symmetric(horizontal: tokens.spacing.md),
-          decoration: BoxDecoration(
-            color: fill,
-            borderRadius: radius,
-            border: Border.all(
-              color: selected ? fill : (borderColor ?? portal.outline),
-              width: tokens.borderWidth,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (leading != null) ...[
-                leading!,
-                SizedBox(width: tokens.spacing.xs),
-              ] else if (icon != null) ...[
-                TweenAnimationBuilder<double>(
-                  tween: Tween(end: selected ? 1 : 0),
-                  duration: duration,
-                  curve: tokens.motion.standard,
-                  builder: (_, fillAxis, __) => Icon(
-                    icon,
-                    fill: fillAxis.clamp(0.0, 1.0),
-                    size: tokens.typeScale.md,
-                    color: ink,
-                  ),
-                ),
-                SizedBox(width: tokens.spacing.xs),
-              ],
-              Text(
-                label,
-                style: tokens.textStyles.caption.copyWith(color: ink),
+        child: _hitArea(
+          tokens.minTapTarget,
+          painted,
+          AnimatedContainer(
+            duration: duration,
+            curve: tokens.motion.standard,
+            constraints: BoxConstraints(minHeight: painted),
+            padding: EdgeInsets.symmetric(horizontal: tokens.spacing.md),
+            decoration: BoxDecoration(
+              color: fill,
+              borderRadius: radius,
+              border: Border.all(
+                color: selected
+                    ? fill
+                    : (borderColor ?? skin.borderColor ?? portal.outline),
+                width: tokens.borderWidth,
               ),
-            ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (leading != null) ...[
+                  leading!,
+                  SizedBox(width: tokens.spacing.xs),
+                ] else if (icon != null) ...[
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(end: selected ? 1 : 0),
+                    duration: duration,
+                    curve: tokens.motion.standard,
+                    builder: (_, fillAxis, __) => Icon(
+                      icon,
+                      fill: fillAxis.clamp(0.0, 1.0),
+                      size: tokens.typeScale.md,
+                      color: ink,
+                    ),
+                  ),
+                  SizedBox(width: tokens.spacing.xs),
+                ],
+                Text(
+                  label,
+                  style: tokens.textStyles.caption.copyWith(color: ink),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+
+  /// A paint under the minimum tap target gets a box around it, so the hit
+  /// area is not painted height (`UI_PATTERNS.md`).
+  static Widget _hitArea(double tap, double painted, Widget chip) =>
+      painted >= tap ? chip : SizedBox(height: tap, child: Center(child: chip));
 }
 
 /// Horizontally scrolling row of [PortalFilterChip]s, inset to the page

@@ -387,3 +387,70 @@ class PortalCalendarTheme extends ThemeExtension<PortalCalendarTheme> {
     );
   }
 }
+
+@immutable
+class PortalFilterChipTheme extends ThemeExtension<PortalFilterChipTheme> {
+  const PortalFilterChipTheme({
+    this.selectedColor,
+    this.onSelectedColor,
+    this.unselectedColor,
+    this.onUnselectedColor,
+    this.borderColor,
+    this.minHeight,
+  });
+
+  /// Fill when selected. Defaults to the app's primary.
+  final Color? selectedColor;
+
+  /// Label and glyph when selected. Defaults to `onPrimary`.
+  final Color? onSelectedColor;
+
+  /// Fill when not selected. Defaults to the surface variant.
+  final Color? unselectedColor;
+
+  /// Label and glyph when not selected. Defaults to `onSurfaceVariant`.
+  final Color? onUnselectedColor;
+
+  /// Outline when not selected. Defaults to the outline tone.
+  final Color? borderColor;
+
+  /// Painted height. Defaults to `minTapTarget` (compact: 32). Under
+  /// `minTapTarget` the hit area stays `minTapTarget` around the paint.
+  final double? minHeight;
+
+  static PortalFilterChipTheme of(BuildContext context) =>
+      Theme.of(context).extension<PortalFilterChipTheme>() ??
+      const PortalFilterChipTheme();
+
+  @override
+  PortalFilterChipTheme copyWith({
+    Color? selectedColor,
+    Color? onSelectedColor,
+    Color? unselectedColor,
+    Color? onUnselectedColor,
+    Color? borderColor,
+    double? minHeight,
+  }) =>
+      PortalFilterChipTheme(
+        selectedColor: selectedColor ?? this.selectedColor,
+        onSelectedColor: onSelectedColor ?? this.onSelectedColor,
+        unselectedColor: unselectedColor ?? this.unselectedColor,
+        onUnselectedColor: onUnselectedColor ?? this.onUnselectedColor,
+        borderColor: borderColor ?? this.borderColor,
+        minHeight: minHeight ?? this.minHeight,
+      );
+
+  @override
+  PortalFilterChipTheme lerp(PortalFilterChipTheme? other, double t) {
+    if (other == null) return this;
+    return PortalFilterChipTheme(
+      selectedColor: Color.lerp(selectedColor, other.selectedColor, t),
+      onSelectedColor: Color.lerp(onSelectedColor, other.onSelectedColor, t),
+      unselectedColor: Color.lerp(unselectedColor, other.unselectedColor, t),
+      onUnselectedColor:
+          Color.lerp(onUnselectedColor, other.onUnselectedColor, t),
+      borderColor: Color.lerp(borderColor, other.borderColor, t),
+      minHeight: lerpDouble(minHeight, other.minHeight, t),
+    );
+  }
+}
