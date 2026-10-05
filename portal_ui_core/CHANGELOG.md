@@ -1,5 +1,7 @@
 ## Unreleased
 
+- `PortalStatCard(valueColor:, backgroundColor:, margin:)` and `PortalStatCardTheme(backgroundColor:)`: a figure that carries a state (value ink, tinted card). Widget beats theme beats the card's own tone. Not built: finance's label-first layout with a small mark and a caption line (a different arrangement, kept in the app; `footer` carries a caption).
+
 - `PortalAmount(tone:, foregroundColor:, fontSize:, fontWeight:, compact:, decimals:)` with `PortalAmountTone` (neutral, credit, alert, muted, onPlate): finance's `MoneyText` needs, defaults unchanged. `foregroundColor` beats `tone`; `decimals: false` rounds to whole units; `compact` is the kit's `£12.4K`. `test/portal_amount_test.dart` compares the text with `MoneyText`'s format. Differences kept on purpose: a negative is the kit's hyphen-minus where finance draws U+2212; `compact` is one decimal (`£3K`, not intl's `£3.02K`); a value that rounds to zero carries no `+`. Not built: finance's slashed-zero face (the app's typeface via tokens), `textAlign` / `maxLines`.
 
 - Fix: `PortalFormat.date` counted relative days by local-midnight `Duration`, so across a DST change `Yesterday` read `Today`. It now compares calendar dates (y/m/d), the same rule as finance's `AppDateUtils.calendarDaysBetween`.

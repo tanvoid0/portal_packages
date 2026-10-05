@@ -21,6 +21,9 @@ class PortalStatCard extends StatelessWidget {
     this.footer,
     this.onTap,
     this.hero = false,
+    this.valueColor,
+    this.backgroundColor,
+    this.margin,
   });
 
   final String value;
@@ -46,6 +49,15 @@ class PortalStatCard extends StatelessWidget {
   /// a page is about — a balance, a total — not a card in a row of three.
   final bool hero;
 
+  /// Ink of the value, for a figure that carries a state. Defaults to
+  /// `onSurface`.
+  final Color? valueColor;
+
+  /// Tints the whole card, for a stat that carries a state.
+  final Color? backgroundColor;
+
+  final EdgeInsetsGeometry? margin;
+
   @override
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
@@ -55,6 +67,8 @@ class PortalStatCard extends StatelessWidget {
 
     return PortalCard(
       onTap: onTap,
+      margin: margin,
+      backgroundColor: backgroundColor ?? skin.backgroundColor,
       padding: skin.padding ?? EdgeInsets.all(tokens.spacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -75,7 +89,7 @@ class PortalStatCard extends StatelessWidget {
             value,
             style: tokens.textStyles
                 .numeric(hero ? tokens.textStyles.hero : tokens.textStyles.title)
-                .copyWith(color: skin.valueColor ?? portal.onSurface),
+                .copyWith(color: valueColor ?? skin.valueColor ?? portal.onSurface),
           ),
           SizedBox(height: tokens.spacing.xs),
           Text(

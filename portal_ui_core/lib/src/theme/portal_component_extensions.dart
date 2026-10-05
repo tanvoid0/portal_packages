@@ -22,6 +22,7 @@ class PortalStatCardTheme extends ThemeExtension<PortalStatCardTheme> {
     this.labelColor,
     this.padding,
     this.wellAlpha,
+    this.backgroundColor,
   });
 
   /// Glyph tint when the widget passes none. Defaults to the app's primary.
@@ -35,6 +36,9 @@ class PortalStatCardTheme extends ThemeExtension<PortalStatCardTheme> {
   /// Opacity of the tint behind the glyph. Defaults to 0.18.
   final double? wellAlpha;
 
+  /// Card fill when the widget passes none. Defaults to the card's own tone.
+  final Color? backgroundColor;
+
   static PortalStatCardTheme of(BuildContext context) =>
       Theme.of(context).extension<PortalStatCardTheme>() ??
       const PortalStatCardTheme();
@@ -46,6 +50,7 @@ class PortalStatCardTheme extends ThemeExtension<PortalStatCardTheme> {
     Color? labelColor,
     EdgeInsetsGeometry? padding,
     double? wellAlpha,
+    Color? backgroundColor,
   }) =>
       PortalStatCardTheme(
         accentColor: accentColor ?? this.accentColor,
@@ -53,6 +58,7 @@ class PortalStatCardTheme extends ThemeExtension<PortalStatCardTheme> {
         labelColor: labelColor ?? this.labelColor,
         padding: padding ?? this.padding,
         wellAlpha: wellAlpha ?? this.wellAlpha,
+        backgroundColor: backgroundColor ?? this.backgroundColor,
       );
 
   @override
@@ -64,6 +70,7 @@ class PortalStatCardTheme extends ThemeExtension<PortalStatCardTheme> {
       labelColor: Color.lerp(labelColor, other.labelColor, t),
       padding: EdgeInsetsGeometry.lerp(padding, other.padding, t),
       wellAlpha: lerpDouble(wellAlpha, other.wellAlpha, t),
+      backgroundColor: Color.lerp(backgroundColor, other.backgroundColor, t),
     );
   }
 }
