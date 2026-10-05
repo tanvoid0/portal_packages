@@ -231,3 +231,48 @@ class PortalProgressTheme extends ThemeExtension<PortalProgressTheme> {
     );
   }
 }
+
+@immutable
+class PortalTextFieldTheme extends ThemeExtension<PortalTextFieldTheme> {
+  const PortalTextFieldTheme({
+    this.filledColor,
+    this.contentPadding,
+    this.borderRadius,
+  });
+
+  /// Fill of a `filled` field. Defaults to `portal.input`.
+  final Color? filledColor;
+
+  /// Defaults to `spacing.lg` across, `spacing.md` down on a `filled` field.
+  final EdgeInsetsGeometry? contentPadding;
+
+  /// Corner of a `filled` field. Defaults to `radii.md`.
+  final BorderRadius? borderRadius;
+
+  static PortalTextFieldTheme of(BuildContext context) =>
+      Theme.of(context).extension<PortalTextFieldTheme>() ??
+      const PortalTextFieldTheme();
+
+  @override
+  PortalTextFieldTheme copyWith({
+    Color? filledColor,
+    EdgeInsetsGeometry? contentPadding,
+    BorderRadius? borderRadius,
+  }) =>
+      PortalTextFieldTheme(
+        filledColor: filledColor ?? this.filledColor,
+        contentPadding: contentPadding ?? this.contentPadding,
+        borderRadius: borderRadius ?? this.borderRadius,
+      );
+
+  @override
+  PortalTextFieldTheme lerp(PortalTextFieldTheme? other, double t) {
+    if (other == null) return this;
+    return PortalTextFieldTheme(
+      filledColor: Color.lerp(filledColor, other.filledColor, t),
+      contentPadding:
+          EdgeInsetsGeometry.lerp(contentPadding, other.contentPadding, t),
+      borderRadius: BorderRadius.lerp(borderRadius, other.borderRadius, t),
+    );
+  }
+}
