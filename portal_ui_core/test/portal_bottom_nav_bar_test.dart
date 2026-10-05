@@ -71,4 +71,39 @@ void main() {
     await t.pumpAndSettle();
     expect(_icon(t, Symbols.push_pin_rounded).fill, 1);
   });
+
+  testWidgets('PortalNavBarTheme colours the bar; a widget argument wins',
+      (t) async {
+    Widget bar({Color? well}) => MaterialApp(
+          theme: PortalThemeConfig(
+            extensionsBuilder: (_) => const [
+              PortalNavBarTheme(
+                selectedWellColor: Colors.orange,
+                selectedMarkColor: Colors.teal,
+              ),
+            ],
+          ).light(),
+          home: Scaffold(
+            bottomNavigationBar: PortalBottomNavBar(
+              selectedIndex: 0,
+              onDestinationSelected: (_) {},
+              destinations: _destinations,
+              selectedWellColor: well,
+            ),
+          ),
+        );
+    Iterable<Color?> wells(WidgetTester t) => t
+        .widgetList<AnimatedContainer>(find.byType(AnimatedContainer))
+        .map((c) => (c.decoration as BoxDecoration?)?.color);
+
+    await t.pumpWidget(bar());
+    await t.pumpAndSettle();
+    expect(wells(t), contains(Colors.orange));
+    expect(_icon(t, Symbols.home_rounded).color, Colors.teal);
+
+    await t.pumpWidget(bar(well: Colors.pink));
+    await t.pumpAndSettle();
+    expect(wells(t), contains(Colors.pink));
+    expect(wells(t), isNot(contains(Colors.orange)));
+  });
 }

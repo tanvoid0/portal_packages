@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../motion/portal_haptics.dart';
+import '../theme/portal_component_extensions.dart';
 import '../theme/portal_ui_theme.dart';
 
 /// A destination in [PortalBottomNavBar].
@@ -33,7 +34,8 @@ class PortalNavDestination {
 /// to be able to read the whole map, not just where they already are.
 ///
 /// Colors resolve from [PortalUiTheme] so the bar inherits each app's world;
-/// the overrides exist for a surface that deliberately differs.
+/// the overrides exist for a surface that deliberately differs. A widget
+/// argument beats [PortalNavBarTheme], which beats the default.
 class PortalBottomNavBar extends StatelessWidget {
   const PortalBottomNavBar({
     super.key,
@@ -93,10 +95,11 @@ class PortalBottomNavBar extends StatelessWidget {
     final brightness = Theme.of(context).brightness;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
-    final bg = backgroundColor ?? portal.card;
-    final border = borderColor ?? portal.border;
-    final mark = markColor ?? portal.onCard;
-    final well = selectedWellColor ?? portal.muted;
+    final skin = PortalNavBarTheme.of(context);
+    final bg = backgroundColor ?? skin.backgroundColor ?? portal.card;
+    final border = borderColor ?? skin.borderColor ?? portal.border;
+    final mark = markColor ?? skin.markColor ?? portal.onCard;
+    final well = selectedWellColor ?? skin.selectedWellColor ?? portal.muted;
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : tokens.motion.medium;
@@ -116,7 +119,8 @@ class PortalBottomNavBar extends StatelessWidget {
           color: bg,
           borderRadius: BorderRadius.circular(tokens.radii.xl),
           border: Border.all(color: border),
-          boxShadow: boxShadow ?? tokens.elevation.medium(brightness),
+          boxShadow:
+              boxShadow ?? skin.boxShadow ?? tokens.elevation.medium(brightness),
         ),
         child: Row(
           children: [
@@ -130,7 +134,7 @@ class PortalBottomNavBar extends StatelessWidget {
                     onDestinationSelected(i);
                   },
                   mark: mark,
-                  selectedMark: selectedMarkColor ?? mark,
+                  selectedMark: selectedMarkColor ?? skin.selectedMarkColor ?? mark,
                   well: well,
                   radius: tokens.radii.lg,
                   duration: duration,

@@ -454,3 +454,70 @@ class PortalFilterChipTheme extends ThemeExtension<PortalFilterChipTheme> {
     );
   }
 }
+
+@immutable
+class PortalNavBarTheme extends ThemeExtension<PortalNavBarTheme> {
+  const PortalNavBarTheme({
+    this.backgroundColor,
+    this.borderColor,
+    this.markColor,
+    this.selectedWellColor,
+    this.selectedMarkColor,
+    this.boxShadow,
+  });
+
+  /// Bar fill. Defaults to the card tone.
+  final Color? backgroundColor;
+
+  /// Bar outline. Defaults to the border tone.
+  final Color? borderColor;
+
+  /// Icon and label ink. Defaults to `onCard`.
+  final Color? markColor;
+
+  /// The indicator well behind the selected icon. Defaults to the muted tone.
+  final Color? selectedWellColor;
+
+  /// Icon ink while selected. Defaults to [markColor].
+  final Color? selectedMarkColor;
+
+  /// Defaults to `tokens.elevation.medium`.
+  final List<BoxShadow>? boxShadow;
+
+  static PortalNavBarTheme of(BuildContext context) =>
+      Theme.of(context).extension<PortalNavBarTheme>() ??
+      const PortalNavBarTheme();
+
+  @override
+  PortalNavBarTheme copyWith({
+    Color? backgroundColor,
+    Color? borderColor,
+    Color? markColor,
+    Color? selectedWellColor,
+    Color? selectedMarkColor,
+    List<BoxShadow>? boxShadow,
+  }) =>
+      PortalNavBarTheme(
+        backgroundColor: backgroundColor ?? this.backgroundColor,
+        borderColor: borderColor ?? this.borderColor,
+        markColor: markColor ?? this.markColor,
+        selectedWellColor: selectedWellColor ?? this.selectedWellColor,
+        selectedMarkColor: selectedMarkColor ?? this.selectedMarkColor,
+        boxShadow: boxShadow ?? this.boxShadow,
+      );
+
+  @override
+  PortalNavBarTheme lerp(PortalNavBarTheme? other, double t) {
+    if (other == null) return this;
+    return PortalNavBarTheme(
+      backgroundColor: Color.lerp(backgroundColor, other.backgroundColor, t),
+      borderColor: Color.lerp(borderColor, other.borderColor, t),
+      markColor: Color.lerp(markColor, other.markColor, t),
+      selectedWellColor:
+          Color.lerp(selectedWellColor, other.selectedWellColor, t),
+      selectedMarkColor:
+          Color.lerp(selectedMarkColor, other.selectedMarkColor, t),
+      boxShadow: t < 0.5 ? boxShadow : other.boxShadow,
+    );
+  }
+}
