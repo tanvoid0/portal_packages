@@ -18,7 +18,27 @@ class PortalButton extends StatelessWidget {
     this.leading,
     this.expand = false,
     this.isLoading = false,
-  });
+    this.backgroundColor,
+    this.foregroundColor,
+  })  : tooltip = null,
+        _circular = false;
+
+  /// A circular icon-only button, [size] across (36 / 48 / 56). [tooltip] is
+  /// required: it is the only name a screen reader gets.
+  PortalButton.icon({
+    required IconData icon,
+    required String this.tooltip,
+    super.key,
+    this.onPressed,
+    this.variant = PortalButtonVariant.secondary,
+    this.size = PortalButtonSize.md,
+    this.isLoading = false,
+    this.backgroundColor,
+    this.foregroundColor,
+  })  : label = '',
+        leading = Icon(icon),
+        expand = false,
+        _circular = true;
 
   final String label;
   final VoidCallback? onPressed;
@@ -32,6 +52,15 @@ class PortalButton extends StatelessWidget {
   /// get two of whatever it creates.
   final bool isLoading;
 
+  /// Replace the variant's fill and ink for this one button; the widget beats
+  /// the theme. Pick a pair that contrasts.
+  final Color? backgroundColor;
+  final Color? foregroundColor;
+
+  /// The accessible name of the [PortalButton.icon] form.
+  final String? tooltip;
+  final bool _circular;
+
   @override
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
@@ -39,13 +68,18 @@ class PortalButton extends StatelessWidget {
     final (hPad, _, labelFontSize) = _metrics(tokens);
     final painted = _paintedHeight;
     final tap = painted < tokens.minTapTarget ? tokens.minTapTarget : painted;
-    final style = _styleFor(portal, Theme.of(context).colorScheme);
+    final base = _styleFor(portal, Theme.of(context).colorScheme);
+    final style = _ButtonStyle(
+      background: backgroundColor ?? base.background,
+      foreground: foregroundColor ?? base.foreground,
+      border: base.border,
+    );
     // Filled buttons are pills; tonal, outlined and ghost keep a soft corner.
     final radius = switch (variant) {
       PortalButtonVariant.primary ||
       PortalButtonVariant.destructive =>
         tokens.radii.full,
-      _ => tokens.radii.md,
+      _ => _circular ? tokens.radii.full : tokens.radii.md,
     };
     final textStyle = portalControlLabelStyle(
       labelFontSize,
@@ -109,11 +143,13 @@ class PortalButton extends StatelessWidget {
           border: style.border,
         ),
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: hPad),
+          padding: EdgeInsets.symmetric(horizontal: _circular ? 0 : hPad),
           child: SizedBox(
             height: painted,
+            width: _circular ? painted : null,
             child: ConstrainedBox(
-              constraints: BoxConstraints(minWidth: tokens.minTapTarget),
+              constraints: BoxConstraints(
+                  minWidth: _circular ? 0 : tokens.minTapTarget),
               child: Align(
                 alignment: Alignment.center,
                 widthFactor: expand ? null : 1,
@@ -127,6 +163,12 @@ class PortalButton extends StatelessWidget {
 
     // A small button paints under the minimum tap target, so the hit area is
     // a box around the paint rather than taller paint (`UI_PATTERNS.md`).
+    if (_circular) {
+      return Tooltip(
+        message: tooltip!,
+        child: SizedBox(width: tap, height: tap, child: Center(child: button)),
+      );
+    }
     if (tap == painted) return button;
     return SizedBox(height: tap, child: Center(child: button));
   }

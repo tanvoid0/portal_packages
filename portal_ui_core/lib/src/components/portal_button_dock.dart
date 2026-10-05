@@ -33,6 +33,8 @@ class PortalButtonDock extends StatelessWidget {
     this.secondary,
     this.showRule,
   })  : actions = null,
+        flexes = null,
+        scrollable = false,
         columns = null;
 
   /// N equal actions in a grid instead of primary + secondary: [columns] to a
@@ -43,6 +45,8 @@ class PortalButtonDock extends StatelessWidget {
     required List<Widget> this.actions,
     this.columns,
     this.showRule,
+    this.flexes,
+    this.scrollable = false,
   })  : primary = null,
         secondary = null;
 
@@ -56,6 +60,14 @@ class PortalButtonDock extends StatelessWidget {
 
   final List<Widget>? actions;
   final int? columns;
+
+  /// Per-action flex for [PortalButtonDock.grid], by index (default 1 each).
+  /// Give the buttons `expand: true` so they fill their share.
+  final List<int>? flexes;
+
+  /// One row that scrolls sideways instead of wrapping: [columns] and
+  /// [flexes] are ignored and each action takes its natural width.
+  final bool scrollable;
 
   @override
   Widget build(BuildContext context) {
@@ -97,6 +109,19 @@ class PortalButtonDock extends StatelessWidget {
   }
 
   List<Widget> _grid(List<Widget> items) {
+    if (scrollable) {
+      return [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: [
+            for (var j = 0; j < items.length; j++) ...[
+              if (j > 0) const SizedBox(width: 8),
+              items[j],
+            ],
+          ]),
+        ),
+      ];
+    }
     final per = (columns ?? math.min(items.length, 4)).clamp(1, 1 << 20);
     final rows = <Widget>[];
     for (var i = 0; i < items.length; i += per) {
@@ -105,7 +130,10 @@ class PortalButtonDock extends StatelessWidget {
       rows.add(Row(children: [
         for (var j = 0; j < per; j++) ...[
           if (j > 0) const SizedBox(width: 8),
-          Expanded(child: j < chunk.length ? chunk[j] : const SizedBox()),
+          Expanded(
+            flex: flexes != null && i + j < flexes!.length ? flexes![i + j] : 1,
+            child: j < chunk.length ? chunk[j] : const SizedBox(),
+          ),
         ],
       ]));
     }
