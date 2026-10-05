@@ -58,6 +58,7 @@ export 'src/components/portal_dialogs.dart';
 export 'src/components/portal_empty_state.dart';
 export 'src/components/portal_fab.dart';
 export 'src/components/portal_filter_chip.dart';
+export 'src/components/portal_icon_tile.dart';
 export 'src/components/portal_list_item.dart';
 export 'src/components/portal_list_skeleton.dart';
 export 'src/components/portal_pressable.dart';

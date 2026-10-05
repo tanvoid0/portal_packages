@@ -3,16 +3,12 @@ import 'package:flutter/material.dart';
 import '../theme/portal_semantic_colors.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_avatar_mark.dart';
+import 'portal_icon_tile.dart';
 import 'portal_pressable.dart';
 import 'portal_progress.dart';
 import 'portal_prompt.dart';
 import 'portal_section_header.dart';
 import 'portal_skeleton.dart';
-
-/// Tint of a 40 dp tonal tile: `primaryContainer`, `tertiaryContainer` for
-/// read-only status rows, `errorContainer` for destructive ones. Never a grey
-/// secondary chip.
-enum PortalListTone { primary, tertiary, error }
 
 /// How a [PortalListItem.value] reads. Never the only signal: pair
 /// positive/negative with a sign or an icon.
@@ -66,33 +62,15 @@ class PortalListLeading {
     Color? backgroundColor,
     Color? foregroundColor,
   }) =>
-      PortalListLeading._(40, (c) {
-        final cs = Theme.of(c).colorScheme;
-        final (bg, fg) = switch (tone) {
-          PortalListTone.primary => (
-              cs.primaryContainer,
-              cs.onPrimaryContainer
-            ),
-          PortalListTone.tertiary => (
-              cs.tertiaryContainer,
-              cs.onTertiaryContainer
-            ),
-          PortalListTone.error => (cs.errorContainer, cs.onErrorContainer),
-        };
-        return ExcludeSemantics(
-          child: Container(
-            width: 40,
-            height: 40,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: backgroundColor ?? bg,
-              borderRadius:
-                  BorderRadius.circular(PortalUiTheme.of(c).tokens.radii.sm),
-            ),
-            child: iconBuilder(c, foregroundColor ?? fg),
-          ),
-        );
-      });
+      PortalListLeading._(
+        40,
+        (c) => PortalIconTile.builder(
+          iconBuilder,
+          tone: tone,
+          backgroundColor: backgroundColor,
+          foregroundColor: foregroundColor,
+        ),
+      );
 
   /// Any widget (a logo plate, a mark), [extent] wide. Decorative: it is
   /// left out of the row's label.
