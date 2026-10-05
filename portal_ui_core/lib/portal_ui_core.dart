@@ -70,6 +70,7 @@ export 'src/components/portal_refresh.dart';
 export 'src/components/portal_result_screen.dart';
 export 'src/components/portal_scroll_page.dart';
 export 'src/components/portal_search_field.dart';
+export 'src/components/portal_select.dart';
 export 'src/components/portal_section_header.dart';
 export 'src/components/portal_segmented_tabs.dart';
 export 'src/components/portal_sheet.dart';

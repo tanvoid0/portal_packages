@@ -1,5 +1,7 @@
 ## Unreleased
 
+- `PortalSelect<T>(items: [PortalSelectItem(value:, label:, icon:)], onChanged:, value:, label:, hint:, helper:, errorText:, required:)`: the dropdown, on `PortalFormField` like `PortalTextField` (label above, hint until chosen, error beats helper), fill and borders from the theme's `InputDecorationTheme`, at least `minTapTarget` tall, label as the control's semantic name, a null `onChanged` disables it. Wraps Material's `DropdownButtonFormField` for the menu. Not built: a `validator` / `Form` integration (pass `errorText`), a searchable or multi-select menu.
+
 - `PortalScrollPage(controller:)`: a `ScrollController` for the page's scroll view; the caller disposes it. Default (none) unchanged.
 
 - `PortalFilterChip(onDeleted:, deleteTooltip:)`: a removable chip (input chip). A close glyph ends the chip; its hit area is `minTapTarget` square over the chip's end, even on a `compact` chip, and it announces as its own named button (`deleteTooltip` is required with `onDeleted`, asserted). The chip body keeps its own `onTap`. Not built: a separate `PortalInputChip` class.
