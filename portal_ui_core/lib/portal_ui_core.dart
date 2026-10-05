@@ -76,6 +76,7 @@ export 'src/components/portal_segmented_tabs.dart';
 export 'src/components/portal_sheet.dart';
 export 'src/components/portal_skeleton.dart';
 export 'src/components/portal_stat_card.dart';
+export 'src/components/portal_stepper.dart';
 export 'src/components/portal_text_field.dart';
 export 'src/components/portal_startup_gate.dart';
 export 'src/components/portal_startup_splash.dart';
