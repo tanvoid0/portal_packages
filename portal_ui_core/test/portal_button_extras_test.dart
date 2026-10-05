@@ -107,4 +107,32 @@ void main() {
             isButton: true));
     h.dispose();
   });
+
+  testWidgets('icon button hit area is the tap target, not the paint',
+      (t) async {
+    var taps = 0;
+    await t.pumpWidget(host(PortalButton.icon(
+      icon: Icons.add,
+      tooltip: 'Add item',
+      size: PortalButtonSize.sm,
+      onPressed: () => taps++,
+    )));
+    // Paint is 36; 21 dp off centre is in the margin of the 48 target.
+    await t.tapAt(t.getCenter(find.byType(Ink)) + const Offset(0, 21));
+    expect(taps, 1);
+    await t.tap(find.byIcon(Icons.add));
+    expect(taps, 2);
+  });
+
+  testWidgets('a button with no handler is still a disabled button',
+      (t) async {
+    final h = t.ensureSemantics();
+    await t.pumpWidget(host(PortalButton.icon(
+      icon: Icons.remove,
+      tooltip: 'Decrease',
+    )));
+    expect(t.getSemantics(find.byType(PortalPressable)),
+        isSemantics(isButton: true, hasEnabledState: true, isEnabled: false));
+    h.dispose();
+  });
 }

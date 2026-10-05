@@ -32,6 +32,7 @@ class PortalPressable extends StatefulWidget {
     this.onTap,
     this.onLongPress,
     this.enabled = true,
+    this.button,
     this.haptic,
     this.ripple = false,
     this.borderRadius,
@@ -46,6 +47,10 @@ class PortalPressable extends StatefulWidget {
   /// False refuses taps and announces disabled, keeping the layout. For "not
   /// a button at all" pass no handlers instead.
   final bool enabled;
+
+  /// Announce as a button even with no handler (a disabled one), instead of
+  /// as plain content. Null follows whether there is a handler.
+  final bool? button;
 
   /// Played on tap, before [onTap]. Off by default: a card in a list should
   /// not buzz, a chip that changes selection should.
@@ -119,9 +124,10 @@ class _PortalPressableState extends State<PortalPressable> {
     final interactive = widget.enabled && hasHandler;
     final curve = _pressed ? _press : _release;
 
+    final isButton = widget.button ?? hasHandler;
     return Semantics(
-      button: hasHandler,
-      enabled: hasHandler ? widget.enabled : null,
+      button: isButton,
+      enabled: isButton ? widget.enabled : null,
       child: AnimatedScale(
         scale: _pressed ? tokens.motion.pressScale : 1,
         duration: curve.duration,

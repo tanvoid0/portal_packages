@@ -109,4 +109,38 @@ void main() {
             tooltip: 'Remove vegan', isButton: true, hasTapAction: true));
     h.dispose();
   });
+
+  testWidgets('a compact chip hugs its label in a Wrap', (t) async {
+    await t.pumpWidget(host(const SizedBox(
+      width: 300,
+      child: Wrap(children: [
+        PortalFilterChip(label: 'A', selected: false, compact: true),
+      ]),
+    )));
+    expect(t.getSize(find.byType(PortalPressable)).width, lessThan(100));
+  });
+
+  testWidgets('compact beats a theme minHeight', (t) async {
+    await t.pumpWidget(host(
+      const PortalFilterChip(label: 'A', selected: false, compact: true),
+      ext: [const PortalFilterChipTheme(minHeight: 40)],
+    ));
+    expect(t.getSize(find.byType(AnimatedContainer)).height, 32);
+  });
+
+  testWidgets('tapping the label end of a deletable chip does not delete',
+      (t) async {
+    var taps = 0, deletes = 0;
+    await t.pumpWidget(host(PortalFilterChip(
+      label: 'Vegan',
+      selected: true,
+      onTap: () => taps++,
+      onDeleted: () => deletes++,
+      deleteTooltip: 'Remove vegan',
+    )));
+    final label = t.getRect(find.text('Vegan'));
+    await t.tapAt(Offset(label.right - 2, label.center.dy));
+    expect(deletes, 0);
+    expect(taps, 1);
+  });
 }

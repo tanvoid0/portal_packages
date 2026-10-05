@@ -87,7 +87,7 @@ class PortalFilterChip extends StatelessWidget {
         : (onUnselectedColor ??
             skin.onUnselectedColor ??
             portal.onSurfaceVariant);
-    final painted = skin.minHeight ?? (compact ? 32.0 : tokens.minTapTarget);
+    final painted = compact ? 32.0 : (skin.minHeight ?? tokens.minTapTarget);
     final radius = BorderRadius.circular(tokens.radii.full);
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
@@ -149,10 +149,14 @@ class PortalFilterChip extends StatelessWidget {
                   label,
                   style: tokens.textStyles.caption.copyWith(color: ink),
                 ),
-                if (onDeleted != null) ...[
-                  SizedBox(width: tokens.spacing.xs),
-                  Icon(Icons.close, size: tokens.typeScale.md, color: ink),
-                ],
+                // The glyph's own box is as wide as the delete target less the
+                // chip's end padding, so the target never reaches the label.
+                if (onDeleted != null)
+                  SizedBox(
+                    width: tokens.minTapTarget - tokens.spacing.sm,
+                    child: Icon(Icons.close,
+                        size: tokens.typeScale.md, color: ink),
+                  ),
               ],
             ),
           ),
@@ -192,7 +196,9 @@ class PortalFilterChip extends StatelessWidget {
   /// A paint under the minimum tap target gets a box around it, so the hit
   /// area is not painted height (`UI_PATTERNS.md`).
   static Widget _hitArea(double tap, double painted, Widget chip) =>
-      painted >= tap ? chip : SizedBox(height: tap, child: Center(child: chip));
+      painted >= tap
+          ? chip
+          : SizedBox(height: tap, child: Center(widthFactor: 1, child: chip));
 }
 
 /// Horizontally scrolling row of [PortalFilterChip]s, inset to the page

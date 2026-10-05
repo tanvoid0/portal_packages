@@ -1,5 +1,7 @@
 ## Unreleased
 
+Fix: `PortalFilterChip` compact hugs its label in a `Wrap` instead of filling the line, `compact` wins over a theme `minHeight`, and the delete target no longer covers the end of the label (the close glyph now owns a `minTapTarget`-wide box); `PortalButton` (and `PortalButton.icon`, so `PortalStepper(size: sm)`) hit area is `minTapTarget`, not the paint, and a null `onPressed` announces as a disabled button instead of plain content (`PortalPressable(button:)`).
+
 Fix: `PortalTextField.amount` rejects an edit that is not a whole amount instead of truncating it (`1234.56` plus a stray dot stays `1234.56`) and accepts a comma decimal; `PortalTextField` and `PortalSelect` name the control by its label and no longer read the visible label a second time (`PortalFormField(excludeLabelSemantics:)`); `PortalSelect` shows the hint for a value matching no item or two instead of asserting, and no longer rebuilds (dropping focus) on a pick.
 
 Fix: `PortalFormat` rounds to the shown precision before choosing sign (`signed(-0.004)` is `£0.00`, not `-£0.00`; `PortalAmount` no longer tints it success), `compact(999960)` is `1M` not `1,000K`, a negative `duration` keeps its sign, and `date` / `time` read a UTC value in local time.
