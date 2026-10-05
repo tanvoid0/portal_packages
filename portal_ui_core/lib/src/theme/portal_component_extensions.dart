@@ -276,3 +276,47 @@ class PortalTextFieldTheme extends ThemeExtension<PortalTextFieldTheme> {
     );
   }
 }
+
+@immutable
+class PortalCalendarTheme extends ThemeExtension<PortalCalendarTheme> {
+  const PortalCalendarTheme({
+    this.selectedColor,
+    this.onSelectedColor,
+    this.markerColor,
+  });
+
+  /// Fill of the selected day and ink of today. Defaults to the app's primary.
+  final Color? selectedColor;
+
+  /// Ink on the selected day. Defaults to `onPrimary`.
+  final Color? onSelectedColor;
+
+  /// The dot under a marked day. Defaults to [selectedColor].
+  final Color? markerColor;
+
+  static PortalCalendarTheme of(BuildContext context) =>
+      Theme.of(context).extension<PortalCalendarTheme>() ??
+      const PortalCalendarTheme();
+
+  @override
+  PortalCalendarTheme copyWith({
+    Color? selectedColor,
+    Color? onSelectedColor,
+    Color? markerColor,
+  }) =>
+      PortalCalendarTheme(
+        selectedColor: selectedColor ?? this.selectedColor,
+        onSelectedColor: onSelectedColor ?? this.onSelectedColor,
+        markerColor: markerColor ?? this.markerColor,
+      );
+
+  @override
+  PortalCalendarTheme lerp(PortalCalendarTheme? other, double t) {
+    if (other == null) return this;
+    return PortalCalendarTheme(
+      selectedColor: Color.lerp(selectedColor, other.selectedColor, t),
+      onSelectedColor: Color.lerp(onSelectedColor, other.onSelectedColor, t),
+      markerColor: Color.lerp(markerColor, other.markerColor, t),
+    );
+  }
+}

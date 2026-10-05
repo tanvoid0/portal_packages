@@ -48,6 +48,7 @@ export 'src/components/portal_badge.dart';
 export 'src/components/portal_bottom_nav_bar.dart';
 export 'src/components/portal_button.dart';
 export 'src/components/portal_button_dock.dart';
+export 'src/components/portal_calendar.dart';
 export 'src/components/portal_card.dart';
 export 'src/components/portal_chat_bubble.dart';
 export 'src/components/portal_composer.dart';
