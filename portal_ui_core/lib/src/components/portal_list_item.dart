@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/portal_semantic_colors.dart';
 import '../theme/portal_ui_theme.dart';
+import '../tokens/design_tokens.dart';
 import 'portal_avatar_mark.dart';
 import 'portal_icon_tile.dart';
 import 'portal_pressable.dart';
@@ -792,7 +793,11 @@ class PortalListSection extends StatelessWidget {
 
   /// Label-to-value rows with no leading: the label muted, the value ink.
   final bool detail;
-  final List<PortalListItem> children;
+
+  /// Usually [PortalListItem]s; any widget (a foreign `ListTile`, a platform
+  /// control) may sit in a section and gets the same dividers, which start at
+  /// a row's text column and at the edge for anything that is not one.
+  final List<Widget> children;
   final int? selected;
   final bool _selectable;
 
@@ -823,7 +828,7 @@ class PortalListSection extends StatelessWidget {
         rows.add(Divider(
           height: 1,
           thickness: 1,
-          indent: sp.lg + item.textInset,
+          indent: sp.lg + _textInset(item),
           color: cs.outlineVariant,
         ));
       }
@@ -843,16 +848,7 @@ class PortalListSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (header != null)
-          Padding(
-            padding: EdgeInsets.fromLTRB(sp.lg, sp.lg, sp.lg, sp.sm),
-            child: captionHeader
-                ? Text(
-                    header!,
-                    style: tokens.textStyles.caption
-                        .copyWith(color: cs.onSurfaceVariant),
-                  )
-                : PortalSectionHeader(title: header!, trailing: headerAction),
-          ),
+          _sectionHeader(tokens, cs, header!, captionHeader, headerAction),
         Padding(
           padding:
               inset ? EdgeInsets.symmetric(horizontal: sp.lg) : EdgeInsets.zero,
@@ -879,4 +875,101 @@ class _ListScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(_ListScope old) => detail != old.detail;
+}
+
+double _textInset(Widget w) => w is PortalListItem ? w.textInset : 0;
+
+Widget _sectionHeader(DesignTokens tokens, ColorScheme cs, String header,
+    bool caption, Widget? action) {
+  final sp = tokens.spacing;
+  return Padding(
+    padding: EdgeInsets.fromLTRB(sp.lg, sp.lg, sp.lg, sp.sm),
+    child: caption
+        ? Text(header,
+            style:
+                tokens.textStyles.caption.copyWith(color: cs.onSurfaceVariant))
+        : PortalSectionHeader(title: header, trailing: action),
+  );
+}
+
+/// [PortalListSection] for a long list: a sliver that builds only the rows in
+/// view, so a list is one section rather than one section per row. Same frame
+/// (header, inset card, dividers from each [PortalListItem]'s text column);
+/// put it in a `CustomScrollView`.
+// ponytail: the card is painted per row (a `Material` with the corners only on
+// the first and last) so ink stays above it; a row builder that returns a
+// foreign widget gets the same Material but a divider at the edge.
+class PortalSliverListSection extends StatelessWidget {
+  const PortalSliverListSection({
+    super.key,
+    required this.itemCount,
+    required this.itemBuilder,
+    this.header,
+    this.headerAction,
+    this.captionHeader = false,
+    this.style = PortalListStyle.inset,
+    this.detail = false,
+  });
+
+  final int itemCount;
+  final NullableIndexedWidgetBuilder itemBuilder;
+  final String? header;
+  final Widget? headerAction;
+  final bool captionHeader;
+  final PortalListStyle style;
+  final bool detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final portal = PortalUiTheme.of(context);
+    final tokens = portal.tokens;
+    final cs = Theme.of(context).colorScheme;
+    final sp = tokens.spacing;
+    final inset = style == PortalListStyle.inset;
+    final r = Radius.circular(tokens.radii.lg);
+
+    final list = SliverList.builder(
+      itemCount: itemCount,
+      itemBuilder: (c, i) {
+        final w = itemBuilder(c, i) ?? const SizedBox.shrink();
+        final last = i == itemCount - 1;
+        Widget row = _ListScope(
+          detail: detail,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            w,
+            if (!last)
+              Divider(
+                height: 1,
+                thickness: 1,
+                indent: sp.lg + _textInset(w),
+                color: cs.outlineVariant,
+              ),
+          ]),
+        );
+        if (inset) {
+          row = Material(
+            color: portal.card,
+            borderRadius: BorderRadius.vertical(
+              top: i == 0 ? r : Radius.zero,
+              bottom: last ? r : Radius.zero,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: row,
+          );
+        }
+        return row;
+      },
+    );
+    return SliverMainAxisGroup(slivers: [
+      if (header != null)
+        SliverToBoxAdapter(
+          child:
+              _sectionHeader(tokens, cs, header!, captionHeader, headerAction),
+        ),
+      inset
+          ? SliverPadding(
+              padding: EdgeInsets.symmetric(horizontal: sp.lg), sliver: list)
+          : list,
+    ]);
+  }
 }
