@@ -66,6 +66,17 @@ void main() {
     expect(tapped, isTrue);
   });
 
+  testWidgets('empty state renders a bare message with no icon or title',
+      (t) async {
+    await t.pumpWidget(_host(const PortalEmptyState(
+      message: 'No bank matches "acme".',
+      inCard: false,
+    )));
+
+    expect(find.text('No bank matches "acme".'), findsOneWidget);
+    expect(find.byType(Icon), findsNothing);
+  });
+
   testWidgets('empty state draws an example between the body and the action',
       (t) async {
     await t.pumpWidget(_host(PortalEmptyState(

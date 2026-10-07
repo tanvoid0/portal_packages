@@ -28,7 +28,7 @@ class PortalEmptyState extends StatelessWidget {
     super.key,
     this.icon,
     this.iconWidget,
-    required this.title,
+    this.title,
     this.message,
     this.actionLabel,
     this.onAction,
@@ -36,14 +36,17 @@ class PortalEmptyState extends StatelessWidget {
     this.example,
     this.iconWellColor,
     this.inCard = true,
-  }) : assert(icon != null || iconWidget != null, 'give an icon or iconWidget');
+  }) : assert(title != null || message != null, 'give a title or a message');
 
   final IconData? icon;
 
   /// Any glyph (a `FaIcon`, a logo) in place of [icon]; it paints its own
-  /// colour and size. Wins over [icon].
+  /// colour and size. Wins over [icon]. Omit both for a message-only inline
+  /// hint (pair with [inCard] false).
   final Widget? iconWidget;
-  final String title;
+
+  /// Optional: a bare [message] with no title is a valid inline hint.
+  final String? title;
   final String? message;
 
   /// Both [actionLabel] and [onAction] must be set for the button to render.
@@ -73,27 +76,32 @@ class PortalEmptyState extends StatelessWidget {
     final iconColor = skin.iconColor ?? portal.onSurfaceVariant;
     final iconSize = skin.iconSize ?? tokens.spacing.xxl;
 
-    final glyph = iconWidget ?? Icon(icon, size: iconSize, color: iconColor);
+    final glyph = iconWidget ?? (icon != null
+        ? Icon(icon, size: iconSize, color: iconColor)
+        : null);
     final content = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (well == null)
-          glyph
-        else
-          CircleAvatar(
-            radius: iconSize * 1.5,
-            backgroundColor: well,
-            child: glyph,
+        if (glyph != null) ...[
+          if (well == null)
+            glyph
+          else
+            CircleAvatar(
+              radius: iconSize * 1.5,
+              backgroundColor: well,
+              child: glyph,
+            ),
+          SizedBox(height: tokens.spacing.md),
+        ],
+        if (title != null)
+          Text(
+            title!,
+            textAlign: TextAlign.center,
+            style: tokens.textStyles.subtitle
+                .copyWith(color: skin.titleColor ?? portal.onSurface),
           ),
-        SizedBox(height: tokens.spacing.md),
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: tokens.textStyles.subtitle
-              .copyWith(color: skin.titleColor ?? portal.onSurface),
-        ),
         if (message != null) ...[
-          SizedBox(height: tokens.spacing.xs),
+          if (title != null) SizedBox(height: tokens.spacing.xs),
           Text(
             message!,
             textAlign: TextAlign.center,
