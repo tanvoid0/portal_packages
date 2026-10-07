@@ -40,6 +40,17 @@ void main() {
     expect(find.byIcon(Icons.calendar_today), findsOneWidget);
   });
 
+  testWidgets('section header colours the icon alone, not the title', (t) async {
+    await t.pumpWidget(_host(const PortalSectionHeader(
+      title: 'Done',
+      icon: Icons.check_circle,
+      iconColor: Color(0xFF00FF00),
+    )));
+
+    final icon = t.widget<Icon>(find.byIcon(Icons.check_circle));
+    expect(icon.color, const Color(0xFF00FF00));
+  });
+
   testWidgets('empty state hides the action unless both label and callback '
       'are given', (t) async {
     await t.pumpWidget(_host(const PortalEmptyState(

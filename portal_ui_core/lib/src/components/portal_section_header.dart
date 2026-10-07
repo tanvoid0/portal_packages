@@ -14,6 +14,7 @@ class PortalSectionHeader extends StatelessWidget {
     this.icon,
     this.trailing,
     this.foregroundColor,
+    this.iconColor,
   });
 
   final String title;
@@ -27,6 +28,11 @@ class PortalSectionHeader extends StatelessWidget {
   /// Overrides icon and title colour. Defaults to `onSurface`.
   final Color? foregroundColor;
 
+  /// Colours the [icon] alone, leaving the title on [foregroundColor]. For a
+  /// status glyph — a green check on a done section — that must not tint the
+  /// title. Defaults to the title's colour.
+  final Color? iconColor;
+
   @override
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
@@ -37,7 +43,7 @@ class PortalSectionHeader extends StatelessWidget {
     return Row(
       children: [
         if (icon != null) ...[
-          Icon(icon, size: style.fontSize, color: ink),
+          Icon(icon, size: style.fontSize, color: iconColor ?? ink),
           SizedBox(width: tokens.spacing.sm),
         ],
         Expanded(child: Text(title, style: style)),
