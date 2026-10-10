@@ -31,6 +31,7 @@ export 'src/theme/portal_typography_config.dart';
 export 'src/theme/portal_ui_theme.dart';
 export 'src/dev/portal_review_tag.dart';
 export 'src/theme/portal_semantic_colors.dart';
+export 'src/theme/portal_sentiment.dart';
 export 'src/theme/portal_toast.dart';
 export 'src/theme/portal_toast_host.dart';
 export 'src/theme/portal_app_feedback.dart';

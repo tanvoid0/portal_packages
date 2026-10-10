@@ -16,17 +16,10 @@ PortalSentiment portalBudgetSentiment(double value) => value > 1
         ? PortalSentiment.warning
         : PortalSentiment.positive;
 
-/// The colour a [PortalSentiment] reads as, as [PortalPrompt] maps it;
-/// neutral is [neutral].
-Color _sentimentColor(BuildContext context, PortalSentiment s, Color neutral) {
-  final sem = PortalSemanticColors.of(context);
-  return switch (s) {
-    PortalSentiment.neutral => neutral,
-    PortalSentiment.positive => sem.success,
-    PortalSentiment.warning => sem.warning,
-    PortalSentiment.negative => Theme.of(context).colorScheme.error,
-  };
-}
+/// The colour a [PortalSentiment] reads as; neutral is [neutral] rather than
+/// the scale's `onSurfaceVariant`, so a meter can carry its own figure colour.
+Color _sentimentColor(BuildContext context, PortalSentiment s, Color neutral) =>
+    s == PortalSentiment.neutral ? neutral : s.base(context);
 
 /// How far through: one chunky, fully rounded track.
 ///

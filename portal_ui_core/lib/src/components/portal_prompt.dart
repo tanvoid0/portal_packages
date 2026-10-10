@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
-import '../theme/portal_semantic_colors.dart';
+import '../theme/portal_sentiment.dart';
 import '../theme/portal_ui_theme.dart';
 import '../tokens/design_tokens.dart';
 
-/// How a prompt reads. Shared with G1's value column and G2's amounts.
-enum PortalSentiment { neutral, positive, warning, negative }
+export '../theme/portal_sentiment.dart' show PortalSentiment, PortalSentimentColors;
 
 enum PortalPromptSize { standard, compact, inline }
 
@@ -208,23 +207,11 @@ class _PromptBody extends StatelessWidget {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
     final cs = Theme.of(context).colorScheme;
-    final sem = PortalSemanticColors.of(context);
     final p = prompt;
 
-    final (base, onBase, glyph) = switch (p.sentiment) {
-      PortalSentiment.neutral => (
-          cs.onSurfaceVariant,
-          portal.card,
-          Icons.info_outline
-        ),
-      PortalSentiment.positive => (sem.success, sem.onSuccess, Icons.check),
-      PortalSentiment.warning => (
-          sem.warning,
-          sem.onWarning,
-          Icons.warning_amber_rounded
-        ),
-      PortalSentiment.negative => (cs.error, cs.onError, Icons.priority_high),
-    };
+    final base = p.sentiment.base(context);
+    final onBase = p.sentiment.onBase(context);
+    final glyph = p.sentiment.glyph;
     final fill = p.sentiment == PortalSentiment.neutral
         ? cs.surfaceContainerHigh
         : Color.alphaBlend(base.withValues(alpha: .12), portal.card);
