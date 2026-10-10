@@ -77,17 +77,12 @@ class AiUserTurn extends StatelessWidget {
                   HapticFeedback.selectionClick();
                   showPortalActionSheet(context, actions);
                 },
-          // onSurface, not the bubble's onPrimaryContainer: that role is a tint
-          // of the accent, so over the accent gradient the question came out
-          // violet on violet. The fill says whose turn it is; the words are
-          // words.
-          // ponytail: keeping the gradient + forced-readable text; flat-lime
-          // skin tone (PortalChatBubbleTheme in ui_core) is the upgrade if
-          // device review rejects the gradient.
-          child: Text(
-            turn.content,
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-          ),
+          // The bubble owns the user turn's text colour: onSurface by default,
+          // or the app's PortalChatBubbleTheme.userForegroundColor over its
+          // flat fill. (It used to be forced here because the bubble's old
+          // onPrimaryContainer default came out violet on violet over the
+          // accent gradient; the theme extension fixes that at the source.)
+          child: Text(turn.content),
         ),
         if (notSent)
           Padding(

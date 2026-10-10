@@ -5,6 +5,46 @@ import '../theme/portal_ui_theme.dart';
 /// One side of a chat turn.
 enum PortalChatAuthor { user, assistant }
 
+/// App-level override for the user turn's fill and text colour.
+///
+/// Unset, [PortalChatBubble] draws the user bubble with the accent gradient
+/// and `onSurface` text -- the fleet default. An app that wants its own flat
+/// brand tone (the approved assistant comp is a flat lime, not a gradient)
+/// registers this in its [ThemeData.extensions]: [userFillColor] replaces the
+/// gradient, and [userForegroundColor] the text colour over it.
+@immutable
+class PortalChatBubbleTheme extends ThemeExtension<PortalChatBubbleTheme> {
+  const PortalChatBubbleTheme({this.userFillColor, this.userForegroundColor});
+
+  /// Flat fill for the user turn. Non-null replaces the accent gradient.
+  final Color? userFillColor;
+
+  /// Text colour over the user turn. Falls back to `onSurface` when null.
+  final Color? userForegroundColor;
+
+  @override
+  PortalChatBubbleTheme copyWith({
+    Color? userFillColor,
+    Color? userForegroundColor,
+  }) => PortalChatBubbleTheme(
+    userFillColor: userFillColor ?? this.userFillColor,
+    userForegroundColor: userForegroundColor ?? this.userForegroundColor,
+  );
+
+  @override
+  PortalChatBubbleTheme lerp(covariant PortalChatBubbleTheme? other, double t) {
+    if (other == null) return this;
+    return PortalChatBubbleTheme(
+      userFillColor: Color.lerp(userFillColor, other.userFillColor, t),
+      userForegroundColor: Color.lerp(
+        userForegroundColor,
+        other.userForegroundColor,
+        t,
+      ),
+    );
+  }
+}
+
 /// A single message in a thread.
 ///
 /// The two authors read differently on purpose: the assistant's turn is a
@@ -56,6 +96,11 @@ class PortalChatBubble extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final brightness = Theme.of(context).brightness;
     final isUser = author == PortalChatAuthor.user;
+    final chatTheme = Theme.of(context).extension<PortalChatBubbleTheme>();
+    // A flat brand fill wins over the accent gradient when the app sets one;
+    // the text colour defaults to onSurface, which reads over either.
+    final userFill = chatTheme?.userFillColor;
+    final userForeground = chatTheme?.userForegroundColor ?? scheme.onSurface;
 
     final radius = BorderRadiusDirectional.only(
       topStart: Radius.circular(isUser ? tokens.radii.lg : tokens.radii.sm),
@@ -66,8 +111,10 @@ class PortalChatBubble extends StatelessWidget {
 
     Widget bubble = DecoratedBox(
       decoration: BoxDecoration(
-        color: isUser ? null : scheme.surfaceContainer,
-        gradient: isUser ? tokens.gradients.accent(scheme) : null,
+        color: isUser ? userFill : scheme.surfaceContainer,
+        gradient: isUser && userFill == null
+            ? tokens.gradients.accent(scheme)
+            : null,
         borderRadius: radius,
         boxShadow: tokens.elevation.soft(brightness),
       ),
@@ -75,7 +122,7 @@ class PortalChatBubble extends StatelessWidget {
         padding: EdgeInsets.all(tokens.spacing.md),
         child: isUser
             ? DefaultTextStyle.merge(
-                style: TextStyle(color: scheme.onPrimaryContainer),
+                style: TextStyle(color: userForeground),
                 child: child,
               )
             : child,

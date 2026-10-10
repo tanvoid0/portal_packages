@@ -76,6 +76,50 @@ void main() {
     expect(find.byIcon(Icons.smart_toy), findsNothing);
   });
 
+  testWidgets('user bubble falls back to the accent gradient without the '
+      'extension', (t) async {
+    await t.pumpWidget(_host(const PortalChatBubble(
+      author: PortalChatAuthor.user,
+      child: Text('hi'),
+    )));
+    final box = t
+        .widget<DecoratedBox>(find.descendant(
+          of: find.byType(PortalChatBubble),
+          matching: find.byType(DecoratedBox),
+        ).first);
+    final deco = box.decoration as BoxDecoration;
+    expect(deco.gradient, isNotNull);
+    expect(deco.color, isNull);
+  });
+
+  testWidgets('user bubble takes the flat fill when the extension is set',
+      (t) async {
+    const fill = Color(0xFFBBEE88);
+    final theme = buildPortalTheme(brightness: Brightness.light);
+    await t.pumpWidget(MaterialApp(
+      theme: theme.copyWith(
+        extensions: [
+          ...theme.extensions.values,
+          const PortalChatBubbleTheme(userFillColor: fill),
+        ],
+      ),
+      home: const Scaffold(
+        body: PortalChatBubble(
+          author: PortalChatAuthor.user,
+          child: Text('hi'),
+        ),
+      ),
+    ));
+    final box = t
+        .widget<DecoratedBox>(find.descendant(
+          of: find.byType(PortalChatBubble),
+          matching: find.byType(DecoratedBox),
+        ).first);
+    final deco = box.decoration as BoxDecoration;
+    expect(deco.color, fill);
+    expect(deco.gradient, isNull);
+  });
+
   testWidgets('footer renders under the bubble', (t) async {
     await t.pumpWidget(_host(const PortalChatBubble(
       author: PortalChatAuthor.assistant,
