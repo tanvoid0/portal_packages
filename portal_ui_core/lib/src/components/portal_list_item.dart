@@ -198,6 +198,7 @@ class PortalListAccessory {
     this.fill = false,
     this.markLabel,
     this.spoken,
+    this.tint,
   }) : assert(
             !busy || busyLabel != null, 'a busy accessory announces busyLabel');
 
@@ -235,6 +236,10 @@ class PortalListAccessory {
   final String? markLabel;
   final String? spoken;
 
+  /// A checkbox's active fill / border, for a per-item accent (a task's own
+  /// colour). Null (default) uses the theme.
+  final Color? tint;
+
   static const none = PortalListAccessory._(_Kind.none);
 
   /// A chevron; [value] is the muted current value ("Theme · System ›").
@@ -246,7 +251,9 @@ class PortalListAccessory {
   const PortalListAccessory.checkbox({
     required bool checked,
     required ValueChanged<bool>? onChanged,
-  }) : this._(_Kind.checkbox, checked: checked, onChanged: onChanged);
+    Color? color,
+  }) : this._(_Kind.checkbox,
+            checked: checked, onChanged: onChanged, tint: color);
 
   const PortalListAccessory.radio({
     required bool checked,
@@ -424,6 +431,7 @@ class PortalListItem extends StatelessWidget {
     String? subtitle,
     PortalListLeading? leading,
     bool checkbox = false,
+    Color? checkboxColor,
     VoidCallback? onEdit,
     String editTooltip = 'Edit',
     VoidCallback? onRemove,
@@ -436,7 +444,8 @@ class PortalListItem extends StatelessWidget {
         leading: leading,
         done: done,
         trailing: checkbox
-            ? PortalListAccessory.checkbox(checked: done, onChanged: onChanged)
+            ? PortalListAccessory.checkbox(
+                checked: done, onChanged: onChanged, color: checkboxColor)
             : PortalListAccessory.switchControl(
                 checked: done, onChanged: onChanged),
         edit: onEdit == null
@@ -823,6 +832,10 @@ class PortalListItem extends StatelessWidget {
         accessory = ExcludeSemantics(
           child: Checkbox(
             value: acc.checked,
+            activeColor: acc.tint,
+            side: acc.tint == null
+                ? null
+                : BorderSide(color: acc.tint!, width: 2),
             onChanged: disabled || acc.onChanged == null
                 ? null
                 : (v) => acc.onChanged!(v ?? false),

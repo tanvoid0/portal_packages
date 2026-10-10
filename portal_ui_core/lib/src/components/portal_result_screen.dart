@@ -22,11 +22,14 @@ class PortalResultScreen extends StatelessWidget {
     this.progress,
     this.progressStartLabel,
     this.progressEndLabel,
+    this.progressSemanticLabel,
     this.dock,
     this.onClose,
   }) : assert(
           progress != null ||
-              (progressStartLabel == null && progressEndLabel == null),
+              (progressStartLabel == null &&
+                  progressEndLabel == null &&
+                  progressSemanticLabel == null),
           'progress labels need a progress value',
         );
 
@@ -46,6 +49,10 @@ class PortalResultScreen extends StatelessWidget {
   /// with a [progress]; null (default) draws none.
   final String? progressStartLabel;
   final String? progressEndLabel;
+
+  /// Spoken name for the [progress] meter (e.g. "Downloading"). Null (default)
+  /// leaves the bar unnamed; the screen title still announces as a header.
+  final String? progressSemanticLabel;
 
   /// A `PortalButtonDock`: a primary (Done, Retry) and an optional secondary.
   final Widget? dock;
@@ -119,6 +126,7 @@ class PortalResultScreen extends StatelessWidget {
                               value: progress,
                               startLabel: progressStartLabel,
                               endLabel: progressEndLabel,
+                              semanticLabel: progressSemanticLabel,
                             ),
                           ),
                         ],
