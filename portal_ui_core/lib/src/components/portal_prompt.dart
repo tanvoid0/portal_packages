@@ -66,7 +66,9 @@ class PortalPrompt extends StatefulWidget {
   final PortalPromptAction? action;
 
   /// A quieter second verb beside [action] ("Dismiss", "Not now"); standard
-  /// size only. The one-action default is unchanged.
+  /// size only. The kit's prompt cards are one-action-max, but production
+  /// deliberately allows one optional quiet secondary; the one-action default
+  /// is unchanged.
   final PortalPromptAction? secondaryAction;
 
   /// Shows the close button.
