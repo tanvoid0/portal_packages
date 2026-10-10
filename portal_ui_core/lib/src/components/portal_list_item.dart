@@ -4,12 +4,14 @@ import '../theme/portal_semantic_colors.dart';
 import '../theme/portal_ui_theme.dart';
 import '../tokens/design_tokens.dart';
 import 'portal_avatar_mark.dart';
+import 'portal_badge.dart';
 import 'portal_icon_tile.dart';
 import 'portal_pressable.dart';
 import 'portal_progress.dart';
 import 'portal_prompt.dart';
 import 'portal_section_header.dart';
 import 'portal_skeleton.dart';
+import 'portal_typing_dots.dart';
 
 /// How a [PortalListItem.value] reads. Never the only signal: pair
 /// positive/negative with a sign or an icon.
@@ -189,7 +191,14 @@ class PortalListAccessory {
     this.actions = const [],
     this.interactive = false,
     this.swatch,
-  });
+    this.tonal = false,
+    this.busy = false,
+    this.busyLabel,
+    this.fill = false,
+    this.markLabel,
+    this.spoken,
+  }) : assert(
+            !busy || busyLabel != null, 'a busy accessory announces busyLabel');
 
   final _Kind _kind;
   final String? text;
@@ -209,6 +218,21 @@ class PortalListAccessory {
 
   /// The accent dot [PortalListAccessory.navigate] draws in place of its value.
   final Color? swatch;
+
+  /// [PortalListAccessory.iconButton] paints a neutral fill behind the glyph.
+  final bool tonal;
+
+  /// [PortalListAccessory.button] in flight, and what it announces meanwhile.
+  final bool busy;
+  final String? busyLabel;
+
+  /// [PortalListAccessory.value] fills its Symbols glyph.
+  final bool fill;
+
+  /// [PortalListAccessory.meta]: the name of its [icon], and the long form of
+  /// its time.
+  final String? markLabel;
+  final String? spoken;
 
   static const none = PortalListAccessory._(_Kind.none);
 
@@ -234,38 +258,64 @@ class PortalListAccessory {
   }) : this._(_Kind.switchControl, checked: checked, onChanged: onChanged);
 
   /// [tooltip] names it for a screen reader: write it from what the handler does.
+  /// [tonal] paints a neutral-fill disc behind the glyph: a quick action meant
+  /// to read as a control (a habit's +1), not the ghost icon of a quiet row.
   const PortalListAccessory.iconButton({
     required IconData icon,
     required String tooltip,
     required VoidCallback? onPressed,
+    bool tonal = false,
   }) : this._(_Kind.iconButton,
-            icon: icon, tooltip: tooltip, onPressed: onPressed);
+            icon: icon, tooltip: tooltip, onPressed: onPressed, tonal: tonal);
 
   /// [tooltip] is the accessible name when [label] alone is ambiguous
-  /// ("Update Gym").
+  /// ("Update Gym"). [busy] is the button in flight (a Stop while the job winds
+  /// down): a spinner in the pill, no taps, no greying out, and [busyLabel] is
+  /// what it announces, so pass `onPressed: null` with it.
   const PortalListAccessory.button({
     required String label,
     required VoidCallback? onPressed,
     String? tooltip,
+    bool busy = false,
+    String? busyLabel,
   }) : this._(_Kind.button,
-            text: label, onPressed: onPressed, tooltip: tooltip);
+            text: label,
+            onPressed: onPressed,
+            tooltip: tooltip,
+            busy: busy,
+            busyLabel: busyLabel);
 
-  /// A right-column value: tabular, never wraps. [unit] follows a space.
+  /// A right-column value: tabular, never wraps. [unit] follows a space. [fill]
+  /// fills the Symbols glyph: the value is set (a rating's star).
   const PortalListAccessory.value(
     String value, {
     String? unit,
     IconData? icon,
     PortalValueSentiment sentiment = PortalValueSentiment.neutral,
+    bool fill = false,
   }) : this._(_Kind.value,
-            text: value, unit: unit, icon: icon, sentiment: sentiment);
+            text: value,
+            unit: unit,
+            icon: icon,
+            sentiment: sentiment,
+            fill: fill);
 
   /// An inbox row's trailing: the time over a primary dot ([unread]) or a
-  /// muted status glyph ([icon]: pinned, waiting to sync).
+  /// muted status glyph ([icon]: pinned, waiting to sync), named by
+  /// [markLabel]. [spoken] is the long form a screen reader hears of [time]
+  /// ("Friday" for "Fri").
   const PortalListAccessory.meta(
     String time, {
     bool unread = false,
     IconData? icon,
-  }) : this._(_Kind.meta, text: time, unread: unread, icon: icon);
+    String? markLabel,
+    String? spoken,
+  }) : this._(_Kind.meta,
+            text: time,
+            unread: unread,
+            icon: icon,
+            markLabel: markLabel,
+            spoken: spoken);
 
   /// Any widget in the trailing slot (an amount over a badge). The row reads
   /// as one label, so say what the widget shows in [semanticLabel]. A
@@ -342,14 +392,61 @@ class PortalListItem extends StatelessWidget {
     this.dimmed = false,
     this.struck = false,
     this.titleMaxLines = 1,
+    this.overline,
+    this.chips,
+    this.semanticLabel,
+    this.live,
+    this.titleSpans,
+    this.subtitleSpans,
+    this.done = false,
+    this.edit,
   })  : _skeleton = false,
-        _skeletonLeading = null;
+        _skeletonLeading = null,
+        _skeletonMeter = false;
+
+  /// A checklist row (a subtask): a switch for the control and [done] striking
+  /// and muting the title, together so no call site can pair the one without
+  /// the other. The whole row is the target.
+  ///
+  /// [onEdit] adds a pencil button after the switch, its own target and its
+  /// own node, named [editTooltip] ("Rename subtask"): the row's one accessory
+  /// is the switch, so the edit control sits beside the row.
+  factory PortalListItem.checklist({
+    Key? key,
+    required String title,
+    required bool done,
+    required ValueChanged<bool>? onChanged,
+    String? subtitle,
+    PortalListLeading? leading,
+    VoidCallback? onEdit,
+    String editTooltip = 'Edit',
+  }) =>
+      PortalListItem(
+        key: key,
+        title: title,
+        subtitle: subtitle,
+        leading: leading,
+        done: done,
+        trailing: PortalListAccessory.switchControl(
+            checked: done, onChanged: onChanged),
+        edit: onEdit == null
+            ? null
+            : PortalListIconAction(
+                icon: Icons.edit_outlined,
+                tooltip: editTooltip,
+                onPressed: onEdit,
+              ),
+      );
 
   /// Shaped like the row, its leading too: [PortalSkeletonLeading.avatar]
-  /// (default), `.tile` or `.none`.
+  /// (default), `.tile` or `.none`. [meter] adds the track and label of a row's
+  /// [progress] under the text.
+  // ponytail: one label bar; a [meter] row with two caption labels would want
+  // the kit's none/start/both choice.
   const PortalListItem.skeleton({
     super.key,
     PortalSkeletonLeading leading = PortalSkeletonLeading.avatar,
+    bool meter = false,
   })  : title = '',
         subtitle = null,
         meta = null,
@@ -369,8 +466,17 @@ class PortalListItem extends StatelessWidget {
         dimmed = false,
         struck = false,
         titleMaxLines = 1,
+        overline = null,
+        chips = null,
+        semanticLabel = null,
+        live = null,
+        titleSpans = null,
+        subtitleSpans = null,
+        done = false,
+        edit = null,
         _skeleton = true,
-        _skeletonLeading = leading;
+        _skeletonLeading = leading,
+        _skeletonMeter = meter;
 
   final String title;
 
@@ -423,8 +529,39 @@ class PortalListItem extends StatelessWidget {
   /// Lines the title may take before it ellipsizes. Default 1.
   final int titleMaxLines;
 
+  /// An eyebrow above the title, drawn uppercase in the `overline` token and
+  /// the primary colour: marks one row (next up). It leads the row's label.
+  final String? overline;
+
+  /// Row metadata under the subtitle, wrapped: [PortalBadge]s (category,
+  /// priority, due). A row stays two lines of text plus this; more than four
+  /// chips is a detail page's job. A [PortalBadge]'s label joins the row's
+  /// label; any other widget is decorative.
+  final List<Widget>? chips;
+
+  /// Replaces the composed title, value, subtitle label.
+  final String? semanticLabel;
+
+  /// A reply still being written: typing dots and these words in the
+  /// subtitle's slot, announced as a live region as the row changes.
+  final String? live;
+
+  /// Painted in place of [title] / [subtitle] in the row's own style (a
+  /// search's marks); the row still reads [title] and [subtitle].
+  final List<InlineSpan>? titleSpans;
+  final List<InlineSpan>? subtitleSpans;
+
+  /// A finished checklist item: [struck] through, and the title muted. See
+  /// [PortalListItem.checklist].
+  final bool done;
+
+  /// An icon button after the trailing, beside the row rather than in it; its
+  /// [PortalListIconAction.tooltip] is its name and it keeps its own node.
+  final PortalListIconAction? edit;
+
   final bool _skeleton;
   final PortalSkeletonLeading? _skeletonLeading;
+  final bool _skeletonMeter;
 
   /// Where a section's divider starts: the text column.
   double get textInset => switch ((_skeleton, leading, _skeletonLeading)) {
@@ -445,7 +582,7 @@ class PortalListItem extends StatelessWidget {
     final detail = _ListScope.detailOf(context);
 
     if (_skeleton) {
-      return ExcludeSemantics(
+      final skeleton = ExcludeSemantics(
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: sp.lg, vertical: sp.md),
           child: Row(children: [
@@ -474,43 +611,107 @@ class PortalListItem extends StatelessWidget {
           ]),
         ),
       );
+      if (!_skeletonMeter) return skeleton;
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          skeleton,
+          ExcludeSemantics(
+            child: Padding(
+              padding: EdgeInsetsDirectional.only(
+                  start: sp.lg + textInset, end: sp.lg, bottom: sp.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  PortalSkeleton(
+                    height: sp.xs,
+                    borderRadius: BorderRadius.circular(tokens.radii.full),
+                  ),
+                  SizedBox(height: sp.sm),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: PortalSkeleton(width: sp.xxxl * 2, height: sp.md),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
     }
 
+    Text text(String s, List<InlineSpan>? spans, int lines, TextStyle style) =>
+        spans == null
+            ? Text(s,
+                maxLines: lines, overflow: TextOverflow.ellipsis, style: style)
+            : Text.rich(TextSpan(children: spans),
+                maxLines: lines, overflow: TextOverflow.ellipsis, style: style);
+
     final heavy = isNew ? FontWeight.w700 : null;
-    final titleText = Text(
+    final titleText = text(
       title,
-      maxLines: titleMaxLines,
-      overflow: TextOverflow.ellipsis,
-      style: styles.body.copyWith(
-        decoration: struck ? TextDecoration.lineThrough : null,
+      titleSpans,
+      titleMaxLines,
+      styles.body.copyWith(
+        decoration: struck || done ? TextDecoration.lineThrough : null,
         color: disabled
             ? cs.onSurface.withValues(alpha: 0.38)
             : destructive
                 ? cs.error
-                : detail
+                : done || detail
                     ? cs.onSurfaceVariant
                     : cs.onSurface,
         fontWeight: heavy ?? (detail ? FontWeight.w400 : FontWeight.w500),
       ),
     );
-    final subtitleText = subtitleWidget ??
-        (subtitle == null
-            ? null
-            : Text(
-                subtitle!,
-                maxLines: 2,
+    final subtitleText = live != null
+        ? Row(mainAxisSize: MainAxisSize.min, children: [
+            const PortalTypingDots(),
+            SizedBox(width: sp.sm),
+            Flexible(
+              child: Text(
+                live!,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: styles.caption.copyWith(
-                  color: isNew ? cs.onSurface : cs.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface,
                 ),
-              ));
+              ),
+            ),
+          ])
+        : subtitleWidget ??
+            (subtitle == null
+                ? null
+                : text(
+                    subtitle!,
+                    subtitleSpans,
+                    2,
+                    styles.caption.copyWith(
+                      color: isNew ? cs.onSurface : cs.onSurfaceVariant,
+                    ),
+                  ));
     final textColumn = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (overline != null)
+          Text(overline!.toUpperCase(),
+              style: styles.overline.copyWith(color: cs.primary)),
         if (inverted && subtitleText != null) subtitleText,
         titleText,
         if (!inverted && subtitleText != null) subtitleText,
+        if (chips != null && chips!.isNotEmpty)
+          Padding(
+            padding: EdgeInsets.only(top: sp.xs),
+            child: Wrap(
+              spacing: sp.xs,
+              runSpacing: sp.xs,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: chips!,
+            ),
+          ),
         if (metaWidget != null)
           metaWidget!
         else if (meta != null)
@@ -548,7 +749,7 @@ class PortalListItem extends StatelessWidget {
           : styles.body;
       return Row(mainAxisSize: MainAxisSize.min, children: [
         if (withIcon && acc.icon != null) ...[
-          Icon(acc.icon, size: 18, color: color),
+          Icon(acc.icon, size: 18, fill: acc.fill ? 1 : null, color: color),
           SizedBox(width: sp.xs),
         ],
         Text(
@@ -626,6 +827,9 @@ class PortalListItem extends StatelessWidget {
         accessory = IconButton(
           icon: Icon(acc.icon),
           tooltip: acc.tooltip,
+          style: acc.tonal
+              ? IconButton.styleFrom(backgroundColor: cs.surfaceContainerHigh)
+              : null,
           onPressed: disabled ? null : acc.onPressed,
         );
       case _Kind.custom:
@@ -640,16 +844,36 @@ class PortalListItem extends StatelessWidget {
             ),
         ]);
       case _Kind.button:
+        // Busy refuses taps without greying out: the disabled colours are the
+        // enabled ones, and the spinner says why.
+        final busyName = acc.busy ? acc.busyLabel! : null;
         accessory = Tooltip(
-          message: acc.tooltip ?? acc.text!,
+          message: busyName ?? acc.tooltip ?? acc.text!,
           child: FilledButton.tonal(
-            onPressed: disabled ? null : acc.onPressed,
+            onPressed: disabled || acc.busy ? null : acc.onPressed,
             style: FilledButton.styleFrom(
               minimumSize: Size(tapTarget, tapTarget),
               backgroundColor: cs.surfaceContainerHigh,
               foregroundColor: cs.onSurface,
+              disabledBackgroundColor:
+                  acc.busy ? cs.surfaceContainerHigh : null,
+              disabledForegroundColor: acc.busy ? cs.onSurface : null,
             ),
-            child: Text(acc.text!),
+            child: busyName == null
+                ? Text(acc.text!)
+                : Row(mainAxisSize: MainAxisSize.min, children: [
+                    SizedBox.square(
+                      dimension: styles.body.fontSize,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: cs.onSurface,
+                        value:
+                            MediaQuery.disableAnimationsOf(context) ? .25 : null,
+                      ),
+                    ),
+                    SizedBox(width: sp.sm),
+                    Text(busyName),
+                  ]),
           ),
         );
       case _Kind.value:
@@ -697,6 +921,7 @@ class PortalListItem extends StatelessWidget {
     }
 
     final labelParts = [
+      overline,
       title,
       if (acc._kind == _Kind.value || acc._kind == _Kind.valueAndAction)
         acc.text,
@@ -705,11 +930,16 @@ class PortalListItem extends StatelessWidget {
         acc.text,
       subtitle,
       meta,
-      if (acc._kind == _Kind.meta) acc.text,
+      if (acc._kind == _Kind.meta) acc.spoken ?? acc.text,
+      if (acc._kind == _Kind.meta && !acc.unread) acc.markLabel,
+      live,
+      for (final c in chips ?? const <Widget>[])
+        if (c is PortalBadge) c.label,
       if (isNew) 'new',
     ].whereType<String>().where((s) => s.isNotEmpty);
 
-    final keepsSemantics = acc._keepsSemantics || leading?.interactive == true;
+    final keepsSemantics =
+        acc._keepsSemantics || leading?.interactive == true || edit != null;
 
     Widget row = ConstrainedBox(
       constraints: BoxConstraints(minHeight: tapTarget + sp.md),
@@ -752,6 +982,15 @@ class PortalListItem extends StatelessWidget {
                         : accessory,
                   ),
                 ],
+                if (edit != null)
+                  Opacity(
+                    opacity: disabled ? .38 : 1,
+                    child: IconButton(
+                      icon: Icon(edit!.icon),
+                      tooltip: edit!.tooltip,
+                      onPressed: disabled ? null : edit!.onPressed,
+                    ),
+                  ),
               ],
             ),
             if (progress != null) ...[
@@ -792,7 +1031,8 @@ class PortalListItem extends StatelessWidget {
       toggled: acc._kind == _Kind.switchControl ? acc.checked : null,
       inMutuallyExclusiveGroup: acc._kind == _Kind.radio ? true : null,
       enabled: !disabled,
-      label: labelParts.join(', '),
+      liveRegion: live == null ? null : true,
+      label: semanticLabel ?? labelParts.join(', '),
       hint: disabledReason,
       onTap: rowTap,
       excludeSemantics: !keepsSemantics,

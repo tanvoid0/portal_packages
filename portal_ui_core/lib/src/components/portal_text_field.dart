@@ -4,8 +4,11 @@ import 'package:flutter/services.dart';
 import '../theme/portal_component_extensions.dart';
 import '../theme/portal_form_field.dart';
 import '../theme/portal_ui_theme.dart';
+import 'portal_prompt.dart';
+import 'portal_skeleton.dart';
 
-/// The one text input: label above, hint, helper, error, prefix, suffix.
+/// The one text input: label above, hint, helper, warning, error, prefix,
+/// suffix, unit.
 ///
 /// Built on [PortalFormField] (label, description and error sit above and
 /// below the control) around a [TextFormField] that takes its fill and
@@ -14,6 +17,19 @@ import '../theme/portal_ui_theme.dart';
 /// `Form`; [errorText] is for a message the caller already has and wins over
 /// the helper. [filled] is the borderless pill for a note or an invite-by-ID
 /// box. Disabled draws through the theme's disabled border.
+///
+/// The line under the field is one slot: [errorText] wins over [warning], which
+/// wins over [helper], which wins over [readOnlyReason]. A warning leaves the
+/// field valid. [readOnlyReason] makes the field read-only (muted, a lock at
+/// the end unless [suffix] is set, still focusable) and says why. [unit] is a
+/// muted trailing label (kg, min) beside [suffix], which is a widget.
+/// [PortalTextField.skeleton] is the field while its value is being read.
+///
+/// With no [textInputAction], a single-line field's keyboard key is Next, so
+/// focus moves on to the next input. This includes the last field of a form,
+/// which now shows Next instead of the platform default: set
+/// `textInputAction: TextInputAction.done` there. An explicit action always
+/// wins, and a multi-line field keeps the platform default.
 ///
 /// [PortalTextField.amount] is the money input: decimal keypad, a second dot
 /// or third decimal stopped at the keyboard, the whole value selected on
@@ -28,6 +44,7 @@ class PortalTextField extends StatefulWidget {
     this.label,
     this.hint,
     this.helper,
+    this.warning,
     this.errorText,
     this.required = false,
     this.obscureText = false,
@@ -45,9 +62,46 @@ class PortalTextField extends StatefulWidget {
     this.prefix,
     this.prefixText,
     this.suffix,
+    this.unit,
+    this.readOnlyReason,
     this.autofillHints,
     this.textCapitalization = TextCapitalization.none,
-  }) : _selectAllOnFocus = false;
+  })  : _selectAllOnFocus = false,
+        _skeleton = false;
+
+  /// The field while its value is being read (a receipt, a payslip): the
+  /// [label] over a skeleton the shape of the field. Hidden from screen
+  /// readers; the page announces the reading.
+  const PortalTextField.skeleton({super.key, this.label})
+      : controller = null,
+        focusNode = null,
+        initialValue = null,
+        hint = null,
+        helper = null,
+        warning = null,
+        errorText = null,
+        required = false,
+        obscureText = false,
+        keyboardType = null,
+        textInputAction = null,
+        onChanged = null,
+        onSubmitted = null,
+        validator = null,
+        inputFormatters = null,
+        maxLines = 1,
+        minLines = null,
+        enabled = false,
+        autofocus = false,
+        filled = false,
+        prefix = null,
+        prefixText = null,
+        suffix = null,
+        unit = null,
+        readOnlyReason = null,
+        autofillHints = null,
+        textCapitalization = TextCapitalization.none,
+        _selectAllOnFocus = false,
+        _skeleton = true;
 
   /// A money input. [currencySymbol] is drawn by the field so it is never
   /// typed. [controller] is required: select-on-focus reads it. Seed it with
@@ -70,6 +124,9 @@ class PortalTextField extends StatefulWidget {
     this.suffix,
     bool signed = false,
   })  : initialValue = null,
+        warning = null,
+        unit = null,
+        readOnlyReason = null,
         obscureText = false,
         keyboardType = TextInputType.numberWithOptions(
           decimal: true,
@@ -84,7 +141,8 @@ class PortalTextField extends StatefulWidget {
         prefixText = currencySymbol,
         autofillHints = null,
         textCapitalization = TextCapitalization.none,
-        _selectAllOnFocus = true;
+        _selectAllOnFocus = true,
+        _skeleton = false;
 
   final TextEditingController? controller;
   final FocusNode? focusNode;
@@ -92,6 +150,10 @@ class PortalTextField extends StatefulWidget {
   final String? label;
   final String? hint;
   final String? helper;
+
+  /// Shown under the field in place of [helper]; the field stays valid.
+  /// [errorText] wins over it.
+  final String? warning;
   final String? errorText;
 
   /// Draws the `*` beside the label.
@@ -113,11 +175,20 @@ class PortalTextField extends StatefulWidget {
   final Widget? prefix;
   final String? prefixText;
   final Widget? suffix;
+
+  /// A muted text suffix: kg, min.
+  final String? unit;
+
+  /// A value that comes from somewhere else ('Comes from Northwind Bank'):
+  /// the field is read-only but not disabled, and this is the reason, shown
+  /// under it when nothing else claims the line and read as the field's hint.
+  final String? readOnlyReason;
   final Iterable<String>? autofillHints;
 
   /// `words` for a name, `sentences` for prose; the amount form has none.
   final TextCapitalization textCapitalization;
   final bool _selectAllOnFocus;
+  final bool _skeleton;
 
   // Reject an edit that is not a whole amount rather than truncating it to the
   // longest matching prefix, which ate the tail of `1234.56` on a stray dot.
@@ -195,10 +266,33 @@ class _PortalTextFieldState extends State<PortalTextField> {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
     final skin = PortalTextFieldTheme.of(context);
+    final radius = skin.borderRadius ?? BorderRadius.circular(tokens.radii.md);
+    if (widget._skeleton) {
+      return ExcludeSemantics(
+        child: PortalFormField(
+          label: widget.label,
+          child: PortalSkeleton(
+            height: tokens.minTapTarget,
+            borderRadius: radius,
+          ),
+        ),
+      );
+    }
     final pill = OutlineInputBorder(
-      borderRadius: skin.borderRadius ?? BorderRadius.circular(tokens.radii.md),
+      borderRadius: radius,
       borderSide: BorderSide.none,
     );
+
+    final readOnly = widget.readOnlyReason != null;
+    final muted =
+        tokens.textStyles.body.copyWith(color: portal.mutedForeground);
+    // One slot under the field: error > warning > helper > readOnlyReason.
+    final warning = widget.errorText == null ? widget.warning : null;
+    final reason = widget.errorText != null ||
+            warning != null ||
+            widget.helper != null
+        ? null
+        : widget.readOnlyReason;
 
     final decoration = InputDecoration(
       hintText: widget.hint,
@@ -212,7 +306,14 @@ class _PortalTextFieldState extends State<PortalTextField> {
               ),
               child: widget.prefix,
             ),
-      suffixIcon: widget.suffix,
+      suffixText: widget.unit,
+      suffixStyle: muted,
+      suffixIcon: widget.suffix ??
+          (readOnly
+              ? const ExcludeSemantics(
+                  child: Icon(Icons.lock_outline_rounded),
+                )
+              : null),
       constraints: BoxConstraints(minHeight: tokens.minTapTarget),
       // The theme's border carries error and focus; only a filled pill drops it.
       filled: widget.filled ? true : null,
@@ -228,21 +329,24 @@ class _PortalTextFieldState extends State<PortalTextField> {
           : null,
     ).applyDefaults(Theme.of(context).inputDecorationTheme);
 
-    return PortalFormField(
+    final field = PortalFormField(
       label: widget.label,
-      description: widget.helper,
+      description: warning == null ? widget.helper : null,
       error: widget.errorText,
       required: widget.required,
       excludeLabelSemantics: true,
       child: Semantics(
         label: widget.label,
+        hint: widget.readOnlyReason,
         child: TextFormField(
           controller: widget.controller,
           focusNode: _focus,
           initialValue: widget.controller == null ? widget.initialValue : null,
           obscureText: widget.obscureText,
           keyboardType: widget.keyboardType,
-          textInputAction: widget.textInputAction,
+          // obscureText implies a single line, so this covers a password too.
+          textInputAction: widget.textInputAction ??
+              (widget.maxLines == 1 ? TextInputAction.next : null),
           onChanged: widget.onChanged,
           onFieldSubmitted: widget.onSubmitted,
           validator: widget.validator,
@@ -250,14 +354,46 @@ class _PortalTextFieldState extends State<PortalTextField> {
           maxLines: widget.maxLines,
           minLines: widget.minLines,
           enabled: widget.enabled,
+          readOnly: readOnly,
           autofocus: widget.autofocus,
           autofillHints: widget.autofillHints,
           textCapitalization: widget.textCapitalization,
-          style: tokens.textStyles.body,
+          style: readOnly ? muted : tokens.textStyles.body,
           cursorColor: portal.primary,
           decoration: decoration,
         ),
       ),
+    );
+
+    // The field stays first in a Column whatever sits under it, so a warning
+    // appearing mid-edit never remounts it.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        field,
+        if (warning != null) ...[
+          SizedBox(height: tokens.spacing.xs),
+          PortalPrompt(
+            message: warning,
+            sentiment: PortalSentiment.warning,
+            size: PortalPromptSize.inline,
+          ),
+        ],
+        // The reason is already the field's semantic hint.
+        if (reason != null) ...[
+          SizedBox(height: tokens.spacing.xs),
+          ExcludeSemantics(
+            child: Text(
+              reason,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: portal.mutedForeground),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

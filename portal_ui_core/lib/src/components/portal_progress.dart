@@ -3,6 +3,30 @@ import 'package:flutter/material.dart';
 import '../theme/portal_component_extensions.dart';
 import '../theme/portal_semantic_colors.dart';
 import '../theme/portal_ui_theme.dart';
+import 'portal_prompt.dart';
+import 'portal_skeleton.dart';
+
+/// A budget meter's sentiment by how much of it is used: positive under 75%,
+/// warning to the limit, negative over it. [value] is spent over budget, 1.0
+/// at the line.
+// ponytail: thresholds fixed at 75% and 100%; make them tokens if a second app wants other bands.
+PortalSentiment portalBudgetSentiment(double value) => value > 1
+    ? PortalSentiment.negative
+    : value >= .75
+        ? PortalSentiment.warning
+        : PortalSentiment.positive;
+
+/// The colour a [PortalSentiment] reads as, as [PortalPrompt] maps it;
+/// neutral is [neutral].
+Color _sentimentColor(BuildContext context, PortalSentiment s, Color neutral) {
+  final sem = PortalSemanticColors.of(context);
+  return switch (s) {
+    PortalSentiment.neutral => neutral,
+    PortalSentiment.positive => sem.success,
+    PortalSentiment.warning => sem.warning,
+    PortalSentiment.negative => Theme.of(context).colorScheme.error,
+  };
+}
 
 /// How far through: one chunky, fully rounded track.
 ///
@@ -11,6 +35,13 @@ import '../theme/portal_ui_theme.dart';
 /// track; a value above 1 paints full in the overflow colour, so over budget
 /// looks different, not just full. NaN and infinity read as 0. Re-skin with
 /// [PortalProgressTheme]; the widget's own colours win.
+///
+/// With [sentiment] the fill takes its colour (see [portalBudgetSentiment])
+/// and a value above 1 stops clamping: the bar rescales so the whole spend
+/// fits, the part up to the limit in the warning colour, the overspend in the
+/// overflow colour, and a tick where the limit sits. [startLabel] and
+/// [endLabel] sit under the bar; only the end label's first word (its
+/// figure) takes the sentiment colour.
 ///
 /// Parts of a whole are [PortalSegmentedProgress]; one bar per step is
 /// [PortalStepProgress].
@@ -23,7 +54,27 @@ class PortalProgress extends StatelessWidget {
     this.trackColor,
     this.overflowColor,
     this.semanticLabel,
-  });
+    this.sentiment,
+    this.startLabel,
+    this.endLabel,
+  }) : _skeleton = false;
+
+  /// The meter while it loads: its track, and a bar at the labels' line
+  /// height for each label the data has. Hidden from screen readers.
+  const PortalProgress.skeleton({
+    super.key,
+    this.height,
+    bool hasStartLabel = true,
+    bool hasEndLabel = true,
+  })  : _skeleton = true,
+        value = 0,
+        fillColor = null,
+        trackColor = null,
+        overflowColor = null,
+        semanticLabel = null,
+        sentiment = null,
+        startLabel = hasStartLabel ? '' : null,
+        endLabel = hasEndLabel ? '' : null;
 
   final double? value;
   final double? height;
@@ -32,8 +83,125 @@ class PortalProgress extends StatelessWidget {
   final Color? overflowColor;
   final String? semanticLabel;
 
+  /// Colours the fill (over [fillColor]) and opts into the over-limit
+  /// rescale; null keeps the plain bar. Neutral is the normal fill.
+  final PortalSentiment? sentiment;
+
+  /// Captions under the bar, start and end. With either, a screen reader
+  /// hears them as the value in place of the percentage.
+  final String? startLabel;
+  final String? endLabel;
+  final bool _skeleton;
+
   @override
   Widget build(BuildContext context) {
+    if (_skeleton) return _buildSkeleton(context);
+    final bar = _buildBar(context);
+    if (startLabel == null && endLabel == null) return bar;
+
+    final portal = PortalUiTheme.of(context);
+    final tokens = portal.tokens;
+    final s = sentiment;
+    final cap = tokens.textStyles
+        .numeric(tokens.textStyles.caption)
+        .copyWith(color: portal.onSurfaceVariant);
+    final end = endLabel;
+    final space = end?.indexOf(' ') ?? -1;
+    final figure = s == null || s == PortalSentiment.neutral
+        ? null
+        : cap.copyWith(
+            color: _sentimentColor(context, s, portal.onSurfaceVariant));
+
+    return Semantics(
+      container: true,
+      label: semanticLabel,
+      value: [startLabel, endLabel].whereType<String>().join(', '),
+      child: ExcludeSemantics(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            bar,
+            SizedBox(height: tokens.spacing.sm),
+            Row(
+              mainAxisAlignment: startLabel == null
+                  ? MainAxisAlignment.end
+                  : MainAxisAlignment.spaceBetween,
+              children: [
+                if (startLabel case final start?)
+                  Flexible(child: Text(start, style: cap)),
+                if (startLabel != null && end != null)
+                  SizedBox(width: tokens.spacing.sm),
+                if (end != null)
+                  Flexible(
+                    child: Text.rich(
+                      TextSpan(
+                        style: cap,
+                        children: [
+                          TextSpan(
+                            text: space < 0 ? end : end.substring(0, space),
+                            style: figure,
+                          ),
+                          if (space >= 0) TextSpan(text: end.substring(space)),
+                        ],
+                      ),
+                      textAlign: TextAlign.end,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    final tokens = PortalUiTheme.of(context).tokens;
+    final h =
+        height ?? PortalProgressTheme.of(context).height ?? tokens.spacing.sm;
+    final cap = tokens.textStyles.caption;
+    final text = MediaQuery.textScalerOf(context)
+        .scale(cap.fontSize ?? tokens.typeScale.sm);
+    Widget label(double width) => SizedBox(
+          height: text * (cap.height ?? 1),
+          child: Center(
+            child: PortalSkeleton(
+              width: width,
+              height: text,
+              borderRadius: BorderRadius.circular(tokens.radii.sm),
+            ),
+          ),
+        );
+
+    return ExcludeSemantics(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PortalSkeleton(
+            height: h,
+            borderRadius: BorderRadius.circular(tokens.radii.full),
+          ),
+          if (startLabel != null || endLabel != null) ...[
+            SizedBox(height: tokens.spacing.sm),
+            Row(
+              mainAxisAlignment: startLabel == null
+                  ? MainAxisAlignment.end
+                  : MainAxisAlignment.spaceBetween,
+              children: [
+                if (startLabel != null) label(tokens.spacing.xxxl * 2),
+                if (endLabel != null)
+                  label(tokens.spacing.xxxl + tokens.spacing.lg),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBar(BuildContext context) {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
     final skin = PortalProgressTheme.of(context);
@@ -57,12 +225,66 @@ class PortalProgress extends StatelessWidget {
     }
 
     final safe = value!.isFinite ? value! : 0.0;
+    final s = sentiment;
     final color = safe > 1
         ? (overflowColor ??
             skin.overflowColor ??
             PortalSemanticColors.of(context).danger)
-        : fill;
+        : (s == null ? fill : _sentimentColor(context, s, fill));
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
+
+    if (s != null && safe > 1) {
+      // Thousandths of the bar up to the limit; kept off 0 and 1000 so both
+      // segments stay flexible.
+      final within = (1000 / safe).round().clamp(1, 999).toInt();
+      final tick = h + tokens.spacing.sm;
+      return Semantics(
+        label: semanticLabel,
+        value: '${(safe * 100).round()}%',
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            ClipRRect(
+              borderRadius: radius,
+              child: SizedBox(
+                height: h,
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: within,
+                      child: ColoredBox(
+                        color: PortalSemanticColors.of(context).warning,
+                      ),
+                    ),
+                    Expanded(
+                      flex: 1000 - within,
+                      child: ColoredBox(color: color),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: FractionallySizedBox(
+                alignment: AlignmentDirectional.centerStart,
+                widthFactor: within / 1000,
+                child: Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: OverflowBox(
+                    maxHeight: tick,
+                    child: SizedBox(
+                      width: tokens.borderWidth * 2,
+                      height: tick,
+                      child: ColoredBox(color: portal.onSurface),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Semantics(
       label: semanticLabel,
