@@ -21,6 +21,7 @@ import '../tools/ai_agent.dart';
 import '../tools/ai_tool.dart';
 import 'ai_chat_history_list.dart';
 import 'ai_chat_labels.dart';
+import 'ai_confirm_card.dart';
 import 'ai_consent.dart';
 import 'ai_suggestion_cards.dart';
 import 'ai_voice_page.dart';
@@ -28,8 +29,11 @@ import 'ai_item_list.dart';
 import 'ai_markdown.dart';
 import 'ai_presence_orb.dart';
 import 'ai_prompt_composer.dart';
+import 'ai_reply_foot.dart';
 import 'ai_settings_section.dart';
+import 'ai_step_tile.dart';
 import 'ai_thinking_tile.dart';
+import 'ai_turn_bubble.dart';
 
 /// Drop-in assistant UI: prompt box, live step log and a confirmation prompt
 /// before any tool that changes data.
@@ -340,6 +344,19 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   bool _reading = false;
   String? _error;
 
+  /// The reply as far as it got when the run failed, so the cut-off prose
+  /// stays on screen above the failure instead of vanishing with the stream.
+  /// Never a completed reply: [_latestReply] does not read it.
+  String? _failedPartial;
+
+  /// The last run failed offline before anything came back: the question is
+  /// marked "Not sent" and no reply bubble is drawn.
+  bool _notSent = false;
+
+  /// The last send could not reach the backend. Drives the header's "Can't
+  /// reach" until a send gets through.
+  bool _lastSendOffline = false;
+
   /// The tool waiting on the user, drawn as a card at the end of the thread.
   _PendingConfirm? _pendingConfirm;
 
@@ -444,18 +461,6 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       for (final turn in _visibleTurns)
         if (turn.content.toLowerCase().contains(query)) turn,
     ];
-  }
-
-  /// Whether the next thing on screen is also the assistant talking.
-  ///
-  /// Messenger draws the face once per run, against the last bubble of it, so
-  /// a multi-part answer reads as one voice rather than three arrivals. The
-  /// live stream and a finished [_reply] both render below the turn list, so
-  /// the last turn has to count them as what follows it.
-  bool _assistantFollows(int index) {
-    final turns = _shownTurns;
-    if (index < turns.length - 1) return !turns[index + 1].isUser;
-    return _streamingReply != null || _reply != null;
   }
 
   /// Leaves the search and puts [turn] on screen where it actually sits.
@@ -644,7 +649,8 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       ..addAll(session.turns);
     _steps.clear();
     _reply = null;
-    _error = null;
+    _clearFailure();
+    _lastSendOffline = false;
     return true;
   }
 
@@ -654,8 +660,16 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       _turns.clear();
       _steps.clear();
       _reply = null;
-      _error = null;
+      _clearFailure();
+      _lastSendOffline = false;
     });
+  }
+
+  /// Forgets the last failure, so a new run starts without its leftovers.
+  void _clearFailure() {
+    _error = null;
+    _failedPartial = null;
+    _notSent = false;
   }
 
   /// Puts the whole conversation on the clipboard as JSON.
@@ -717,11 +731,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   /// but it is also inert when there is no backend store to choose from,
   /// and a tooltip on a dead region announces an action that does not
   /// exist.
-  // ponytail: 'Change model' is a literal, like the panel's 'AI settings'.
-  // Both belong in AiChatLabels; that file is owned by another session
-  // right now, so they go together in one copy pass.
-  Widget _wrapPicker(bool enabled, Widget child) =>
-      enabled ? Tooltip(message: 'Change model', child: child) : child;
+  Widget _wrapPicker(bool enabled, Widget child) => enabled
+      ? Tooltip(message: widget.labels.changeModel, child: child)
+      : child;
 
   Future<void> _showHistory() async {
     final store = widget.store;
@@ -808,7 +820,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                             top: false,
                             child: ListTile(
                               leading: const Icon(Icons.tune_rounded),
-                              title: const Text('AI settings'),
+                              title: Text(widget.labels.aiSettings),
                               onTap: () {
                                 // Close the panel first: settings pushes a
                                 // route, and leaving the panel open behind it
@@ -1026,7 +1038,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         _input.text = turns[index].content;
         _input.selection = TextSelection.collapsed(offset: _input.text.length);
       }
-      _error = null;
+      _clearFailure();
       _steps.clear();
       if (widget.onSend == null) _turns.removeRange(index, _turns.length);
     });
@@ -1083,11 +1095,14 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       setState(() {
         _running = true;
         _cancelled = false;
-        _error = null;
+        _clearFailure();
       });
       try {
         await send(prompt);
-        if (mounted && !_cancelled) _followNewest();
+        if (mounted && !_cancelled) {
+          setState(() => _lastSendOffline = false);
+          _followNewest();
+        }
       } catch (e) {
         if (mounted && !_cancelled) _failWith(e);
       } finally {
@@ -1102,7 +1117,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       _running = true;
       _cancelled = false;
       _reply = null;
-      _error = null;
+      _clearFailure();
       _steps.clear();
       if (keeping) {
         _input.clear();
@@ -1144,10 +1159,12 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
           _reply = result.message;
           _replyThinking = result.thinking;
           _streamingReply = null;
+          _lastSendOffline = false;
         });
         return;
       }
       setState(() {
+        _lastSendOffline = false;
         _turns.add(
           AiChatTurn(
             role: 'assistant',
@@ -1159,6 +1176,17 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                 for (final step in _steps)
                   for (final block in step.blocks) block.toJson(),
               ],
+              // What each step was, so a reload can still draw the receipts
+              // ("Add item") once the live step lines are gone.
+              if (_steps.isNotEmpty)
+                'tools': [
+                  for (final step in _steps)
+                    {
+                      'name': step.call.name,
+                      'failed': step.failed,
+                      'mutates': _mutates(step.call.name),
+                    },
+                ],
               if (result.thinking != null) 'thinking': result.thinking,
               if (_steps.isNotEmpty) 'step_count': _steps.length,
               if (result.stats case final stats?) ...{
@@ -1175,8 +1203,19 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       await _persist();
     } catch (e) {
       if (!mounted || _cancelled) return;
+      final offline = isAiOfflineError(e);
+      final partial = _streamingReply ?? '';
+      final cutOff = partial.isNotEmpty || _steps.isNotEmpty;
       setState(() {
         _error = _messageFor(e);
+        _lastSendOffline = offline;
+        // Nothing came back and the network is why: the question never left,
+        // so it carries the "Not sent" mark and there is no reply to draw. A
+        // run that got somewhere first failed mid-flight instead, and keeps
+        // what it had. No question on screen to mark (a one-shot with no
+        // store) falls through to the reply's own failure line.
+        _notSent = offline && !cutOff && _lastUserTurn != null;
+        _failedPartial = partial.isEmpty ? null : partial;
         _streamingReply = null;
       });
       _followNewest();
@@ -1200,13 +1239,19 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     }
   }
 
+  List<AiTool> get _tools =>
+      widget.tools ?? widget.runtime?.tools ?? const <AiTool>[];
+
+  /// Whether the tool called [name] changes data. False for one this page no
+  /// longer has, which only costs a receipt.
+  bool _mutates(String name) => resolveTool(_tools, name)?.mutates ?? false;
+
   /// Runs an [AiAction] button: same tools, same confirm prompt as a call the
   /// model makes. Nothing here goes back to the model -- the user asked for
   /// this action directly.
   Future<void> _runAction(AiAction action) async {
     if (_busy) return;
-    final tools = widget.tools ?? widget.runtime?.tools ?? const <AiTool>[];
-    final tool = resolveTool(tools, action.tool);
+    final tool = resolveTool(_tools, action.tool);
     final call = AiToolCall(action.tool, action.args);
     if (tool == null) {
       if (mounted) {
@@ -1276,6 +1321,34 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     ];
   }
 
+  /// Names of the data-changing tools a restored turn ran and finished. Reads
+  /// as defensively as [_blocksOf]: a thread saved before turns recorded
+  /// `tools` has none, and an odd entry is skipped rather than thrown on.
+  List<String> _receiptsOf(AiChatTurn turn) {
+    final raw = turn.payload?['tools'];
+    if (raw is! List) return const [];
+    return [
+      for (final entry in raw)
+        if (entry is Map &&
+            entry['name'] is String &&
+            entry['mutates'] == true &&
+            entry['failed'] != true)
+          entry['name'] as String,
+    ];
+  }
+
+  /// A line per change that went through, under the reply that reports it.
+  List<Widget> _receipts(Iterable<String> names) {
+    final gap = PortalUiTheme.of(context).tokens.spacing.sm;
+    return [
+      for (final name in names)
+        Padding(
+          padding: EdgeInsets.only(top: gap),
+          child: AiReceipt(label: aiToolTitle(name)),
+        ),
+    ];
+  }
+
   Widget _blockBody(AiBlock block, ThemeData theme) {
     final custom = widget.renderers[block.kind];
     if (custom != null) return custom(block);
@@ -1311,30 +1384,21 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     ],
   );
 
-  /// One completed tool call: what ran, plus whatever it had to show. The raw
-  /// result text is a fallback for a tool with no blocks of its own.
+  /// One completed tool call: what ran, plus whatever it had to show. A tool
+  /// with no blocks of its own is told by its result text instead of its name;
+  /// [AiStepLine] keeps that to two lines, since image_search returns a
+  /// screenful of Unsplash URLs.
   Widget _stepView(AiAgentStep step, ThemeData theme) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      ListTile(
-        dense: true,
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(
-          step.failed ? Icons.error_outline : Icons.check_circle_outline,
-          color: step.failed ? theme.colorScheme.error : null,
-          size: 20,
-        ),
-        title: Text(aiToolTitle(step.call.name)),
-        subtitle: step.blocks.isEmpty
-            // A tool result is written for the model, and some are long --
-            // image_search returns a screenful of Unsplash URLs. Two lines is
-            // enough to say what happened without burying the conversation.
-            ? Text(
-                _stepResultText(step.result),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              )
-            : null,
+      AiStepLine(
+        icon: step.failed
+            ? PortalIcons.error_rounded
+            : PortalIcons.check_circle_rounded,
+        iconColor: step.failed ? theme.colorScheme.error : null,
+        text: step.blocks.isEmpty && step.result.trim().isNotEmpty
+            ? _stepResultText(step.result)
+            : aiToolTitle(step.call.name),
       ),
       for (final block in step.blocks)
         Padding(
@@ -1434,21 +1498,197 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   /// The bubble is appended at the end of the thread, so without the scroll
   /// it lands under the composer and the run looks like it simply stopped.
   void _failWith(Object error) {
-    setState(
-      () => _error = aiErrorMessage(error, offline: widget.labels.offline),
-    );
+    setState(() {
+      _error = _messageFor(error);
+      _lastSendOffline = isAiOfflineError(error);
+    });
     _followNewest();
   }
 
   String _messageFor(Object error) =>
       aiErrorMessage(error, offline: widget.labels.offline);
 
-  void _copyTurn(AiChatTurn turn) {
-    Clipboard.setData(ClipboardData(text: turn.content));
+  void _copyText(String text) {
+    Clipboard.setData(ClipboardData(text: text));
     HapticFeedback.selectionClick();
     ScaffoldMessenger.maybeOf(
       context,
     )?.showSnackBar(SnackBar(content: Text(widget.labels.copied)));
+  }
+
+  /// `09:14 - 4.2s - 3 steps`, skipping whatever this turn does not know.
+  /// Threads saved before turns carried a time show nothing at all.
+  String? _meta(AiChatTurn turn) {
+    final parts = [
+      if (turn.at case final at?)
+        MaterialLocalizations.of(
+          context,
+        ).formatTimeOfDay(TimeOfDay.fromDateTime(at)),
+      if (turn.took case final took?) _formatTook(took),
+      if (turn.payload?['step_count'] case final int steps when steps > 0)
+        '$steps ${steps == 1 ? 'step' : 'steps'}',
+      if (turn.payload?['tokens'] case final int tokens when tokens > 0)
+        '$tokens tokens',
+      if (turn.payload?['model'] case final String model when model.isNotEmpty)
+        model,
+    ];
+    return parts.isEmpty ? null : parts.join('  ·  ');
+  }
+
+  static String _formatTook(Duration took) {
+    if (took.inSeconds < 60) {
+      return '${(took.inMilliseconds / 1000).toStringAsFixed(1)}s';
+    }
+    return '${took.inMinutes}m ${took.inSeconds % 60}s';
+  }
+
+  /// The assistant's mark for a reply foot: small, no presence dot -- the
+  /// dot is the header's status line, and repeated down the thread it would
+  /// claim every past reply is live.
+  Widget get _footMark => _AiPresenceAvatar(
+    busy: false,
+    local: widget.runtime?.usesLocalModel ?? false,
+    avatar: widget.avatar,
+    size: 20,
+    showDot: false,
+  );
+
+  /// The assistant's bubble around [child], with [footer] under it.
+  Widget _replyBubble(Widget child, {Widget? footer}) => PortalChatBubble(
+    author: PortalChatAuthor.assistant,
+    footer: footer,
+    child: child,
+  );
+
+  /// A reply's body: [text], and a receipt line under it for each change in
+  /// [changes] that went through.
+  Widget _replyBody(Widget text, List<String> changes) => changes.isEmpty
+      ? text
+      : Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [text, ..._receipts(changes)],
+        );
+
+  /// Whether [at] falls on a different calendar day from [previous].
+  static bool _newDay(DateTime? previous, DateTime at) =>
+      previous != null &&
+      (previous.year != at.year ||
+          previous.month != at.month ||
+          previous.day != at.day);
+
+  /// One transcript turn. The root carries the [GlobalObjectKey] that
+  /// [_revealTurn] scrolls to.
+  ///
+  /// [notSent] marks the question whose send never left the device;
+  /// [newest] is the last turn on screen, the only reply that can be redone;
+  /// [canRedo] is whether the page can re-ask the last question at all.
+  Widget _turnView(
+    AiChatTurn turn, {
+    required bool notSent,
+    required bool newest,
+    required bool canRedo,
+  }) {
+    final labels = widget.labels;
+    final Widget content;
+    if (turn.isUser) {
+      content = Semantics(
+        label: labels.youSaid,
+        child: AiUserTurn(
+          turn: turn,
+          notSent: notSent,
+          onRetry: _busy ? null : _retry,
+          // Actions live behind a long-press, like every other chat bubble on
+          // the platform. Any question can be reworked, not just the newest:
+          // the mistake worth fixing is often three turns back. Going back
+          // drops the answers after it, so _rewindTo asks before throwing
+          // away more than the last exchange.
+          onCopy: () => _copyText(turn.content),
+          onEdit: !_busy && _canRewind(turn)
+              ? () => _rewindTo(_visibleTurns.indexOf(turn))
+              : null,
+          onDelete: !_busy && _canRewind(turn)
+              ? () => _rewindTo(_visibleTurns.indexOf(turn), refill: false)
+              : null,
+          copy: labels.copy,
+          edit: labels.edit,
+          delete: labels.delete,
+          notSentLabel: labels.notSent,
+          retry: labels.retry,
+        ),
+      );
+    } else {
+      // The foot's copy button rather than the bubble's long-press menu: the
+      // reply is selectable text, and a long press there belongs to the
+      // selection.
+      content = Semantics(
+        label: labels.assistantSaid,
+        child: _replyBubble(
+          _replyBody(
+            AiMarkdown(
+              text: turn.content,
+              copyCodeLabel: labels.copy,
+              copiedLabel: labels.copied,
+            ),
+            _receiptsOf(turn),
+          ),
+          footer: _doneFoot(
+            meta: _meta(turn),
+            onCopy: () => _copyText(turn.content),
+            onRegenerate: newest && canRedo && !_busy ? _retry : null,
+          ),
+        ),
+      );
+    }
+    return Padding(
+      key: GlobalObjectKey(turn),
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GestureDetector(
+        onTap: _chatQuery.trim().isEmpty ? null : () => _revealTurn(turn),
+        child: content,
+      ),
+    );
+  }
+
+  /// The foot of a reply that is still coming: writing, or waiting on the
+  /// user's answer to a proposed change.
+  AiReplyFoot _liveFoot() {
+    final labels = widget.labels;
+    return AiReplyFoot(
+      mark: _footMark,
+      status: _pendingConfirm == null
+          ? AiReplyStatus.writing
+          : AiReplyStatus.waiting,
+      writing: labels.writing,
+      waitingForYou: labels.waitingForYou,
+    );
+  }
+
+  /// The foot of a reply that never arrived (or stopped short): the reason,
+  /// and a way to ask again where there is a question to ask.
+  AiReplyFoot _failedFoot() => AiReplyFoot(
+    status: AiReplyStatus.failed,
+    failure: _error,
+    onRetry: _lastUserTurn != null && !_busy ? _retry : null,
+    retry: widget.labels.retry,
+  );
+
+  /// A finished reply's foot: copy, and regenerate where redoing it makes
+  /// sense. [meta] is the caption (time, how long, steps, model).
+  AiReplyFoot _doneFoot({
+    required VoidCallback onCopy,
+    VoidCallback? onRegenerate,
+    String? meta,
+  }) {
+    final labels = widget.labels;
+    return AiReplyFoot(
+      mark: _footMark,
+      status: AiReplyStatus.done,
+      meta: meta,
+      onCopy: onCopy,
+      onRegenerate: onRegenerate,
+      copyReply: labels.copyReply,
+      regenerate: labels.regenerate,
+    );
   }
 
   /// The provider and model picker, one tap from the conversation.
@@ -1487,9 +1727,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                 children: [
                   Expanded(
                     child: Text(
-                      // ponytail: literal, promote to AiChatLabels with
-                      // 'Change model' and 'AI settings' in one copy pass.
-                      'AI provider',
+                      widget.labels.aiProvider,
                       style: Theme.of(sheetContext).textTheme.titleMedium,
                     ),
                   ),
@@ -1526,6 +1764,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final canPickBackend = widget.runtime?.backendStore != null;
+    final shown = _shownTurns;
+    final lastUser = _lastUserTurn;
+    final streaming = _streamingReply?.isNotEmpty ?? false;
     return Padding(
       padding: EdgeInsets.only(
         left: 16,
@@ -1624,12 +1865,16 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                                       secondChild: Text(
                                         _busy
                                             ? widget.labels.thinking
+                                            : _lastSendOffline
+                                            ? widget.labels.cantReach
                                             : widget.runtime!.backendLabel,
                                         style: theme.textTheme.labelSmall
                                             ?.copyWith(
-                                              color: theme
-                                                  .colorScheme
-                                                  .onSurfaceVariant,
+                                              color: _lastSendOffline && !_busy
+                                                  ? theme.colorScheme.error
+                                                  : theme
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
                                               height: 1.1,
                                             ),
                                         maxLines: 1,
@@ -1716,7 +1961,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                 if (widget.onSettings != null &&
                     (!widget.fill || widget.store == null))
                   IconButton(
-                    tooltip: 'AI settings',
+                    tooltip: widget.labels.aiSettings,
                     icon: const Icon(Icons.tune_rounded),
                     iconSize: 20,
                     visualDensity: VisualDensity.compact,
@@ -1837,7 +2082,11 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                               refreshLabel: widget.labels.moreIdeas,
                             ),
                           ],
-                          for (final (index, turn) in _shownTurns.indexed) ...[
+                          for (final (index, turn) in shown.indexed) ...[
+                            if (turn.at case final at?
+                                when index > 0 &&
+                                    _newDay(shown[index - 1].at, at))
+                              AiDayStamp(label: aiDayStamp(context, at)),
                             if (_thinkingOf(turn) case final thinking?)
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 4),
@@ -1846,44 +2095,13 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                                   label: widget.labels.thinking,
                                 ),
                               ),
-                            Padding(
-                              key: GlobalObjectKey(turn),
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: GestureDetector(
-                                onTap: _chatQuery.trim().isEmpty
-                                    ? null
-                                    : () => _revealTurn(turn),
-                                child: _TurnBubble(
-                                  turn: turn,
-                                  avatar: widget.avatar,
-                                  local:
-                                      widget.runtime?.usesLocalModel ?? false,
-                                  showAvatar: !_assistantFollows(index),
-                                  onCopy: () => _copyTurn(turn),
-                                  copyLabel: widget.labels.copy,
-                                  copiedLabel: widget.labels.copied,
-                                  youLabel: widget.labels.youSaid,
-                                  assistantLabel: widget.labels.assistantSaid,
-                                  // Any question can be reworked, not just the newest:
-                                  // the mistake worth fixing is often three turns back.
-                                  // Going back drops the answers after it, so
-                                  // _rewindTo asks before throwing away more than the
-                                  // last exchange.
-                                  onEdit: !_busy && _canRewind(turn)
-                                      ? () => _rewindTo(
-                                          _visibleTurns.indexOf(turn),
-                                        )
-                                      : null,
-                                  onDelete: !_busy && _canRewind(turn)
-                                      ? () => _rewindTo(
-                                          _visibleTurns.indexOf(turn),
-                                          refill: false,
-                                        )
-                                      : null,
-                                  editLabel: widget.labels.edit,
-                                  deleteLabel: widget.labels.delete,
-                                ),
-                              ),
+                            _turnView(
+                              turn,
+                              notSent: _notSent && identical(turn, lastUser),
+                              newest:
+                                  index == shown.length - 1 &&
+                                  _chatQuery.trim().isEmpty,
+                              canRedo: lastUser != null,
                             ),
                             for (final block in _blocksOf(turn))
                               Padding(
@@ -1896,15 +2114,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                               when partial.isNotEmpty)
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Semantics(
-                                liveRegion: true,
-                                child: _assistantBubble(
-                                  context,
-                                  AiMarkdown(text: partial),
-                                  avatar: widget.avatar,
-                                  local:
-                                      widget.runtime?.usesLocalModel ?? false,
-                                ),
+                              child: _replyBubble(
+                                AiMarkdown(text: partial),
+                                footer: _busy ? _liveFoot() : null,
                               ),
                             ),
                           if (_replyThinking case final thinking?)
@@ -1912,14 +2124,22 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                               thinking: thinking,
                               label: widget.labels.thinking,
                             ),
-                          if (_reply != null)
+                          if (_reply case final reply?)
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: _assistantBubble(
-                                context,
-                                AiMarkdown(text: _reply!),
-                                avatar: widget.avatar,
-                                local: widget.runtime?.usesLocalModel ?? false,
+                              child: _replyBubble(
+                                _replyBody(
+                                  AiMarkdown(text: reply),
+                                  [
+                                    for (final step in _steps)
+                                      if (!step.failed &&
+                                          _mutates(step.call.name))
+                                        step.call.name,
+                                  ],
+                                ),
+                                footer: _busy
+                                    ? null
+                                    : _doneFoot(onCopy: () => _copyText(reply)),
                               ),
                             ),
                           for (final proposal in _proposals)
@@ -1955,83 +2175,44 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                           if (_pendingConfirm case final pending?)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 8),
-                              child: _ConfirmCard(
-                                pending: pending,
+                              child: AiConfirmCard(
+                                toolName: pending.tool.name,
+                                // The row the call would change speaks for the
+                                // argument dump that held its id; the photo is
+                                // still the call's own.
+                                args: pending.preview == null
+                                    ? pending.call.args
+                                    : const {},
+                                coverImageUrl: aiPreviewImage(pending.call.args),
+                                previewTitle: pending.preview?.title,
                                 onAccept: () => _answerConfirm(true),
                                 onDecline: () => _answerConfirm(false),
                                 onEdit: _canEdit(pending.call)
                                     ? () => _editPending(pending)
                                     : null,
+                                declineLabel: widget.labels.decline,
+                                editLabel: widget.labels.edit,
+                                acceptLabel: widget.labels.accept,
+                                retryLabel: widget.labels.retry,
                               ),
                             ),
-                          // A failure is part of the conversation, so it reads as one:
-                          // the assistant's own bubble shape in the error colours,
-                          // rather than loose red text that ran the width of the page
-                          // and pushed Retry off to the side.
-                          if (_error != null)
+                          // Nothing to hang the state on yet -- no text, or a
+                          // card waiting -- so it stands on its own.
+                          if (_busy && !streaming) _liveFoot(),
+                          // A failure is part of the conversation, so it reads as
+                          // one: under whatever the reply managed to say, with the
+                          // reason and a way to ask again. A question that never
+                          // left says so under itself instead.
+                          if (_error != null && !_notSent)
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: Container(
-                                  constraints: BoxConstraints(
-                                    maxWidth:
-                                        MediaQuery.sizeOf(context).width * 0.85,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 10,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.errorContainer,
-                                    borderRadius: const BorderRadius.only(
-                                      topLeft: Radius.circular(16),
-                                      topRight: Radius.circular(16),
-                                      bottomLeft: Radius.circular(4),
-                                      bottomRight: Radius.circular(16),
-                                    ),
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _error!,
-                                        style: theme.textTheme.bodyMedium
-                                            ?.copyWith(
-                                              height: 1.45,
-                                              color: theme
-                                                  .colorScheme
-                                                  .onErrorContainer,
-                                            ),
-                                      ),
-                                      if (_lastUserTurn != null && !_busy)
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                            top: 4,
-                                          ),
-                                          child: TextButton.icon(
-                                            onPressed: _retry,
-                                            icon: const Icon(
-                                              Icons.refresh_rounded,
-                                              size: 18,
-                                            ),
-                                            label: Text(widget.labels.retry),
-                                            style: TextButton.styleFrom(
-                                              foregroundColor: theme
-                                                  .colorScheme
-                                                  .onErrorContainer,
-                                              padding: EdgeInsets.zero,
-                                              visualDensity:
-                                                  VisualDensity.compact,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
+                              child: switch (_failedPartial) {
+                                final partial? => _replyBubble(
+                                  AiMarkdown(text: partial),
+                                  footer: _failedFoot(),
                                 ),
-                              ),
+                                null => _failedFoot(),
+                              },
                             ),
                         ],
                       ),
@@ -2121,72 +2302,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                 ? widget.labels.consentBlocked
                 : (_busy && _pendingConfirm == null)
                 ? widget.labels.working
+                : _pendingConfirm != null
+                ? widget.labels.typeAChange
                 : widget.labels.inputHint,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// One argument of a pending tool call, as a label and a readable value.
-///
-/// The user is being asked to approve a change to their own data, so the
-/// arguments have to be legible -- a JSON dump is not an answer to "allow
-/// this?".
-class _ArgRow extends StatelessWidget {
-  const _ArgRow({required this.name, required this.value});
-
-  final String name;
-  final Object? value;
-
-  static String describe(Object? value) => switch (value) {
-    null => '-',
-    // Steps and ingredients are sentences. Joined with a comma they read as
-    // "Preheat the oven., Cut the aubergine.", so each gets its own line.
-    final List list => list.map(describe).join('\n'),
-    // Rows arrive as {recipe_id, date, meal_type, servings}. The id is the
-    // one value a person cannot check -- "868faf5c-bdc9-4f55 2026-09-08
-    // dinner 4" is not an answer to "allow this?" -- so it is dropped, unless
-    // dropping leaves nothing to show.
-    final Map map => switch (map.values
-        .where((v) => !_looksLikeId(v))
-        .map(describe)
-        .join(' ')) {
-      '' => map.values.map(describe).join(' '),
-      final kept => kept,
-    },
-    _ => '$value',
-  };
-
-  static final _uuid = RegExp(
-    r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
-    caseSensitive: false,
-  );
-
-  static bool _looksLikeId(Object? value) =>
-      value is String && _uuid.hasMatch(value.trim());
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 92,
-            child: Text(
-              name.replaceAll('_', ' '),
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(describe(value), style: theme.textTheme.bodySmall),
           ),
         ],
       ),
@@ -2291,264 +2409,6 @@ class _ProposalCard extends StatelessWidget {
   }
 }
 
-/// The assistant's shared chrome, over [PortalChatBubble]: the avatar gutter
-/// that repeats beside every reply (or a same-width placeholder when
-/// [showAvatar] is false, so a run of replies keeps one left edge instead of
-/// stepping out under the face). Used both for a finished turn (by
-/// [_TurnBubble], which adds its own long-press-free footer) and for the
-/// in-flight streaming reply and the not-yet-committed final reply, neither
-/// of which have a footer to show.
-Widget _assistantBubble(
-  BuildContext context,
-  Widget child, {
-  Widget? avatar,
-  bool local = false,
-  bool showAvatar = true,
-  Widget? footer,
-}) {
-  final gutter = 24 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.3);
-  return PortalChatBubble(
-    author: PortalChatAuthor.assistant,
-    leading: showAvatar
-        ? _AiPresenceAvatar(
-            busy: false,
-            local: local,
-            avatar: avatar,
-            size: 24,
-            // The dot is the header's status line. Repeated down the thread
-            // it would claim every past reply is live.
-            showDot: false,
-          )
-        : SizedBox(width: gutter),
-    footer: footer,
-    child: child,
-  );
-}
-
-class _TurnBubble extends StatelessWidget {
-  const _TurnBubble({
-    required this.turn,
-    this.avatar,
-    this.local = false,
-    this.showAvatar = true,
-    this.onEdit,
-    this.onDelete,
-    this.onCopy,
-    this.editLabel = 'Edit',
-    this.deleteLabel = 'Delete',
-    this.copyLabel = 'Copy',
-    this.copiedLabel = 'Copied',
-    this.youLabel = 'You said',
-    this.assistantLabel = 'Assistant said',
-  });
-
-  final AiChatTurn turn;
-
-  /// The host's own assistant face, shown beside the reply. Null falls back
-  /// to the default glyph.
-  final Widget? avatar;
-  final bool local;
-
-  /// False on every reply but the last of a run, which leaves the gutter
-  /// empty so the bubbles still line up under the one face above them.
-  final bool showAvatar;
-
-  /// Puts this turn back in the composer. Null for anything not editable.
-  final VoidCallback? onEdit;
-
-  /// Drops this turn (and everything after it) with no re-typing. Null for
-  /// anything not deletable.
-  final VoidCallback? onDelete;
-
-  /// Puts this turn on the clipboard. Offered on every turn, including the
-  /// assistant's -- an answer you cannot copy out is an answer you retype.
-  final VoidCallback? onCopy;
-  final String editLabel;
-  final String deleteLabel;
-  final String copyLabel;
-  final String copiedLabel;
-
-  /// Read out before the turn itself, so a screen reader says who is talking
-  /// -- on screen that is the bubble's side and colour, which announces
-  /// nothing.
-  final String youLabel;
-  final String assistantLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isUser = turn.isUser;
-    final meta = _meta(context);
-    final scheme = theme.colorScheme;
-    if (!isUser) {
-      // A visible button rather than the bubble's long-press menu: the reply
-      // is selectable text, and a long press there belongs to the selection.
-      return Semantics(
-        label: assistantLabel,
-        child: _assistantBubble(
-          context,
-          AiMarkdown(
-            text: turn.content,
-            copyCodeLabel: copyLabel,
-            copiedLabel: copiedLabel,
-          ),
-          avatar: avatar,
-          local: local,
-          showAvatar: showAvatar,
-          footer: Padding(
-            // Line the timestamp up with the card above it, not with the
-            // face in the gutter. Under the avatar it read as a caption on
-            // the orb rather than on the reply.
-            padding: const EdgeInsets.only(left: 34),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (meta != null) _metaText(theme, meta),
-                if (onCopy != null)
-                  IconButton(
-                    onPressed: onCopy,
-                    tooltip: copyLabel,
-                    icon: const Icon(Icons.copy_rounded, size: 16),
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    constraints: const BoxConstraints(),
-                    color: scheme.onSurfaceVariant,
-                  ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-    final canAct = onEdit != null || onDelete != null || onCopy != null;
-    return Semantics(
-      label: youLabel,
-      child: PortalChatBubble(
-        author: PortalChatAuthor.user,
-        // Long-press for actions, like every other chat bubble on the
-        // platform -- a pencil icon sitting next to the bubble at all times
-        // was one more thing to explain for an action people only ever take
-        // right after sending.
-        onLongPress: canAct ? () => _showActions(context, scheme) : null,
-        footer: meta == null
-            ? null
-            : _metaText(theme, meta, color: scheme.onSurfaceVariant),
-        child: Text(
-          turn.content,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            height: 1.45,
-            // onSurface, not onPrimaryContainer. M3 pairs the container
-            // with its own "on" role, but that role is a tint of the accent
-            // -- so what the user typed came out violet on violet while the
-            // reply beside it was plain text, and the quieter of the two
-            // was the one they wrote. The tinted fill is enough to say
-            // whose turn it is; the words are words.
-            color: scheme.onSurface,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // PortalChatBubble's onLongPress carries no press position, so the menu
-  // anchors to the bubble's own bounds instead of the exact finger position.
-  // ponytail: close enough that showMenu still lands on screen; an
-  // onLongPressStart(details) slot on PortalChatBubble is the upgrade path
-  // if pixel-exact anchoring matters later.
-  Future<void> _showActions(BuildContext context, ColorScheme scheme) async {
-    HapticFeedback.selectionClick();
-    final theme = Theme.of(context);
-    final box = context.findRenderObject()! as RenderBox;
-    final overlay =
-        Overlay.of(context).context.findRenderObject()! as RenderBox;
-    final action = await showMenu<VoidCallback>(
-      context: context,
-      position: RelativeRect.fromRect(
-        box.localToGlobal(Offset.zero, ancestor: overlay) & box.size,
-        Offset.zero & overlay.size,
-      ),
-      items: [
-        if (onCopy != null)
-          PopupMenuItem(
-            value: onCopy,
-            child: ListTile(
-              leading: const Icon(Icons.copy_rounded),
-              title: Text(copyLabel),
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-            ),
-          ),
-        if (onEdit != null)
-          PopupMenuItem(
-            value: onEdit,
-            child: ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: Text(editLabel),
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-            ),
-          ),
-        if (onDelete != null)
-          PopupMenuItem(
-            value: onDelete,
-            child: ListTile(
-              leading: Icon(Icons.delete_outline, color: scheme.error),
-              title: Text(
-                deleteLabel,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: scheme.error,
-                ),
-              ),
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-            ),
-          ),
-      ],
-    );
-    action?.call();
-  }
-
-  /// `09:14 - 4.2s - 3 steps`, skipping whatever this turn does not know.
-  /// Threads saved before turns carried a time show nothing at all.
-  String? _meta(BuildContext context) {
-    final parts = [
-      if (turn.at case final at?)
-        MaterialLocalizations.of(
-          context,
-        ).formatTimeOfDay(TimeOfDay.fromDateTime(at)),
-      if (turn.took case final took?) _formatTook(took),
-      if (turn.payload?['step_count'] case final int steps when steps > 0)
-        '$steps ${steps == 1 ? 'step' : 'steps'}',
-      if (turn.payload?['tokens'] case final int tokens when tokens > 0)
-        '$tokens tokens',
-      if (turn.payload?['model'] case final String model when model.isNotEmpty)
-        model,
-    ];
-    return parts.isEmpty ? null : parts.join('  ·  ');
-  }
-
-  static String _formatTook(Duration took) {
-    if (took.inSeconds < 60) {
-      return '${(took.inMilliseconds / 1000).toStringAsFixed(1)}s';
-    }
-    return '${took.inMinutes}m ${took.inSeconds % 60}s';
-  }
-
-  Widget _metaText(ThemeData theme, String meta, {Color? color}) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Text(
-        meta,
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: (color ?? theme.colorScheme.onSurfaceVariant).withValues(
-            alpha: 0.7,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// The chat header's overflow menu entries.
 enum _ChatMenuAction { find, copyAsMarkdown, copyAsJson }
 
@@ -2562,110 +2422,6 @@ class _PendingConfirm {
   /// The row this call would change, if the tool could resolve one.
   final AiItem? preview;
   final answer = Completer<AiToolDecision>();
-}
-
-/// The cover photo a call carries, if it named one.
-///
-/// Tools that save something people look at -- a recipe, a jacket -- take an
-/// image URL the model found with `image_search`. Showing it beats printing
-/// the URL: the picture is most of what makes the proposal recognisable.
-String? _previewImage(AiToolCall call) {
-  for (final entry in call.args.entries) {
-    final key = entry.key.toLowerCase();
-    if (!key.contains('image') && !key.contains('photo')) continue;
-    final value = entry.value;
-    if (value is! String) continue;
-    final url = Uri.tryParse(value.trim());
-    if (url != null && (url.scheme == 'https' || url.scheme == 'http')) {
-      return value.trim();
-    }
-  }
-  return null;
-}
-
-/// The proposed change, asked in the thread in a proposal-shaped card.
-class _ConfirmCard extends StatelessWidget {
-  const _ConfirmCard({
-    required this.pending,
-    required this.onAccept,
-    required this.onDecline,
-    this.onEdit,
-  });
-
-  final _PendingConfirm pending;
-  final VoidCallback onAccept;
-  final VoidCallback onDecline;
-  final VoidCallback? onEdit;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: theme.colorScheme.primary, width: 1.5),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              aiToolTitle(pending.tool.name),
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            if (pending.tool.description.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(pending.tool.description, style: theme.textTheme.bodySmall),
-            ],
-            if (_previewImage(pending.call) case final url?) ...[
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: Image.network(
-                    url,
-                    fit: BoxFit.cover,
-                    // A cover photo is decoration. A broken link must not take
-                    // the card -- and the decision it is asking for -- with it.
-                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                  ),
-                ),
-              ),
-            ],
-            if (pending.preview case final item?) ...[
-              const SizedBox(height: 12),
-              AiItemList(items: [item]),
-            ] else ...[
-              if (pending.call.args.isNotEmpty) const SizedBox(height: 12),
-              for (final arg in pending.call.args.entries)
-                // The photo is shown, so its URL is not worth a row too.
-                if (arg.value != _previewImage(pending.call))
-                  _ArgRow(name: arg.key, value: arg.value),
-            ],
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(onPressed: onDecline, child: const Text('Decline')),
-                if (onEdit != null) ...[
-                  const SizedBox(width: 4),
-                  TextButton(onPressed: onEdit, child: const Text('Edit')),
-                ],
-                const SizedBox(width: 8),
-                FilledButton(onPressed: onAccept, child: const Text('Accept')),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 /// The assistant's avatar with a presence dot, Messenger-style.

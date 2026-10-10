@@ -1,4 +1,26 @@
-## Unreleased
+## 0.2.2
+
+- `AiAssistantPage`: the chat reply, redone. The per-reply avatar gutter is
+  gone; each reply ends in one foot line -- the mark, Copy, Regenerate (newest
+  reply only) and the time / took / steps / model caption -- and says
+  "Writing" while it is coming or "Waiting for you" while a proposed change
+  needs an answer. Day stamps ("Today", "Yesterday") sit between turns of
+  different days. The proposed-change card, the step lines and a
+  per-change receipt ("Add item") are the new shared widgets.
+- Offline is told apart from a failed reply. A send that fails offline before
+  anything came back marks the question "Not sent" with Retry and draws no
+  reply; the header reads "Can't reach" until a send gets through. A reply
+  that dies mid-flight keeps what it had written and ends in the failure
+  sentence with Retry.
+- A kept turn now records each step it ran (`payload['tools']`), so receipts
+  survive a reload. Threads saved without it read as before.
+- `AiChatLabels`: `writing`, `waitingForYou`, `notSent`, `cantReach`,
+  `copyReply`, `regenerate`, `typeAChange`, `accept`, `decline`, plus
+  `changeModel`, `aiSettings` and `aiProvider` for the three strings that were
+  literals. All optional, with the English defaults.
+- Your own bubble keeps readable text over the accent gradient.
+
+## 0.2.1
 
 - `AiSettingsGroup`: the assistant's settings as a grouped list of rows --
   provider, routing (only with `hasServer`) and on-device models -- each with

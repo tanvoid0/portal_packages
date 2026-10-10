@@ -65,6 +65,18 @@ class AiChatLabels {
     this.copied = 'Copied',
     this.deleted = 'Chat deleted',
     this.undo = 'Undo',
+    this.writing = 'Writing',
+    this.waitingForYou = 'Waiting for you',
+    this.notSent = 'Not sent',
+    this.cantReach = "Can't reach",
+    this.copyReply = 'Copy reply',
+    this.regenerate = 'Regenerate reply',
+    this.typeAChange = 'Type a change…',
+    this.accept = 'Accept',
+    this.decline = 'Decline',
+    this.changeModel = 'Change model',
+    this.aiSettings = 'AI settings',
+    this.aiProvider = 'AI provider',
   });
 
   final String inputHint;
@@ -168,4 +180,29 @@ class AiChatLabels {
   /// Per-message copy, and what the snackbar says once it lands.
   final String copy;
   final String copied;
+
+  /// The line under a reply: its state while it is coming, and the actions
+  /// once it is here.
+  final String writing;
+  final String waitingForYou;
+  final String copyReply;
+  final String regenerate;
+
+  /// Under the question when the network was down before anything came back,
+  /// and the header's status until the next send gets through.
+  final String notSent;
+  final String cantReach;
+
+  /// Composer hint while a proposed change waits on the user: typing declines
+  /// it and says what to do instead.
+  final String typeAChange;
+
+  /// The proposed-change card's answers.
+  final String accept;
+  final String decline;
+
+  /// Header tooltip, the settings entry and the provider sheet's title.
+  final String changeModel;
+  final String aiSettings;
+  final String aiProvider;
 }

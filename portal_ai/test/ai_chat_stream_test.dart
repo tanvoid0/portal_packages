@@ -114,7 +114,7 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.send);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.copy_rounded));
+    await tester.tap(find.byTooltip('Copy reply'));
     await tester.pumpAndSettle();
 
     expect(clipboard, ['the answer']);

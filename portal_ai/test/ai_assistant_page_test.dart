@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
@@ -33,6 +36,75 @@ class _ScriptedClient implements AiCompletionClient {
     AiSamplerConfig sampler = const AiSamplerConfig(),
   }) async* {
     yield await complete(systemPrompt: systemPrompt, userPrompt: userPrompt);
+  }
+}
+
+/// The network is down until it is handed a reply.
+class _FlakyClient implements AiCompletionClient {
+  final replies = <String>[];
+
+  @override
+  Future<bool> isAvailable() async => true;
+
+  @override
+  Future<String> complete({
+    required String systemPrompt,
+    required String userPrompt,
+    AiSamplerConfig sampler = const AiSamplerConfig(),
+    bool jsonMode = false,
+  }) async {
+    if (replies.isEmpty) throw const SocketException('Failed host lookup');
+    return replies.removeAt(0);
+  }
+
+  @override
+  Stream<String> completeStream({
+    required String systemPrompt,
+    required String userPrompt,
+    AiSamplerConfig sampler = const AiSamplerConfig(),
+  }) async* {
+    yield await complete(systemPrompt: systemPrompt, userPrompt: userPrompt);
+  }
+}
+
+/// Starts an answer, then loses the connection under it.
+class _CutOffClient extends _FlakyClient {
+  @override
+  Stream<String> completeStream({
+    required String systemPrompt,
+    required String userPrompt,
+    AiSamplerConfig sampler = const AiSamplerConfig(),
+  }) async* {
+    yield '{"final": "partial';
+    throw const SocketException('Connection reset by peer');
+  }
+}
+
+/// Answers "Answer 1", "Answer 2", ... once [gate] opens, so a test can look
+/// at the page while the reply is still on its way. Starts open.
+class _GatedClient implements AiCompletionClient {
+  var gate = Completer<void>()..complete();
+  var _answers = 0;
+
+  @override
+  Future<bool> isAvailable() async => true;
+
+  @override
+  Future<String> complete({
+    required String systemPrompt,
+    required String userPrompt,
+    AiSamplerConfig sampler = const AiSamplerConfig(),
+    bool jsonMode = false,
+  }) async => '{"title":"A chat"}';
+
+  @override
+  Stream<String> completeStream({
+    required String systemPrompt,
+    required String userPrompt,
+    AiSamplerConfig sampler = const AiSamplerConfig(),
+  }) async* {
+    await gate.future;
+    yield '{"final":"Answer ${++_answers}"}';
   }
 }
 
@@ -398,6 +470,313 @@ void main() {
       expect(find.text('plan dinners'), findsOneWidget);
     },
   );
+
+  /// A page that keeps its thread, over [client].
+  Future<_MemoryStore> pumpKept(
+    WidgetTester tester,
+    AiCompletionClient client, {
+    _MemoryStore? store,
+    Widget? avatar,
+  }) async {
+    final kept = store ?? _MemoryStore();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
+        home: Scaffold(
+          body: AiAssistantPage(
+            runtime: PortalAiRuntime(client: client),
+            store: kept,
+            avatar: avatar,
+          ),
+        ),
+      ),
+    );
+    return kept;
+  }
+
+  Future<void> ask(WidgetTester tester, String question) async {
+    await tester.enterText(find.byType(TextField), question);
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+  }
+
+  bool assistantBubble(Widget w) =>
+      w is PortalChatBubble && w.author == PortalChatAuthor.assistant;
+
+  testWidgets('offline before anything arrives: the question is Not sent', (
+    tester,
+  ) async {
+    final client = _FlakyClient();
+    await pumpKept(tester, client);
+
+    await ask(tester, 'plan dinners');
+    await tester.pumpAndSettle();
+
+    // The mark sits under the question; there is no reply to hang one on.
+    expect(find.textContaining('Not sent', findRichText: true), findsOneWidget);
+    expect(find.text('plan dinners'), findsOneWidget);
+    expect(find.byWidgetPredicate(assistantBubble), findsNothing);
+    expect(tester.widget<TextField>(find.byType(TextField)).enabled, isTrue);
+    expect(find.text("Can't reach"), findsOneWidget);
+
+    client.replies.add('{"final":"Here is a plan."}');
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Here is a plan.'), findsOneWidget);
+    expect(find.textContaining('Not sent', findRichText: true), findsNothing);
+    expect(find.text("Can't reach"), findsNothing);
+    // Asked once, not left behind twice.
+    expect(find.text('plan dinners'), findsOneWidget);
+  });
+
+  testWidgets('a reply cut off mid-flight keeps its words and offers Retry', (
+    tester,
+  ) async {
+    await pumpKept(tester, _CutOffClient());
+
+    await ask(tester, 'plan dinners');
+    await tester.pumpAndSettle();
+
+    // It got somewhere, so this is not "Not sent" even though the network
+    // is why it stopped.
+    expect(find.textContaining('partial'), findsOneWidget);
+    expect(find.textContaining('Not sent', findRichText: true), findsNothing);
+    expect(find.text('Retry'), findsOneWidget);
+    expect(
+      find.textContaining('No connection', findRichText: true),
+      findsOneWidget,
+    );
+    expect(find.byTooltip('Copy reply'), findsNothing);
+  });
+
+  testWidgets('the foot says Writing while the reply is coming', (tester) async {
+    final client = _GatedClient()..gate = Completer<void>();
+    await pumpKept(tester, client);
+
+    await ask(tester, 'hello');
+    await tester.pump();
+
+    // No text yet, and the foot already says so. pump, never settle: the
+    // shimmer on the word loops for as long as the reply does.
+    expect(find.text('Writing'), findsOneWidget);
+    expect(find.byTooltip('Copy reply'), findsNothing);
+
+    client.gate.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Answer 1'), findsOneWidget);
+    expect(find.text('Writing'), findsNothing);
+    expect(find.byTooltip('Copy reply'), findsOneWidget);
+  });
+
+  testWidgets('a proposed change makes the foot say Waiting for you', (
+    tester,
+  ) async {
+    await pumpSheet(
+      tester,
+      runtimeWith(const [
+        '{"tool":"add_item","args":{"name":"Milk"}}',
+        '{"final":"Added."}',
+      ]),
+    );
+
+    await ask(tester, 'add milk');
+    await tester.pump();
+
+    expect(find.text('Waiting for you'), findsOneWidget);
+    expect(find.text('Writing'), findsNothing);
+    // Typing now is the correction, and the field says so.
+    expect(find.text('Type a change…'), findsOneWidget);
+
+    await tester.tap(find.text('Accept'));
+    await tester.pumpAndSettle();
+    expect(find.text('Waiting for you'), findsNothing);
+  });
+
+  testWidgets('a host that is busy shows Writing before any text', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
+        home: Scaffold(
+          body: AiAssistantPage(
+            turns: const [AiChatTurn(role: 'user', content: 'plan my week')],
+            onSend: (_) async {},
+            busy: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Writing'), findsOneWidget);
+  });
+
+  testWidgets('every reply carries its own mark in the foot, no gutter', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
+        home: Scaffold(
+          body: AiAssistantPage(
+            avatar: const Icon(Icons.face),
+            turns: const [
+              AiChatTurn(role: 'user', content: 'plan my week'),
+              AiChatTurn(role: 'assistant', content: 'Monday is clear.'),
+              AiChatTurn(role: 'assistant', content: 'Tuesday is not.'),
+            ],
+            onSend: (_) async {},
+          ),
+        ),
+      ),
+    );
+
+    // The header, plus the foot of each of the two replies.
+    expect(find.byIcon(Icons.face), findsNWidgets(3));
+  });
+
+  testWidgets('only the newest reply can be regenerated', (tester) async {
+    await pumpKept(tester, _GatedClient());
+
+    for (final question in ['first', 'second']) {
+      await ask(tester, question);
+      await tester.pumpAndSettle();
+    }
+    expect(find.byTooltip('Copy reply'), findsNWidgets(2));
+    expect(find.byTooltip('Regenerate reply'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Regenerate reply'));
+    await tester.pumpAndSettle();
+
+    // The second answer is redone in place; the first is untouched.
+    expect(find.text('Answer 1'), findsOneWidget);
+    expect(find.text('Answer 2'), findsNothing);
+    expect(find.text('Answer 3'), findsOneWidget);
+    expect(find.text('second'), findsOneWidget);
+  });
+
+  testWidgets('a change that went through leaves a receipt, and keeps it', (
+    tester,
+  ) async {
+    final store = _MemoryStore();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
+        home: Scaffold(
+          body: AiAssistantPage(
+            runtime: runtimeWith(const [
+              '{"tool":"add_item","args":{"name":"Milk"}}',
+              '{"final":"Added milk to your list."}',
+            ]),
+            store: store,
+          ),
+        ),
+      ),
+    );
+
+    await ask(tester, 'add milk');
+    await tester.pump();
+    await tester.tap(find.text('Accept'));
+    await tester.pumpAndSettle();
+
+    // Once the live step lines are gone, the receipt is what says it ran.
+    expect(find.text('Add item'), findsOneWidget);
+    final saved = store.load(store.listSummaries().single.id)!;
+    expect(saved.turns.last.payload?['tools'], [
+      {'name': 'add_item', 'failed': false, 'mutates': true},
+    ]);
+  });
+
+  testWidgets('a reload draws receipts from the saved tools, and survives none', (
+    tester,
+  ) async {
+    final store = _MemoryStore();
+    Future<void> save(String id, Object? tools) => store.save(
+      AiChatSession(
+        id: id,
+        title: id,
+        createdAt: DateTime(2026, 10, 1),
+        updatedAt: DateTime(2026, 10, 1),
+        turns: [
+          const AiChatTurn(role: 'user', content: 'add milk'),
+          AiChatTurn(
+            role: 'assistant',
+            content: 'Done.',
+            payload: {'tools': ?tools},
+          ),
+        ],
+      ),
+    );
+    Future<void> open(String id) => tester.pumpWidget(
+      MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
+        home: Scaffold(
+          body: AiAssistantPage(
+            key: UniqueKey(),
+            runtime: PortalAiRuntime(client: _ScriptedClient(const [])),
+            store: store,
+            initialSessionId: id,
+          ),
+        ),
+      ),
+    );
+
+    await save('ran', [
+      {'name': 'add_item', 'failed': false, 'mutates': true},
+      // Neither of these changed anything, so neither earns a receipt.
+      {'name': 'list_items', 'failed': false, 'mutates': false},
+      {'name': 'delete_item', 'failed': true, 'mutates': true},
+    ]);
+    await open('ran');
+    expect(find.text('Add item'), findsOneWidget);
+    expect(find.text('List items'), findsNothing);
+    expect(find.text('Delete item'), findsNothing);
+
+    // A thread from before turns recorded tools, and one with junk in the key.
+    await save('old', null);
+    await open('old');
+    expect(find.text('Done.'), findsOneWidget);
+    expect(find.text('Add item'), findsNothing);
+
+    await save('odd', ['oops', 3, {'name': 5, 'mutates': true}, <String, Object?>{}]);
+    await open('odd');
+    expect(tester.takeException(), isNull);
+    expect(find.text('Done.'), findsOneWidget);
+    expect(find.text('Add item'), findsNothing);
+
+    await save('worse', 'not a list');
+    await open('worse');
+    expect(tester.takeException(), isNull);
+    expect(find.text('Done.'), findsOneWidget);
+  });
+
+  testWidgets('a new calendar day gets a stamp between turns', (tester) async {
+    final now = DateTime.now();
+    final earlier = now.subtract(const Duration(days: 3));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
+        home: Scaffold(
+          body: AiAssistantPage(
+            turns: [
+              AiChatTurn(role: 'user', content: 'old question', at: earlier),
+              AiChatTurn(role: 'assistant', content: 'old answer', at: earlier),
+              AiChatTurn(role: 'user', content: 'new question', at: now),
+              AiChatTurn(role: 'assistant', content: 'new answer', at: now),
+            ],
+            onSend: (_) async {},
+          ),
+        ),
+      ),
+    );
+
+    // One break, between the two days -- not before the first turn, and not
+    // between turns of the same day.
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.textContaining('old question'), findsOneWidget);
+  });
 
   testWidgets('editing the last question puts it back in the composer', (
     tester,
