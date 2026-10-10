@@ -33,6 +33,8 @@ class PortalDayStrip extends StatelessWidget {
     this.mark,
     this.markLabel,
     this.controller,
+    this.reverse = false,
+    this.padding,
   });
 
   /// Date-only, local time; only year, month and day are compared.
@@ -48,20 +50,37 @@ class PortalDayStrip extends StatelessWidget {
   /// Scrolls the strip, so a caller can bring today into view.
   final ScrollController? controller;
 
+  /// Lays the strip out end-to-start — the last day at the right, scrolled to
+  /// that end — matching a `reverse: true` list. For a strip that opens on the
+  /// newest day. Default false (oldest at the left, scrolled to the start).
+  final bool reverse;
+
+  /// Leading/trailing padding. Null uses `spacing.lg`; pass `EdgeInsets.zero`
+  /// inside an already-padded parent.
+  final EdgeInsetsGeometry? padding;
+
   static bool _same(DateTime a, DateTime? b) =>
       b != null && a.year == b.year && a.month == b.month && a.day == b.day;
 
   @override
   Widget build(BuildContext context) {
     final t = PortalUiTheme.of(context).tokens;
+    final ordered = reverse ? days.reversed.toList() : days;
+    final gap = t.spacing.xs;
+    // Gaps interleaved by hand (SDK floor is Dart 3.3; Row.spacing needs 3.27).
+    final cells = <Widget>[
+      for (var i = 0; i < ordered.length; i++) ...[
+        if (i > 0) SizedBox(width: gap),
+        _cell(context, ordered[i]),
+      ],
+    ];
     return SingleChildScrollView(
       controller: controller,
+      reverse: reverse,
       scrollDirection: Axis.horizontal,
-      padding: EdgeInsets.symmetric(horizontal: t.spacing.lg),
-      child: Row(
-        spacing: t.spacing.xs,
-        children: [for (final d in days) _cell(context, d)],
-      ),
+      padding:
+          padding ?? EdgeInsets.symmetric(horizontal: t.spacing.lg),
+      child: Row(children: cells),
     );
   }
 

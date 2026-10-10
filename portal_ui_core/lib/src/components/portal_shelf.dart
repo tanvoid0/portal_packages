@@ -20,6 +20,7 @@ class PortalShelf extends StatelessWidget {
     this.height,
     this.gap,
     this.trailing,
+    this.padding,
   });
 
   /// Section title above the row, drawn by [PortalSectionHeader].
@@ -40,10 +41,16 @@ class PortalShelf extends StatelessWidget {
   /// A last cell after the children — an "add" chip, a shuffle.
   final Widget? trailing;
 
+  /// Leading/trailing padding around the row (and header). Null uses the page
+  /// gutter (`layout.pageHorizontal`); pass `EdgeInsets.zero` when the shelf
+  /// sits inside an already-padded parent so it is not double-inset.
+  final EdgeInsetsGeometry? padding;
+
   @override
   Widget build(BuildContext context) {
     final tokens = PortalUiTheme.of(context).tokens;
-    final gutter = EdgeInsets.symmetric(horizontal: tokens.layout.pageHorizontal);
+    final gutter = padding ??
+        EdgeInsets.symmetric(horizontal: tokens.layout.pageHorizontal);
     final between = gap ?? tokens.spacing.md;
     final items = <Widget>[
       for (final c in children) SizedBox(width: itemWidth, child: c),
