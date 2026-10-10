@@ -90,29 +90,6 @@ void main() {
     expect(find.textContaining('868faf5c'), findsNothing);
   });
 
-  testWidgets('a failed step swaps the answers for Retry', (tester) async {
-    var retried = 0;
-    await _pump(
-      tester,
-      AiConfirmCard(
-        toolName: 'recipe.create_recipe',
-        args: const {'title': 'Ratatouille'},
-        failure: 'Server said no',
-        onRetry: () => retried++,
-        onAccept: () {},
-        onDecline: () {},
-      ),
-    );
-
-    expect(
-      find.textContaining('Server said no', findRichText: true),
-      findsOneWidget,
-    );
-    expect(find.text('Accept'), findsNothing);
-    await tester.tap(find.text('Retry'));
-    expect(retried, 1);
-  });
-
   testWidgets('step line and receipt show their text', (tester) async {
     await _pump(
       tester,

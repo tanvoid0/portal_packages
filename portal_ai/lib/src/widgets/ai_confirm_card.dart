@@ -56,12 +56,6 @@ bool _looksLikeId(Object? value) =>
 
 /// A proposed tool call, asked in the thread: what it is, what it carries,
 /// and Decline / Edit / Accept.
-///
-/// With [failure] set the card is the failed-step state instead: the same
-/// call, the reason it failed in an inline prompt, and [onRetry] in place of
-/// the three answers. Retry re-runs the tool outside the agent loop -- the
-/// user asked for it directly, so the model is not consulted again and the
-/// host re-confirms before it writes.
 class AiConfirmCard extends StatelessWidget {
   const AiConfirmCard({
     super.key,
@@ -72,12 +66,9 @@ class AiConfirmCard extends StatelessWidget {
     this.onEdit,
     this.previewTitle,
     this.coverImageUrl,
-    this.failure,
-    this.onRetry,
     this.declineLabel = 'Decline',
     this.editLabel = 'Edit',
     this.acceptLabel = 'Accept',
-    this.retryLabel = 'Retry',
   });
 
   /// The qualified tool name; titles the card and, when it names a delete or
@@ -98,13 +89,9 @@ class AiConfirmCard extends StatelessWidget {
   /// the argument rows -- the photo is shown, so its URL is not worth a row.
   final String? coverImageUrl;
 
-  /// Why the step failed. Non-null swaps the answers for a Retry prompt.
-  final String? failure;
-  final VoidCallback? onRetry;
   final String declineLabel;
   final String editLabel;
   final String acceptLabel;
-  final String retryLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -119,7 +106,6 @@ class AiConfirmCard extends StatelessWidget {
     ];
     final name = toolName.toLowerCase();
     final destructive = name.contains('delete') || name.contains('remove');
-    final failed = failure;
 
     return PortalCard(
       variant: PortalCardVariant.outlined,
@@ -198,47 +184,37 @@ class AiConfirmCard extends StatelessWidget {
                   ),
                 ],
                 SizedBox(height: spacing.md),
-                if (failed != null)
-                  PortalPrompt(
-                    message: failed,
-                    sentiment: PortalSentiment.negative,
-                    size: PortalPromptSize.inline,
-                    action: onRetry == null
-                        ? null
-                        : (label: retryLabel, onPressed: onRetry!),
-                  )
-                else
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Wrap(
-                      alignment: WrapAlignment.end,
-                      spacing: spacing.sm,
-                      runSpacing: spacing.xs,
-                      children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: spacing.sm,
+                    runSpacing: spacing.xs,
+                    children: [
+                      PortalButton(
+                        label: declineLabel,
+                        variant: PortalButtonVariant.ghost,
+                        size: PortalButtonSize.sm,
+                        onPressed: onDecline,
+                      ),
+                      if (onEdit != null)
                         PortalButton(
-                          label: declineLabel,
-                          variant: PortalButtonVariant.ghost,
+                          label: editLabel,
+                          variant: PortalButtonVariant.secondary,
                           size: PortalButtonSize.sm,
-                          onPressed: onDecline,
+                          onPressed: onEdit,
                         ),
-                        if (onEdit != null)
-                          PortalButton(
-                            label: editLabel,
-                            variant: PortalButtonVariant.secondary,
-                            size: PortalButtonSize.sm,
-                            onPressed: onEdit,
-                          ),
-                        PortalButton(
-                          label: acceptLabel,
-                          variant: destructive
-                              ? PortalButtonVariant.destructive
-                              : PortalButtonVariant.primary,
-                          size: PortalButtonSize.sm,
-                          onPressed: onAccept,
-                        ),
-                      ],
-                    ),
+                      PortalButton(
+                        label: acceptLabel,
+                        variant: destructive
+                            ? PortalButtonVariant.destructive
+                            : PortalButtonVariant.primary,
+                        size: PortalButtonSize.sm,
+                        onPressed: onAccept,
+                      ),
+                    ],
                   ),
+                ),
               ],
             ),
           ),

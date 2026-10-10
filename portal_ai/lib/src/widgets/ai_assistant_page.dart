@@ -553,18 +553,30 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     final id = _sessionId ??= now.microsecondsSinceEpoch.toString();
     final existing = store.load(id);
     final first = _turns.first.content.trim();
-    await store.save(
-      AiChatSession(
-        id: id,
-        title:
-            existing?.title ??
-            (first.length <= 48 ? first : '${first.substring(0, 45)}...'),
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now,
-        turns: List.of(_turns),
-        pinned: existing?.pinned ?? false,
-      ),
-    );
+    try {
+      await store.save(
+        AiChatSession(
+          id: id,
+          title:
+              existing?.title ??
+              (first.length <= 48 ? first : '${first.substring(0, 45)}...'),
+          createdAt: existing?.createdAt ?? now,
+          updatedAt: now,
+          turns: List.of(_turns),
+          pinned: existing?.pinned ?? false,
+        ),
+      );
+    } catch (e) {
+      // ponytail: chat history is best-effort local storage. The turn is
+      // already on screen and in memory; only its survival across a reload is
+      // lost. Swallow the save failure here so it can never be mistaken for a
+      // *send* failure -- a persist throw used to fall into _send's catch,
+      // which drew a false failure foot under a reply that actually arrived
+      // and whose Retry then deleted that good turn. Upgrade: surface a
+      // "couldn't save" chip if reload-loss ever needs to be visible.
+      debugPrint('portal_ai: chat history save failed: $e');
+      return;
+    }
     if (mounted) setState(_reloadSessions);
     unawaited(_autoTitle(id));
   }
@@ -2193,7 +2205,6 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                                 declineLabel: widget.labels.decline,
                                 editLabel: widget.labels.edit,
                                 acceptLabel: widget.labels.accept,
-                                retryLabel: widget.labels.retry,
                               ),
                             ),
                           // Nothing to hang the state on yet -- no text, or a
