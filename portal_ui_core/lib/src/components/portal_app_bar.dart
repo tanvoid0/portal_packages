@@ -62,6 +62,8 @@ class PortalAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.title,
     this.titleWidget,
     this.subtitle,
+    this.status,
+    this.statusIcon,
     this.leading,
     this.actions = const [],
     this.trailing,
@@ -70,8 +72,10 @@ class PortalAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.backgroundColor,
     this.bottom,
     this.excludeHeaderSemantics = false,
-  }) : assert((title == null) != (titleWidget == null),
-            'Give exactly one of title or titleWidget');
+  })  : assert((title == null) != (titleWidget == null),
+            'Give exactly one of title or titleWidget'),
+        assert(subtitle == null || status == null,
+            'Give a subtitle or a status, not both');
 
   final String? title;
 
@@ -80,6 +84,12 @@ class PortalAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   /// Breadcrumb or context line under the title ("Wardrobe", "3 of 12").
   final String? subtitle;
+
+  /// A one-line status under the title ("Synced just now"), muted, a polite
+  /// live region so a change is announced. A bar has a [subtitle] or a status,
+  /// not both. [statusIcon] leads it.
+  final String? status;
+  final IconData? statusIcon;
 
   /// Overrides the automatic back button.
   final Widget? leading;
@@ -112,6 +122,8 @@ class PortalAppBar extends StatelessWidget implements PreferredSizeWidget {
         title: title,
         titleWidget: titleWidget,
         subtitle: subtitle,
+        status: status,
+        statusIcon: statusIcon,
         centerTitle: centerTitle,
       ),
       leading: leading,
@@ -140,6 +152,8 @@ class PortalSliverAppBar extends StatelessWidget {
     this.title,
     this.titleWidget,
     this.subtitle,
+    this.status,
+    this.statusIcon,
     this.leading,
     this.actions = const [],
     this.trailing,
@@ -151,12 +165,18 @@ class PortalSliverAppBar extends StatelessWidget {
     this.floating = false,
     this.expandedHeight,
     this.flexibleSpace,
-  }) : assert((title == null) != (titleWidget == null),
-            'Give exactly one of title or titleWidget');
+  })  : assert((title == null) != (titleWidget == null),
+            'Give exactly one of title or titleWidget'),
+        assert(subtitle == null || status == null,
+            'Give a subtitle or a status, not both');
 
   final String? title;
   final Widget? titleWidget;
   final String? subtitle;
+
+  /// See [PortalAppBar.status].
+  final String? status;
+  final IconData? statusIcon;
   final Widget? leading;
   final List<PortalAction> actions;
   final List<Widget>? trailing;
@@ -181,6 +201,8 @@ class PortalSliverAppBar extends StatelessWidget {
         title: title,
         titleWidget: titleWidget,
         subtitle: subtitle,
+        status: status,
+        statusIcon: statusIcon,
         centerTitle: centerTitle,
       ),
       leading: leading,
@@ -293,12 +315,16 @@ class _PortalAppBarTitle extends StatelessWidget {
     this.title,
     this.titleWidget,
     this.subtitle,
+    this.status,
+    this.statusIcon,
     this.centerTitle,
   });
 
   final String? title;
   final Widget? titleWidget;
   final String? subtitle;
+  final String? status;
+  final IconData? statusIcon;
   final bool? centerTitle;
 
   @override
@@ -315,10 +341,14 @@ class _PortalAppBarTitle extends StatelessWidget {
       overflow: TextOverflow.ellipsis,
       child: titleWidget ?? Text(title!),
     );
-    if (subtitle == null) return titleText;
+    if (subtitle == null && status == null) return titleText;
 
     final centered =
         centerTitle ?? Theme.of(context).appBarTheme.centerTitle ?? false;
+    final caption = tokens.textStyles.caption.copyWith(
+      fontSize: tokens.typeScale.sm,
+      color: portal.onSurfaceVariant,
+    );
     return Column(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -326,15 +356,38 @@ class _PortalAppBarTitle extends StatelessWidget {
           centered ? CrossAxisAlignment.center : CrossAxisAlignment.start,
       children: [
         titleText,
-        Text(
-          subtitle!,
-          style: tokens.textStyles.caption.copyWith(
-            fontSize: tokens.typeScale.sm,
-            color: portal.onSurfaceVariant,
+        if (subtitle != null)
+          Text(
+            subtitle!,
+            style: caption,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          )
+        else
+          Semantics(
+            liveRegion: true,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (statusIcon != null) ...[
+                  Icon(statusIcon, size: 14, color: portal.onSurfaceVariant),
+                  SizedBox(width: tokens.spacing.xs),
+                ],
+                Flexible(
+                  child: Text(
+                    status!,
+                    style: caption.copyWith(
+                      fontWeight: FontWeight.w500,
+                      height: 1.3,
+                      letterSpacing: 0,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
       ],
     );
   }

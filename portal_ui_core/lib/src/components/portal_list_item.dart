@@ -188,6 +188,7 @@ class PortalListAccessory {
     this.child,
     this.actions = const [],
     this.interactive = false,
+    this.swatch,
   });
 
   final _Kind _kind;
@@ -206,11 +207,16 @@ class PortalListAccessory {
   /// A custom [child] that is a control and keeps its own semantics.
   final bool interactive;
 
+  /// The accent dot [PortalListAccessory.navigate] draws in place of its value.
+  final Color? swatch;
+
   static const none = PortalListAccessory._(_Kind.none);
 
   /// A chevron; [value] is the muted current value ("Theme · System ›").
-  const PortalListAccessory.navigate({String? value})
-      : this._(_Kind.navigate, text: value);
+  /// [swatch] draws a 20 dp colour dot in place of that text (an accent
+  /// picker); [value] still names it in the row's label.
+  const PortalListAccessory.navigate({String? value, Color? swatch})
+      : this._(_Kind.navigate, text: value, swatch: swatch);
 
   const PortalListAccessory.checkbox({
     required bool checked,
@@ -564,7 +570,19 @@ class PortalListItem extends StatelessWidget {
         break;
       case _Kind.navigate:
         accessory = Row(mainAxisSize: MainAxisSize.min, children: [
-          if (acc.text != null)
+          if (acc.swatch != null)
+            Padding(
+              padding: EdgeInsets.only(right: sp.xs),
+              child: ExcludeSemantics(
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                      color: acc.swatch, shape: BoxShape.circle),
+                ),
+              ),
+            )
+          else if (acc.text != null)
             Padding(
               padding: EdgeInsets.only(right: sp.xs),
               child: Text(

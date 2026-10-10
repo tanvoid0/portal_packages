@@ -60,6 +60,29 @@ void main() {
     expect(find.text('Sign in first'), findsOneWidget);
   });
 
+  testWidgets('navigate swatch draws a dot instead of the value text, which '
+      'still names the row', (t) async {
+    final sem = t.ensureSemantics();
+    const teal = Color(0xFF009688);
+    await t.pumpWidget(host(const PortalListSection(children: [
+      PortalListItem(
+        title: 'Accent',
+        trailing: PortalListAccessory.navigate(value: 'Teal', swatch: teal),
+      ),
+    ])));
+    final dot = find.byWidgetPredicate((w) =>
+        w is Container &&
+        w.decoration is BoxDecoration &&
+        (w.decoration as BoxDecoration).color == teal &&
+        (w.decoration as BoxDecoration).shape == BoxShape.circle);
+    expect(dot, findsOneWidget);
+    expect(t.getSize(dot), const Size(20, 20));
+    expect(find.text('Teal'), findsNothing);
+    expect(t.getSemantics(find.byType(PortalListItem)).label,
+        'Accent, Teal');
+    sem.dispose();
+  });
+
   testWidgets('skeleton row builds without a label', (t) async {
     await t.pumpWidget(host(const PortalListSection(
       children: [PortalListItem.skeleton()],

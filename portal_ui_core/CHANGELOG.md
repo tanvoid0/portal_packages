@@ -132,6 +132,10 @@ Fix: `PortalFormat` rounds to the shown precision before choosing sign (`signed(
 
 - Plus Jakarta Sans ships in the package (`assets/fonts/`, OFL). `PortalTypeScale.fontFamily` defaults to it and `buildPortalTheme` sets it as `ThemeData.fontFamily`, so an app gets the fleet typeface with no font of its own; a per-style family in `PortalTextStyles` still wins.
 
+- `PortalListAccessory.navigate(swatch:)`: a 20 dp colour dot (decorative, out of semantics) drawn in place of the value text, for an accent picker. `value` still names the row in its label. Default (none) unchanged.
+
+- `PortalAppBar` / `PortalSliverAppBar(status:, statusIcon:)`: a one-line muted status under the title (`Synced just now`, optional 14 dp leading icon), a live region so a change is announced. A bar has a `subtitle` or a `status`, not both (asserted). Default (none) renders the bar as before. Not built: the kit's `count · status` pair (give the count in `status`).
+
 ## 0.1.2
 
 - Example app and screenshots.
