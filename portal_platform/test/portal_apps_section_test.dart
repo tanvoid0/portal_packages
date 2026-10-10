@@ -1,15 +1,46 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_platform/portal_platform.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
-PortalRelease _release({int versionCode = 10, String versionName = '1.4.0'}) =>
+PortalRelease _release({
+  String slug = 'portal-gym',
+  int versionCode = 10,
+  String versionName = '1.4.0',
+  String? notes,
+}) =>
     PortalRelease(
-      slug: 'portal-gym',
+      slug: slug,
       versionCode: versionCode,
       versionName: versionName,
-      apkUrl: Uri.parse('https://example.test/gym.apk'),
+      apkUrl: Uri.parse('https://example.test/$slug.apk'),
       sha256: 'a' * 64,
       sizeBytes: 0,
+      notes: notes,
     );
+
+/// A service whose manifest the test hands over, and counts the asks.
+class _FakeUpdates extends PortalUpdateService {
+  _FakeUpdates(this.manifest)
+      : super(
+          manifestUrl: 'https://example.test/updates.json',
+          appName: 'Portal Self',
+        );
+
+  Future<PortalUpdateManifest> Function() manifest;
+  int loads = 0;
+
+  @override
+  Future<PortalUpdateManifest> fetchManifest() {
+    loads++;
+    return manifest();
+  }
+}
+
+PortalUpdateManifest _manifestOf(List<PortalRelease> releases) =>
+    PortalUpdateManifest({for (final r in releases) r.slug: r});
 
 void main() {
   group('portalAppActionFor', () {
@@ -101,6 +132,129 @@ void main() {
         PortalInstalledApps.packageNameFor('portal-launcher'),
         'com.tanvoid0.portallauncher',
       );
+    });
+  });
+
+  group('PortalAppsSection.grouped', () {
+    // A skeleton shimmers for as long as it is on screen, so a test that wants
+    // to look at one cannot settle.
+    Future<void> pump(
+      WidgetTester tester,
+      _FakeUpdates service, {
+      bool settle = true,
+    }) async {
+      await tester.pumpWidget(MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: PortalAppsSection.grouped(service: service),
+          ),
+        ),
+      ));
+      if (settle) {
+        await tester.pumpAndSettle();
+      } else {
+        await tester.pump();
+      }
+    }
+
+    testWidgets('loading is a header over two skeleton rows', (tester) async {
+      final pending = Completer<PortalUpdateManifest>();
+      await pump(tester, _FakeUpdates(() => pending.future), settle: false);
+
+      expect(find.text('Portal apps'), findsOneWidget);
+      expect(find.byType(PortalListItem), findsNWidgets(2));
+      expect(find.text('Check again'), findsNothing);
+    });
+
+    testWidgets('an error is a prompt whose Retry loads again',
+        (tester) async {
+      var fail = true;
+      final service = _FakeUpdates(() async {
+        if (fail) throw const PortalUpdateException('Update server returned 500.');
+        return _manifestOf([_release()]);
+      });
+      await pump(tester, service);
+
+      expect(find.text('Portal apps'), findsOneWidget);
+      expect(find.text('Update server returned 500.'), findsOneWidget);
+      expect(find.byType(PortalListItem), findsNothing);
+
+      fail = false;
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+
+      expect(service.loads, 2);
+      expect(find.text('Update server returned 500.'), findsNothing);
+      expect(find.text('Gym'), findsOneWidget);
+    });
+
+    testWidgets('nothing published is nothing on the page', (tester) async {
+      await pump(tester, _FakeUpdates(() async => _manifestOf([])));
+
+      expect(find.text('Portal apps'), findsNothing);
+      expect(find.byType(PortalListItem), findsNothing);
+    });
+
+    testWidgets('rows carry their one action, named for the app',
+        (tester) async {
+      await pump(
+        tester,
+        _FakeUpdates(() async => _manifestOf([
+              _release(),
+              _release(slug: 'portal-recipe', versionName: '2.0.0'),
+            ])),
+      );
+
+      expect(find.text('Gym'), findsOneWidget);
+      expect(find.text('Recipe'), findsOneWidget);
+      expect(find.text('v1.4.0'), findsOneWidget);
+      expect(find.byTooltip('Install Gym'), findsOneWidget);
+      expect(find.byTooltip('Install Recipe'), findsOneWidget);
+      expect(find.text('Check again'), findsOneWidget);
+      // Nothing installed, so nothing to open a More for.
+      expect(find.byTooltip('More for Gym'), findsNothing);
+    });
+
+    testWidgets('Install all appears from two waiting apps', (tester) async {
+      await pump(
+        tester,
+        _FakeUpdates(() async => _manifestOf([
+              _release(),
+              _release(slug: 'portal-recipe'),
+            ])),
+      );
+
+      expect(find.text('Install all (2)'), findsOneWidget);
+    });
+
+    testWidgets('and not for one, which is the row\'s own button',
+        (tester) async {
+      await pump(tester, _FakeUpdates(() async => _manifestOf([_release()])));
+
+      expect(find.text('Gym'), findsOneWidget);
+      expect(find.textContaining('Install all'), findsNothing);
+    });
+
+    testWidgets('Install asks in a sheet first, and Later leaves it be',
+        (tester) async {
+      final service = _FakeUpdates(() async => _manifestOf([
+            _release(notes: 'Faster sync\n- Fixed a crash'),
+          ]));
+      await pump(tester, service);
+
+      await tester.tap(find.byTooltip('Install Gym'));
+      await tester.pumpAndSettle();
+
+      expect(find.text("What's new"), findsOneWidget);
+      expect(find.text('Faster sync'), findsOneWidget);
+      // A list marker the publisher typed is dropped for ours.
+      expect(find.text('Fixed a crash'), findsOneWidget);
+
+      await tester.tap(find.text('Later'));
+      await tester.pumpAndSettle();
+
+      expect(find.text("What's new"), findsNothing);
     });
   });
 }

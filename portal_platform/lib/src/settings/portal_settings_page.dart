@@ -1,16 +1,18 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
-import '../auth/device_security/device_security_controller.dart';
-import '../auth/device_security/portal_device_security_settings_tile.dart';
+import '../config/portal_server_prefs.dart';
+import '../services/api_client.dart';
 import '../session/session_controller.dart';
 import '../update/portal_update_service.dart';
 import '../update/portal_update_tile.dart';
+import '../widgets/portal_app_version.dart';
 import 'portal_apps_section.dart';
 import 'portal_change_password_page.dart';
-import 'portal_profile_tile.dart';
+import 'portal_server_page.dart';
 import 'portal_settings_labels.dart';
-import 'portal_status_tile.dart';
 import 'portal_theme_controller.dart';
 
 /// One group of rows on [PortalSettingsPage].
@@ -26,6 +28,9 @@ class PortalSettingsSection {
 /// An app passes a subset to [PortalSettingsPage.include] to drop one, and
 /// [PortalSettingsPage.order] to move its own sections somewhere other than
 /// the default slot.
+///
+/// [assistant] is the slot for [PortalSettingsPage.assistantSection];
+/// [about] is the account block (change password, sign out, delete account).
 enum PortalSettingsGroup { profile, appearance, custom, assistant, status, apps, about }
 
 /// The settings every Portal app has, in one page.
@@ -33,32 +38,37 @@ enum PortalSettingsGroup { profile, appearance, custom, assistant, status, apps,
 /// Everything here is app-independent: the profile is one shared record, the
 /// theme mode is a preference, the server and assistant are the same backend,
 /// and the app list is the same published manifest. An app supplies only what
-/// is genuinely its own — [sections] for its features, [aiSection] for the
-/// backend picker (which lives in `portal_ai`, a package above this one).
+/// is genuinely its own — [sections] for its features, [assistantSection] for
+/// the backend picker (which lives in `portal_ai`, a package above this one).
 ///
-/// Plain Material by default, for the same reason [PortalUpdateTile] is:
-/// `portal_platform` sits below the UI kit. An app with its own settings
-/// chrome passes [sectionBuilder] rather than forking the page —
-/// `portal_finance` does, to keep its bordered cards.
+/// Built from `portal_ui_core`: a grouped page of inset sections, the account
+/// cell first, every row leading with a tonal tile, and Portal Cloud's outage
+/// in the bar's status line. Theme and accent open sheets; Mode reports
+/// whether Portal Cloud answered when the page opened. Seven taps on App
+/// version open the dev server page; nothing announces it. An app with its
+/// own chrome for its [sections] passes [sectionBuilder] rather than forking
+/// the page — `portal_finance` does, to keep its bordered cards.
 ///
 /// An app whose settings screen is too different to mount this at all can
 /// still use the pieces: [PortalStatusSection], [PortalAppsSection] and
 /// [PortalUpdateTile] each stand alone, which is how `portal_task` uses them.
 ///
 /// See `docs/SETTINGS.md`.
-class PortalSettingsPage extends StatelessWidget {
+class PortalSettingsPage extends StatefulWidget {
   const PortalSettingsPage({
     super.key,
     this.labels = const PortalSettingsLabels(),
     this.themeController,
     this.palettes = const [],
-    this.aiSection,
+    this.assistantSection,
+    @Deprecated('pass assistantSection') this.aiSection,
     this.sections = const [],
     this.include = PortalSettingsGroup.values,
     this.order = PortalSettingsGroup.values,
     this.sectionBuilder,
     this.backgroundColor,
     this.onChangePassword,
+    this.onSignIn,
   });
 
   final PortalSettingsLabels labels;
@@ -67,14 +77,22 @@ class PortalSettingsPage extends StatelessWidget {
   /// the user change the theme should not show a control that does nothing.
   final PortalThemeController? themeController;
 
-  /// Selectable palettes. Empty hides the colour picker: an app with a
-  /// hand-built theme has nothing to switch between.
+  /// Selectable palettes. Empty hides the accent row: an app with a
+  /// hand-built theme has nothing to switch between. The first is shown while
+  /// the controller holds no (or an unknown) id, so list the app's own accent
+  /// first.
   final List<PortalPaletteOption> palettes;
 
-  /// The app's AI backend picker, e.g. `AiBackendSelector` from `portal_ai`.
+  /// The app's AI settings, e.g. `AiSettingsSection` from `portal_ai`, drawn
+  /// inline where [PortalSettingsGroup.assistant] falls.
+  final Widget? assistantSection;
+
+  /// Legacy form of [assistantSection]: one "Assistant" row that opens the
+  /// widget on its own page. Ignored when [assistantSection] is given.
   final Widget? aiSection;
 
   /// App-specific groups, rendered where [PortalSettingsGroup.custom] falls.
+  /// Their children go in as given — finance's are already inset sections.
   final List<PortalSettingsSection> sections;
 
   /// Groups to build at all. Anything absent is skipped.
@@ -84,9 +102,12 @@ class PortalSettingsPage extends StatelessWidget {
   /// way, so an app that only reorders can leave `include` alone.
   final List<PortalSettingsGroup> order;
 
-  /// Renders one group. Default is an uppercase label above bare rows.
+  /// Renders one of [sections]. Default is a kit section header above the
+  /// children as given.
   final Widget Function(String title, List<Widget> children)? sectionBuilder;
 
+  /// The page tone. Defaults to the grouped tone in light mode, so the inset
+  /// sections read as cards; dark mode keeps the theme's surface.
   final Color? backgroundColor;
 
   /// Replaces the change-password write. Only an app holding key material
@@ -94,136 +115,455 @@ class PortalSettingsPage extends StatelessWidget {
   final Future<void> Function(String currentPassword, String newPassword)?
       onChangePassword;
 
-  static const _padding = EdgeInsets.symmetric(horizontal: 16);
+  /// Shows a Sign in row in the profile's place while signed out. Null shows
+  /// nothing there: only the app knows how to reach its login.
+  final VoidCallback? onSignIn;
+
+  @override
+  State<PortalSettingsPage> createState() => _PortalSettingsPageState();
+}
+
+class _PortalSettingsPageState extends State<PortalSettingsPage> {
+  /// Whether Portal Cloud answered when the page opened. Null until it has.
+  bool? _reachable;
+  String? _version;
+  bool _checkingUpdate = false;
+  String? _deleteError;
+
+  // Server-switch reveal: 7 taps on the App version row (Android's own
+  // dev-options gesture), or a debug build. The gesture is only a
+  // discoverability gate -- PortalServerPrefs.localUrlFrom's private-host
+  // check is what actually stops this reaching a real server.
+  bool _devToolsUnlocked = kDebugMode;
+  int _serverTaps = 0;
+
+  PortalSettingsLabels get _labels => widget.labels;
+
+  @override
+  void initState() {
+    super.initState();
+    _probe();
+    // Best-effort read: a build with no package info shows the placeholder.
+    PortalAppVersion.load().then((info) {
+      if (mounted) setState(() => _version = PortalAppVersion.format(info));
+    }, onError: (_) {});
+    if (!_devToolsUnlocked) {
+      PortalServerPrefs.devToolsUnlocked().then((unlocked) {
+        if (unlocked && mounted) setState(() => _devToolsUnlocked = true);
+      });
+    }
+  }
+
+  /// Once, on open -- not polled. An app that mounts this without
+  /// PortalBootstrap has no client to ask, and says nothing rather than blame
+  /// the server for a wiring mistake.
+  Future<void> _probe() async {
+    if (!Get.isRegistered<ApiClient>()) return;
+    bool ready;
+    try {
+      ready = (await Get.find<ApiClient>().checkBackendReadiness()).isReady;
+    } catch (_) {
+      // A thrown readiness check (no network, DNS, a 5xx) means we could not
+      // reach the backend -- which is exactly "unreachable". Treat it as such
+      // rather than leaving the Mode row stuck on "Checking..." forever, and
+      // never let it surface as an unhandled async error.
+      ready = false;
+    }
+    if (!mounted) return;
+    setState(() => _reachable = ready);
+  }
+
+  void _onVersionTap() {
+    if (_devToolsUnlocked) {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => PortalServerPage(labels: widget.labels),
+      ));
+      return;
+    }
+    _serverTaps++;
+    if (_serverTaps >= 7) {
+      PortalServerPrefs.unlockDevTools();
+      setState(() => _devToolsUnlocked = true);
+    }
+  }
+
+  Future<void> _checkForUpdates(PortalUpdateService service) async {
+    setState(() => _checkingUpdate = true);
+    final result = await service.check();
+    if (!mounted) return;
+    setState(() => _checkingUpdate = false);
+
+    if (result.status == PortalUpdateStatus.updateAvailable) {
+      await showPortalUpdateDialog(context, service, result.release!);
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(
+        result.status == PortalUpdateStatus.upToDate
+            ? _labels.upToDate
+            : result.message ?? _labels.updateCheckFailed,
+      ),
+    ));
+  }
+
+  Future<void> _signOut(SessionController session) async {
+    final confirmed = await portalConfirm(
+      context,
+      title: _labels.signOutConfirmTitle,
+      message: _labels.signOutConfirmMessage,
+      confirmLabel: _labels.signOut,
+      cancelLabel: _labels.cancel,
+    );
+    if (confirmed) await session.signOut();
+  }
+
+  /// Deletes the account server-side, then signs out.
+  ///
+  /// Play requires an in-app deletion path for any app that creates accounts,
+  /// so this belongs here rather than in one app's own settings.
+  Future<void> _deleteAccount(SessionController session) async {
+    final confirmed = await portalConfirm(
+      context,
+      title: _labels.deleteAccountConfirmTitle,
+      message: _labels.deleteAccountConfirmMessage,
+      confirmLabel: _labels.deleteAccount,
+      cancelLabel: _labels.cancel,
+      isDestructive: true,
+    );
+    if (confirmed && mounted) await _runDelete(session);
+  }
+
+  Future<void> _runDelete(SessionController session) async {
+    setState(() => _deleteError = null);
+    try {
+      await session.deleteAccount();
+    } catch (error) {
+      // Still signed in, and the account still exists. Saying nothing here
+      // would read as a delete that worked.
+      if (!mounted) return;
+      setState(() => _deleteError = '${_labels.deleteAccountFailed} $error');
+    }
+  }
+
+  /// The header of a section built by hand: the one [PortalListSection] draws.
+  Widget _header(String title) {
+    final sp = PortalUiTheme.of(context).tokens.spacing;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(sp.lg, sp.lg, sp.lg, sp.sm),
+      child: PortalSectionHeader(title: title),
+    );
+  }
+
+  Widget _defaultSection(String title, List<Widget> children) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [_header(title), ...children],
+      );
+
+  Widget _profile(SessionController session) => Obx(() {
+        final user = session.user.value;
+        if (user == null) {
+          final onSignIn = widget.onSignIn;
+          if (onSignIn == null) return const SizedBox.shrink();
+          return PortalListSection(children: [
+            PortalListItem(
+              title: _labels.signIn,
+              subtitle: _labels.signInSubtitle,
+              leading: PortalListLeading.tile(PortalIcons.login_rounded),
+              trailing: const PortalListAccessory.navigate(),
+              onTap: onSignIn,
+            ),
+          ]);
+        }
+        final name = (user['name'] as String?)?.trim() ?? '';
+        final email = (user['email'] as String?)?.trim() ?? '';
+        final photo = SessionController.avatarUrlFor(user);
+        return PortalListSection(children: [
+          PortalListItem(
+            title: name.isEmpty ? _labels.profileFallbackTitle : name,
+            subtitle: email.isEmpty ? null : email,
+            leading: PortalListLeading.avatar(
+              SessionController.initialsFor(user),
+              image: photo == null ? null : NetworkImage(photo),
+              large: true,
+            ),
+            trailing: const PortalListAccessory.navigate(),
+            onTap: () => PortalSheet.show<void>(
+              context,
+              builder: (_) => _NameSheet(
+                labels: _labels,
+                session: session,
+                current: name,
+              ),
+            ),
+          ),
+        ]);
+      });
+
+  Widget _appearance(PortalThemeController theme) => Obx(() {
+        final palette = _currentPalette(theme, widget.palettes);
+        return PortalListSection(
+          header: _labels.appearance,
+          children: [
+            PortalListItem(
+              title: _labels.theme,
+              leading: PortalListLeading.tile(PortalIcons.dark_mode_rounded),
+              trailing: PortalListAccessory.navigate(
+                value: PortalThemeController.labelFor(theme.themeMode.value),
+              ),
+              onTap: () => PortalSheet.show<void>(
+                context,
+                title: _labels.theme,
+                builder: (_) => _ThemeSheet(controller: theme),
+              ),
+            ),
+            if (palette != null)
+              PortalListItem(
+                title: _labels.accentColour,
+                leading: PortalListLeading.tile(PortalIcons.palette_rounded),
+                trailing: PortalListAccessory.navigate(
+                  value: palette.label,
+                  swatch: palette.swatch,
+                ),
+                onTap: () => PortalSheet.show<void>(
+                  context,
+                  title: _labels.accentColour,
+                  builder: (_) => _AccentSheet(
+                    controller: theme,
+                    palettes: widget.palettes,
+                  ),
+                ),
+              ),
+          ],
+        );
+      });
+
+  Widget _status(PortalUpdateService? updates) {
+    // ponytail: Mode reflects reachability only; routing-aware text needs a modeLabel callback — add when an app asks.
+    final mode = switch (_reachable) {
+      null => _labels.checking,
+      true => _labels.modeCloud,
+      false => _labels.modeOnDevice,
+    };
+    return PortalListSection(
+      header: _labels.status,
+      children: [
+        // Nothing to be in a mode of without a client.
+        if (Get.isRegistered<ApiClient>())
+          PortalListItem(
+            title: _labels.mode,
+            leading: PortalListLeading.tile(
+              PortalIcons.swap_horiz_rounded,
+              tone: PortalListTone.tertiary,
+            ),
+            trailing: PortalListAccessory.value(
+              mode,
+              sentiment: PortalValueSentiment.dim,
+            ),
+          ),
+        _HiddenTapRow(
+          title: _labels.appVersion,
+          leading: PortalListLeading.tile(
+            PortalIcons.info_rounded,
+            tone: PortalListTone.tertiary,
+          ),
+          trailing: PortalListAccessory.value(
+            _version ?? '…',
+            sentiment: PortalValueSentiment.dim,
+          ),
+          onHiddenTap: _onVersionTap,
+        ),
+        if (updates != null && updates.isEnabled)
+          PortalListItem(
+            title: _labels.checkForUpdates,
+            leading: PortalListLeading.tile(
+              PortalIcons.system_update_rounded,
+              tone: PortalListTone.tertiary,
+            ),
+            trailing: _checkingUpdate
+                ? PortalListAccessory.value(
+                    _labels.checking,
+                    sentiment: PortalValueSentiment.dim,
+                  )
+                : PortalListAccessory.none,
+            onTap: _checkingUpdate ? null : () => _checkForUpdates(updates),
+          ),
+      ],
+    );
+  }
+
+  Widget _account(SessionController session) => Obx(() {
+        if (session.user.value == null) return const SizedBox.shrink();
+        final sp = PortalUiTheme.of(context).tokens.spacing;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _header(_labels.account),
+            if (_deleteError case final error?)
+              Padding(
+                padding: EdgeInsets.fromLTRB(sp.lg, 0, sp.lg, sp.sm),
+                child: PortalPrompt(
+                  size: PortalPromptSize.compact,
+                  sentiment: PortalSentiment.negative,
+                  message: error,
+                  action: (
+                    label: _labels.retry,
+                    onPressed: () => _runDelete(session),
+                  ),
+                ),
+              ),
+            PortalListSection(children: [
+              PortalListItem(
+                title: _labels.changePassword,
+                leading: PortalListLeading.tile(PortalIcons.lock_rounded),
+                trailing: const PortalListAccessory.navigate(),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => PortalChangePasswordPage(
+                      labels: _labels,
+                      onSubmit: widget.onChangePassword,
+                    ),
+                  ),
+                ),
+              ),
+              PortalListItem(
+                title: _labels.signOut,
+                leading: PortalListLeading.tile(PortalIcons.logout_rounded),
+                onTap: () => _signOut(session),
+              ),
+              PortalListItem(
+                title: _labels.deleteAccount,
+                leading: PortalListLeading.tile(
+                  PortalIcons.delete_rounded,
+                  tone: PortalListTone.error,
+                ),
+                destructive: true,
+                onTap: () => _deleteAccount(session),
+              ),
+            ]),
+          ],
+        );
+      });
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final sp = PortalUiTheme.of(context).tokens.spacing;
     final updates = Get.isRegistered<PortalUpdateService>()
         ? Get.find<PortalUpdateService>()
         : null;
-    final build = sectionBuilder ?? _defaultSection;
+    final buildSection = widget.sectionBuilder ?? _defaultSection;
 
     final children = <Widget>[];
-    for (final group in order) {
-      if (!include.contains(group)) continue;
+    for (final group in widget.order) {
+      if (!widget.include.contains(group)) continue;
       switch (group) {
         case PortalSettingsGroup.profile:
           if (Get.isRegistered<SessionController>()) {
-            children.add(PortalProfileTile(labels: labels));
+            children.add(_profile(Get.find<SessionController>()));
           }
 
         case PortalSettingsGroup.appearance:
-          final theme = themeController;
-          if (theme == null) break;
-          children.add(build(labels.appearance, [
-            _ThemeModePicker(controller: theme),
-            if (palettes.isNotEmpty)
-              _PalettePicker(controller: theme, palettes: palettes),
-          ]));
+          final theme = widget.themeController;
+          if (theme != null) children.add(_appearance(theme));
 
         case PortalSettingsGroup.custom:
-          for (final section in sections) {
-            children.add(build(section.title, section.children));
+          for (final section in widget.sections) {
+            children.add(buildSection(section.title, section.children));
           }
 
         case PortalSettingsGroup.assistant:
-          // Folded into the status row below: one "Assistant" entry, showing
-          // live health and opening the same picker, instead of two separate
-          // rows that can drift out of sync with each other.
-          break;
+          final ai = widget.aiSection;
+          if (widget.assistantSection case final section?) {
+            children.add(section);
+          } else if (ai != null) {
+            children.add(PortalListSection(children: [
+              PortalListItem(
+                title: _labels.assistant,
+                leading:
+                    PortalListLeading.tile(PortalIcons.auto_awesome_rounded),
+                trailing: const PortalListAccessory.navigate(),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => _AssistantSettingsPage(
+                      title: _labels.assistant,
+                      child: ai,
+                    ),
+                  ),
+                ),
+              ),
+            ]));
+          }
 
         case PortalSettingsGroup.status:
-          final ai = aiSection;
-          children.add(build(labels.status, [
-            PortalStatusSection(
-              contentPadding: _padding,
-              labels: labels,
-              onAssistantTap: ai == null
-                  ? null
-                  : () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => _AssistantSettingsPage(
-                            title: labels.assistant,
-                            child: ai,
-                          ),
-                        ),
-                      ),
-            ),
-          ]));
+          children.add(_status(updates));
 
         case PortalSettingsGroup.apps:
           // Gated on the same predicate the section itself uses, so iOS and a
           // build with no manifest URL get no empty heading.
           if (updates == null || !portalCanInstallApps(updates)) break;
-          children.add(build(labels.portalApps, [
-            PortalAppsSection(
-              service: updates,
-              contentPadding: _padding,
-              labels: labels,
-            ),
-          ]));
+          children.add(PortalAppsSection.grouped(
+            service: updates,
+            labels: _labels,
+          ));
 
         case PortalSettingsGroup.about:
-          children.add(build(labels.about, [
-            PortalUpdateTile(service: updates, title: labels.appVersion),
-            if (Get.isRegistered<DeviceSecurityController>())
-              const PortalDeviceSecuritySettingsTile(contentPadding: _padding),
-            if (Get.isRegistered<SessionController>()) ...[
-              _ChangePasswordTile(
-                labels: labels,
-                onSubmit: onChangePassword,
-              ),
-              _SignOutTile(labels: labels),
-              _DeleteAccountTile(labels: labels),
-            ],
-          ]));
+          if (Get.isRegistered<SessionController>()) {
+            children.add(_account(Get.find<SessionController>()));
+          }
       }
     }
 
+    final unreachable = _reachable == false;
     return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(title: Text(labels.title)),
+      backgroundColor: widget.backgroundColor ??
+          (cs.brightness == Brightness.light ? cs.surfaceContainerHigh : null),
+      appBar: PortalAppBar(
+        title: _labels.title,
+        status: unreachable ? _labels.cloudUnreachable : null,
+        statusIcon: PortalIcons.cloud_off_rounded,
+      ),
       body: ListView(
-        padding: const EdgeInsets.only(bottom: 32),
+        padding: EdgeInsets.only(top: sp.lg, bottom: sp.xxl),
         children: children,
       ),
     );
   }
-
-  static Widget _defaultSection(String title, List<Widget> children) =>
-      _Section(title: title, children: children);
 }
 
-class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.children});
+/// The page's [palettes] entry in force: the controller's pick, else the
+/// first (the app's own accent). Null when the app offers no palettes.
+PortalPaletteOption? _currentPalette(
+  PortalThemeController controller,
+  List<PortalPaletteOption> palettes,
+) {
+  if (palettes.isEmpty) return null;
+  final id = controller.paletteId.value;
+  return palettes.firstWhere((p) => p.id == id, orElse: () => palettes.first);
+}
 
-  final String title;
-  final List<Widget> children;
+/// A row that counts taps nobody is told about: out of semantics, no ripple.
+/// A subclass, not a wrapper, so [PortalListSection] still insets the divider
+/// under it to the text column.
+class _HiddenTapRow extends PortalListItem {
+  const _HiddenTapRow({
+    required super.title,
+    super.leading,
+    super.trailing,
+    required this.onHiddenTap,
+  });
+
+  final VoidCallback onHiddenTap;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-          child: Text(
-            title.toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.primary,
-              letterSpacing: 1.1,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        ...children,
-      ],
-    );
-  }
+  Widget build(BuildContext context) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: true,
+        onTap: onHiddenTap,
+        child: super.build(context),
+      );
 }
 
-/// The page the status row's "Assistant" tile opens: the app's backend
+/// The legacy [PortalSettingsPage.aiSection] row's page: the app's backend
 /// picker (provider list, model dropdown, Ollama host field) on its own
 /// screen, rather than cramming it into the middle of the general list.
 class _AssistantSettingsPage extends StatelessWidget {
@@ -246,204 +586,243 @@ class _AssistantSettingsPage extends StatelessWidget {
   }
 }
 
-class _SignOutTile extends StatelessWidget {
-  const _SignOutTile({required this.labels});
-
-  final PortalSettingsLabels labels;
-
-  Future<void> _signOut(BuildContext context) async {
-    final session = Get.find<SessionController>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(labels.signOutConfirmTitle),
-        content: Text(labels.signOutConfirmMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(labels.cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: Text(labels.signOut),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) await session.signOut();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return ListTile(
-      contentPadding: PortalSettingsPage._padding,
-      leading: Icon(Icons.logout_rounded, color: cs.error),
-      title: Text(labels.signOut, style: TextStyle(color: cs.error)),
-      onTap: () => _signOut(context),
-    );
-  }
-}
-
-/// Deletes the account server-side, then signs out.
+/// Edit name: one field over a Save dock. Save is off while the field is
+/// blank and busy while the write runs; a failed write is a retry prompt under
+/// the field, never a close.
 ///
-/// Play requires an in-app deletion path for any app that creates accounts,
-/// so this belongs here rather than in one app's own settings.
-class _DeleteAccountTile extends StatelessWidget {
-  const _DeleteAccountTile({required this.labels});
+/// The profile is one record shared by every Portal app, so the write is
+/// [SessionController.updateName], not a per-app display name.
+class _NameSheet extends StatefulWidget {
+  const _NameSheet({
+    required this.labels,
+    required this.session,
+    required this.current,
+  });
 
   final PortalSettingsLabels labels;
+  final SessionController session;
+  final String current;
 
-  Future<void> _delete(BuildContext context) async {
-    final session = Get.find<SessionController>();
-    final cs = Theme.of(context).colorScheme;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(labels.deleteAccountConfirmTitle),
-        content: Text(labels.deleteAccountConfirmMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(labels.cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: cs.error),
-            child: Text(labels.deleteAccount),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    try {
-      await session.deleteAccount();
-    } catch (error) {
-      // Still signed in, and the account still exists. Saying nothing here
-      // would read as a delete that worked.
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${labels.deleteAccountFailed} $error')),
-      );
+  @override
+  State<_NameSheet> createState() => _NameSheetState();
+}
+
+class _NameSheetState extends State<_NameSheet> {
+  late final _name = TextEditingController(text: widget.current);
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _name.text.trim();
+    if (name.isEmpty || _busy) return;
+    if (name == widget.current) {
+      Navigator.pop(context);
+      return;
     }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await widget.session.updateName(name);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = widget.labels.nameSaveFailed;
+      });
+      return;
+    }
+    if (mounted) Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return ListTile(
-      contentPadding: PortalSettingsPage._padding,
-      leading: Icon(Icons.person_remove_rounded, color: cs.error),
-      title: Text(labels.deleteAccount, style: TextStyle(color: cs.error)),
-      onTap: () => _delete(context),
+    final labels = widget.labels;
+    final sp = PortalUiTheme.of(context).tokens.spacing;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: PortalSheetScaffold(
+            title: labels.editName,
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                PortalTextField(
+                  controller: _name,
+                  label: labels.nameDialogTitle,
+                  helper: labels.nameDialogHelper,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.words,
+                  autofillHints: const [AutofillHints.name],
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _save(),
+                ),
+                if (_error case final error?)
+                  Padding(
+                    padding: EdgeInsets.only(top: sp.md),
+                    child: PortalPrompt(
+                      size: PortalPromptSize.compact,
+                      sentiment: PortalSentiment.negative,
+                      message: error,
+                      action: (label: labels.retry, onPressed: _save),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        PortalButtonDock(
+          primary: ListenableBuilder(
+            listenable: _name,
+            builder: (_, __) => PortalButton(
+              label: labels.save,
+              size: PortalButtonSize.lg,
+              expand: true,
+              isLoading: _busy,
+              onPressed: _name.text.trim().isEmpty ? null : _save,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
 
-/// Name, email and initials for the one profile every Portal app shares.
-class _ThemeModePicker extends StatelessWidget {
-  const _ThemeModePicker({required this.controller});
+/// The Theme row's picker: applies on tap, so no dock.
+class _ThemeSheet extends StatelessWidget {
+  const _ThemeSheet({required this.controller});
 
   final PortalThemeController controller;
 
+  static IconData _icon(ThemeMode mode) => switch (mode) {
+        ThemeMode.system => PortalIcons.brightness_auto_rounded,
+        ThemeMode.light => PortalIcons.light_mode_rounded,
+        ThemeMode.dark => PortalIcons.dark_mode_rounded,
+      };
+
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: PortalSettingsPage._padding,
-      child: Obx(
-        () => SegmentedButton<ThemeMode>(
-          showSelectedIcon: false,
-          segments: [
+  Widget build(BuildContext context) => Obx(() {
+        final current = controller.themeMode.value;
+        return PortalListSection.selectable(
+          selected: ThemeMode.values.indexOf(current),
+          children: [
             for (final mode in ThemeMode.values)
-              ButtonSegment(
-                value: mode,
-                label: Text(PortalThemeController.labelFor(mode)),
-                icon: Icon(PortalThemeController.iconFor(mode), size: 18),
+              PortalListItem(
+                title: PortalThemeController.labelFor(mode),
+                leading: PortalListLeading.icon(_icon(mode)),
+                trailing: PortalListAccessory.radio(
+                  checked: mode == current,
+                  onChanged: (_) {
+                    controller.setThemeMode(mode);
+                    Navigator.pop(context);
+                  },
+                ),
               ),
           ],
-          selected: {controller.themeMode.value},
-          onSelectionChanged: (s) => controller.setThemeMode(s.first),
-        ),
-      ),
-    );
-  }
+        );
+      });
 }
 
-class _PalettePicker extends StatelessWidget {
-  const _PalettePicker({required this.controller, required this.palettes});
+/// The Accent colour row's picker: a disc and its name per palette, applied on
+/// tap. The pick carries a check glyph, so it never rests on fill alone.
+class _AccentSheet extends StatelessWidget {
+  const _AccentSheet({required this.controller, required this.palettes});
 
   final PortalThemeController controller;
   final List<PortalPaletteOption> palettes;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Obx(
-        () => Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            for (final p in palettes)
-              InkWell(
-                borderRadius: BorderRadius.circular(24),
-                onTap: () => controller.setPaletteId(p.id),
-                child: Tooltip(
-                  message: p.label,
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: p.swatch,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: controller.paletteId.value == p.id
-                            ? Theme.of(context).colorScheme.onSurface
-                            : Colors.transparent,
-                        width: 3,
-                      ),
+    final t = PortalUiTheme.of(context).tokens;
+    final cs = Theme.of(context).colorScheme;
+    return Obx(() {
+      final picked = _currentPalette(controller, palettes);
+      return Wrap(
+        spacing: t.spacing.sm,
+        runSpacing: t.spacing.sm,
+        children: [
+          for (final p in palettes)
+            Semantics(
+              selected: p == picked,
+              inMutuallyExclusiveGroup: true,
+              button: true,
+              label: p.label,
+              excludeSemantics: true,
+              onTap: () => _pick(context, p),
+              child: InkWell(
+                onTap: () => _pick(context, p),
+                borderRadius: BorderRadius.circular(t.radii.md),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minWidth: t.minTapTarget,
+                    maxWidth: t.minTapTarget * 1.5,
+                    minHeight: t.minTapTarget,
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(t.spacing.xs),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 28,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: p.swatch,
+                            shape: BoxShape.circle,
+                            border: p == picked
+                                ? Border.all(color: cs.onSurface, width: 2)
+                                : null,
+                          ),
+                          child: p == picked
+                              ? Container(
+                                  width: 18,
+                                  height: 18,
+                                  decoration: BoxDecoration(
+                                    color: cs.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    PortalIcons.check_rounded,
+                                    size: 14,
+                                    color: cs.onPrimary,
+                                  ),
+                                )
+                              : null,
+                        ),
+                        SizedBox(height: t.spacing.xs),
+                        Text(
+                          p.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: t.textStyles.caption.copyWith(
+                            color: p == picked
+                                ? cs.onSurface
+                                : cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Opens [PortalChangePasswordPage]. Hidden while signed out — there is no
-/// account to change the password of.
-class _ChangePasswordTile extends StatelessWidget {
-  const _ChangePasswordTile({required this.labels, this.onSubmit});
-
-  final PortalSettingsLabels labels;
-  final Future<void> Function(String currentPassword, String newPassword)?
-      onSubmit;
-
-  @override
-  Widget build(BuildContext context) {
-    final session = Get.find<SessionController>();
-    return Obx(() {
-      if (session.user.value == null) return const SizedBox.shrink();
-      return ListTile(
-        contentPadding: PortalSettingsPage._padding,
-        leading: const Icon(Icons.password_outlined),
-        title: Text(labels.changePassword),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => PortalChangePasswordPage(
-              labels: labels,
-              onSubmit: onSubmit,
             ),
-          ),
-        ),
+        ],
       );
     });
+  }
+
+  void _pick(BuildContext context, PortalPaletteOption p) {
+    controller.setPaletteId(p.id);
+    Navigator.pop(context);
   }
 }

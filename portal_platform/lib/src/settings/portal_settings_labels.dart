@@ -16,6 +16,10 @@ class PortalSettingsLabels {
     this.status = 'Status',
     this.portalApps = 'Portal apps',
     this.about = 'About',
+    this.account = 'Account',
+    this.signIn = 'Sign in',
+    this.signInSubtitle = 'Sync your chats and use Portal Cloud',
+    this.editName = 'Edit name',
     this.profileFallbackTitle = 'Your profile',
     this.nameDialogTitle = 'Your name',
     this.nameDialogHelper = 'Shared by every Portal app',
@@ -24,15 +28,25 @@ class PortalSettingsLabels {
     this.save = 'Save',
     this.signOut = 'Sign out',
     this.signOutConfirmTitle = 'Sign out?',
-    this.signOutConfirmMessage = 'You will need to sign in again.',
+    this.signOutConfirmMessage =
+        'Chats on this phone stay. Sync stops until you sign in again.',
     this.deleteAccount = 'Delete account',
     this.deleteAccountConfirmTitle = 'Delete your account?',
     this.deleteAccountConfirmMessage =
-        'This deletes your Portal account and everything stored against it on '
-            'the server, in every Portal app. It cannot be undone.',
+        "Your chats, settings and Portal Cloud data go from every device. "
+            "This can't be undone.",
     this.deleteAccountFailed = 'Could not delete your account.',
     this.notSignedIn = 'Not signed in',
     this.appVersion = 'App version',
+    this.theme = 'Theme',
+    this.accentColour = 'Accent colour',
+    this.mode = 'Mode',
+    this.modeCloud = 'Portal Cloud',
+    this.modeOnDevice = 'On-device',
+    this.cloudUnreachable = 'Portal Cloud unreachable',
+    this.checkForUpdates = 'Check for updates',
+    this.upToDate = 'Up to date',
+    this.updateCheckFailed = 'The update check did not complete',
     this.changePassword = 'Change password',
     this.changePasswordIntro =
         'Your Portal account password, the same one every Portal app signs '
@@ -84,6 +98,10 @@ class PortalSettingsLabels {
     this.installAllFailed = 'skipped',
     this.noOtherApps = 'No other apps published yet',
     this.appListFailed = 'Could not load the app list.',
+    this.more = 'More',
+    this.retry = 'Retry',
+    this.whatsNew = "What's new",
+    this.later = 'Later',
   });
 
   final String title;
@@ -95,7 +113,15 @@ class PortalSettingsLabels {
   final String portalApps;
   final String about;
 
+  /// The heading over change password, sign out and delete account. The
+  /// `about` group reads this, not [about]: its version rows moved to Status,
+  /// and what is left is the account.
+  final String account;
+
   // Profile.
+  final String signIn;
+  final String signInSubtitle;
+  final String editName;
   final String profileFallbackTitle;
   final String nameDialogTitle;
   final String nameDialogHelper;
@@ -111,6 +137,19 @@ class PortalSettingsLabels {
   final String deleteAccountFailed;
   final String notSignedIn;
   final String appVersion;
+
+  // Appearance, Status and updates.
+  final String theme;
+  final String accentColour;
+  final String mode;
+  final String modeCloud;
+  final String modeOnDevice;
+  final String cloudUnreachable;
+  final String checkForUpdates;
+  final String upToDate;
+  final String updateCheckFailed;
+
+  // Account.
   final String changePassword;
   final String changePasswordIntro;
   final String changePasswordSubmit;
@@ -157,4 +196,8 @@ class PortalSettingsLabels {
   final String installAllFailed;
   final String noOtherApps;
   final String appListFailed;
+  final String more;
+  final String retry;
+  final String whatsNew;
+  final String later;
 }

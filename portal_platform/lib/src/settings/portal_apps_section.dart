@@ -1,8 +1,9 @@
 import 'dart:async';
 
-import 'dart:io';
-
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../update/portal_installed_apps.dart';
@@ -16,8 +17,11 @@ import 'portal_settings_labels.dart';
 /// Android only, and only when a manifest URL was configured. A caller uses
 /// this to decide whether to render a section *heading* — otherwise iOS gets
 /// a "Portal apps" label with nothing under it.
+///
+/// Reads Flutter's [defaultTargetPlatform] rather than `Platform.isAndroid`:
+/// the same answer on a device, and a widget test can say it is on Android.
 bool portalCanInstallApps(PortalUpdateService service) =>
-    Platform.isAndroid && service.isEnabled;
+    defaultTargetPlatform == TargetPlatform.android && service.isEnabled;
 
 /// The other Portal apps, installable from inside this one.
 ///
@@ -37,6 +41,11 @@ bool portalCanInstallApps(PortalUpdateService service) =>
 /// applicationId is not listed there reads as not installed. Opening still
 /// goes through the `portal-x://` scheme, which needs the `<queries>` intent
 /// block in each app manifest.
+///
+/// [PortalAppsSection.grouped] is the same list as a kit section for
+/// `PortalSettingsPage`: it carries its own header, Check again lives on that
+/// header, an installed row's More (or a long press) holds Uninstall, and
+/// Install / Update ask first in a sheet. Same load, probe and install logic.
 class PortalAppsSection extends StatefulWidget {
   const PortalAppsSection({
     super.key,
@@ -44,7 +53,17 @@ class PortalAppsSection extends StatefulWidget {
     this.contentPadding,
     this.labels = const PortalSettingsLabels(),
     this.tileBuilder,
-  });
+  }) : _grouped = false;
+
+  const PortalAppsSection.grouped({
+    super.key,
+    required this.service,
+    this.labels = const PortalSettingsLabels(),
+  })  : contentPadding = null,
+        tileBuilder = null,
+        _grouped = true;
+
+  final bool _grouped;
 
   final PortalUpdateService service;
   final EdgeInsetsGeometry? contentPadding;
@@ -161,7 +180,8 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
 
   void _tap(PortalRelease release) => switch (_actionFor(release)) {
         PortalAppAction.open => _open(release),
-        PortalAppAction.install || PortalAppAction.update => _install(release),
+        PortalAppAction.install || PortalAppAction.update =>
+          widget._grouped ? _installSheet(release) : _install(release),
       };
 
   /// Hands the app to Android's uninstall confirmation.
@@ -172,24 +192,15 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
   /// system UI reports nothing back.
   Future<void> _uninstall(PortalRelease release) async {
     final labels = widget.labels;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('${labels.uninstall} ${release.displayName}?'),
-        content: Text(labels.uninstallConfirmMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(labels.cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(labels.uninstall),
-          ),
-        ],
-      ),
+    final confirmed = await portalConfirm(
+      context,
+      title: '${labels.uninstall} ${release.displayName}?',
+      message: labels.uninstallConfirmMessage,
+      confirmLabel: labels.uninstall,
+      cancelLabel: labels.cancel,
+      isDestructive: true,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     await PortalInstalledApps.uninstall(release.slug);
     // The system prompt may never have opened (an app that vanished between
     // the probe and the tap), in which case nothing backgrounds this app and
@@ -213,6 +224,56 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
     // resume fires to correct the row.
     await _probeInstalled();
   }
+
+  /// [_install] for the grouped list: a sheet with what is new instead of the
+  /// dialog, and the same install and snackbar behind Update.
+  Future<void> _installSheet(PortalRelease release) async {
+    final go = await PortalSheet.show<bool>(
+      context,
+      builder: (_) => _UpdateSheet(
+        release: release,
+        installed: _installed[release.slug],
+        action: _actionFor(release),
+        labels: widget.labels,
+      ),
+    );
+    if (go == true && mounted) {
+      await portalInstallAndReport(context, widget.service, release);
+    }
+    await _probeInstalled();
+  }
+
+  /// An installed row's More, or a long press on it: its own action again,
+  /// then Uninstall. Nothing to uninstall until it is installed.
+  Future<void> _showActions(PortalRelease release) {
+    final labels = widget.labels;
+    final action = _actionFor(release);
+    return showPortalActionSheet(
+      context,
+      [
+        PortalAction(
+          icon: action == PortalAppAction.update
+              ? PortalIcons.system_update_rounded
+              : PortalIcons.open_in_new_rounded,
+          label: _actionLabel(action),
+          onPressed: () => _tap(release),
+        ),
+        PortalAction(
+          icon: PortalIcons.delete_rounded,
+          label: labels.uninstall,
+          destructive: true,
+          onPressed: () => _uninstall(release),
+        ),
+      ],
+      title: release.displayName,
+    );
+  }
+
+  String _actionLabel(PortalAppAction action) => switch (action) {
+        PortalAppAction.open => widget.labels.open,
+        PortalAppAction.install => widget.labels.install,
+        PortalAppAction.update => widget.labels.update,
+      };
 
   /// Hands every app that is not installed to the browser, one download
   /// after another. The install sheets come when the user opens each one.
@@ -251,7 +312,127 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      widget._grouped ? _buildGrouped(context) : _buildList(context);
+
+  /// The four states as a kit section: skeleton rows while loading, a header
+  /// and a retry prompt on failure, nothing when there is nothing to list.
+  Widget _buildGrouped(BuildContext context) {
+    if (!portalCanInstallApps(widget.service)) return const SizedBox.shrink();
+    final labels = widget.labels;
+    final sp = PortalUiTheme.of(context).tokens.spacing;
+
+    if (_error != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(sp.lg, sp.lg, sp.lg, sp.sm),
+            child: PortalSectionHeader(title: labels.portalApps),
+          ),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: sp.lg),
+            child: PortalPrompt(
+              size: PortalPromptSize.compact,
+              sentiment: PortalSentiment.negative,
+              message: _error!,
+              action: (label: labels.retry, onPressed: _load),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final apps = _apps;
+    if (apps == null) {
+      return PortalListSection(
+        header: labels.portalApps,
+        children: const [
+          PortalListItem.skeleton(leading: PortalSkeletonLeading.tile),
+          PortalListItem.skeleton(leading: PortalSkeletonLeading.tile),
+        ],
+      );
+    }
+    if (apps.isEmpty) return const SizedBox.shrink();
+
+    // Missing and out-of-date both count, as in [_buildList].
+    final pending = apps
+        .where((a) => _actionFor(a) != PortalAppAction.open)
+        .toList(growable: false);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PortalListSection(
+          header: labels.portalApps,
+          // The force-check of [_buildList], on the header where a section's
+          // one action goes.
+          headerAction: TextButton(
+            onPressed: _refreshing ? null : _probeInstalled,
+            child: Text(labels.checkAgain),
+          ),
+          children: [for (final app in apps) _groupedRow(context, app)],
+        ),
+        // Only for more than one: for a single app it is the row's button.
+        if (pending.length > 1)
+          Padding(
+            padding: EdgeInsets.fromLTRB(sp.lg, sp.md, sp.lg, 0),
+            child: PortalButton(
+              label: '${labels.installAll} (${pending.length})',
+              variant: PortalButtonVariant.secondary,
+              leading: const Icon(PortalIcons.download_rounded),
+              expand: true,
+              isLoading: _batching,
+              onPressed: () => _runInstallAll(pending),
+            ),
+          ),
+      ],
+    );
+  }
+
+  PortalListItem _groupedRow(BuildContext context, PortalRelease app) {
+    final labels = widget.labels;
+    final action = _actionFor(app);
+    final installed = _installed.containsKey(app.slug);
+    final name = app.displayName;
+    final label = _actionLabel(action);
+    // What the update changes, only where it is a decision (see [_buildList]).
+    final notes = action == PortalAppAction.update ? app.notes : null;
+
+    return PortalListItem(
+      title: name,
+      subtitle: [
+        portalAppVersionLine(app, _installed[app.slug]),
+        if (notes != null && notes.isNotEmpty) notes,
+      ].join('\n'),
+      leading: _appThumbnail(context, app),
+      onLongPress: installed ? () => _showActions(app) : null,
+      trailing: PortalListAccessory.widget(
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Tooltip(
+              message: '$label $name',
+              child: PortalButton(
+                label: label,
+                variant: PortalButtonVariant.secondary,
+                onPressed: () => _tap(app),
+              ),
+            ),
+            if (installed)
+              IconButton(
+                icon: const Icon(PortalIcons.more_vert_rounded),
+                tooltip: '${labels.more} for $name',
+                onPressed: () => _showActions(app),
+              ),
+          ],
+        ),
+        interactive: true,
+      ),
+    );
+  }
+
+  Widget _buildList(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final padding = widget.contentPadding;
     final labels = widget.labels;
@@ -416,6 +597,128 @@ Widget portalAppAvatar(PortalRelease release, Color color) {
       errorBuilder: (_, __, ___) => fallback,
     ),
   );
+}
+
+/// [portalAppAvatar] for a list row's 40 dp thumbnail: the same published icon
+/// and the same fallback glyph, square-cropped instead of a circle.
+PortalListLeading _appThumbnail(BuildContext context, PortalRelease release) {
+  final cs = Theme.of(context).colorScheme;
+  final fallback = ColoredBox(
+    color: cs.surfaceContainerHighest,
+    child: Center(
+      child: Icon(portalAppIconFor(release.slug), color: cs.onSurfaceVariant),
+    ),
+  );
+  final url = release.iconUrl;
+  return PortalListLeading.thumbnail(
+    url == null
+        ? fallback
+        : Image.network(
+            url.toString(),
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => fallback,
+          ),
+  );
+}
+
+/// The question behind a Portal apps row's Install or Update: which app, what
+/// it changes, and a dock to go ahead or not. Pops true on go.
+class _UpdateSheet extends StatelessWidget {
+  const _UpdateSheet({
+    required this.release,
+    required this.installed,
+    required this.action,
+    required this.labels,
+  });
+
+  final PortalRelease release;
+  final PortalInstalledApp? installed;
+  final PortalAppAction action;
+  final PortalSettingsLabels labels;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final t = PortalUiTheme.of(context).tokens;
+    final name = release.displayName;
+    final label =
+        action == PortalAppAction.update ? labels.update : labels.install;
+    // The manifest's notes are one string; a line each, with any list marker
+    // the publisher typed dropped in favour of ours.
+    final notes = (release.notes ?? '')
+        .split('\n')
+        .map((l) => l.replaceFirst(RegExp(r'^\s*[-*•]\s*'), '').trim())
+        .where((l) => l.isNotEmpty);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: PortalSheetScaffold(
+            title: '$label $name',
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                PortalListSection(
+                  style: PortalListStyle.fullBleed,
+                  children: [
+                    PortalListItem(
+                      title: name,
+                      subtitle: portalAppVersionLine(release, installed),
+                      leading: _appThumbnail(context, release),
+                    ),
+                  ],
+                ),
+                if (notes.isNotEmpty) ...[
+                  Padding(
+                    padding: EdgeInsets.only(top: t.spacing.lg, bottom: t.spacing.sm),
+                    child: PortalSectionHeader(title: labels.whatsNew),
+                  ),
+                  for (final note in notes)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: t.spacing.sm),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ExcludeSemantics(
+                            child: Text(
+                              '•  ',
+                              style: t.textStyles.body
+                                  .copyWith(color: cs.onSurfaceVariant),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              note,
+                              style: t.textStyles.body
+                                  .copyWith(color: cs.onSurface),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        PortalButtonDock(
+          primary: PortalButton(
+            label: label,
+            size: PortalButtonSize.lg,
+            expand: true,
+            onPressed: () => Navigator.pop(context, true),
+          ),
+          secondary: PortalButton(
+            label: labels.later,
+            variant: PortalButtonVariant.ghost,
+            expand: true,
+            onPressed: () => Navigator.pop(context, false),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// Best-effort icon per app. An unknown slug still lists and still installs.

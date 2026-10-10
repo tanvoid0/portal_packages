@@ -17,9 +17,11 @@ import 'portal_update_service.dart';
 /// host app was wired. Passing no [service] now only drops the rows that need
 /// one.
 ///
-/// Plain Material on purpose — `portal_platform` sits below the UI kit, so it
-/// cannot reach for ui_core's tokens. An app that wants its own styling
-/// composes [PortalAppVersionText] instead.
+/// Plain Material, for an app that embeds it in its own settings hub
+/// (`portal_task` does) rather than mounting `PortalSettingsPage`, whose Status
+/// group has its own App version and Check for updates rows in the kit's
+/// styling. An app that wants other styling composes [PortalAppVersionText]
+/// instead.
 class PortalUpdateTile extends StatefulWidget {
   const PortalUpdateTile({
     super.key,
@@ -274,7 +276,20 @@ Future<bool> showPortalUpdateDialog(
     return false;
   }
   if (!context.mounted) return false;
+  return portalInstallAndReport(context, service, release);
+}
 
+/// Hands [release] to [service] and says where the download went, or why it
+/// did not. True when the browser hand-off started.
+///
+/// The tail of [showPortalUpdateDialog], public because the Portal apps sheet
+/// in `PortalAppsSection.grouped` asks its own question first and then needs
+/// the same install and the same words.
+Future<bool> portalInstallAndReport(
+  BuildContext context,
+  PortalUpdateService service,
+  PortalRelease release,
+) async {
   String? error;
   try {
     await service.install(release);

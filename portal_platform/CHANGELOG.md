@@ -1,4 +1,17 @@
+## Unreleased
+
+- `PortalSettingsPage` rebuilt as the grouped kit page: inset sections from `portal_ui_core`, a tonal tile on every row, headers as written (no longer upper-cased), and Portal Cloud's outage in the bar's status line. Needs `portal_ui_core` 0.2.1 (`PortalListAccessory.navigate(swatch:)`, `PortalAppBar(status:)`); the constraint is raised to match.
+  - Profile is an account cell that opens an Edit name sheet; signed out, `onSignIn` (new) adds a Sign in row.
+  - Appearance: Theme and Accent colour rows open sheets that apply on tap. The accent row shows the first of `palettes` while the controller holds no id.
+  - `assistantSection` (new) draws the app's AI settings inline in the Assistant slot. `aiSection` is deprecated: it still works, as one "Assistant" row that opens the widget on its own page.
+  - Status: Mode (Portal Cloud / On-device, from one readiness probe on open), App version (seven taps still open the server page) and Check for updates. This replaces the old Server and Assistant health rows.
+  - The About group now holds the account block: Change password, Sign out, Delete account, under an "Account" heading. A failed delete is a retry prompt above the rows. The device-security row is no longer added here; an app that has one mounts it in its own `sections`.
+  - `sectionBuilder` now wraps only `sections`; its default is a kit header over the children as given.
+- `PortalAppsSection.grouped`: the same list as a kit section, with skeleton, error (retry), empty and data states, Check again on the header, a More button and long press holding Uninstall, and Install / Update asked in a sheet that shows what is new. The default constructor is unchanged.
+- `portalInstallAndReport`: the install-and-snackbar tail of `showPortalUpdateDialog`, shared with the Install / Update sheet.
+- `portalCanInstallApps` reads Flutter's `defaultTargetPlatform` rather than `Platform.isAndroid`, so a widget test can render the app list.
+- `PortalSettingsLabels`: `account`, `signIn`, `signInSubtitle`, `editName`, `theme`, `accentColour`, `mode`, `modeCloud`, `modeOnDevice`, `cloudUnreachable`, `checkForUpdates`, `upToDate`, `updateCheckFailed`, `more`, `retry`, `whatsNew`, `later`. The sign out and delete account confirmations carry the new copy.
+
 ## 0.1.1
 
 - Source moved to the public `portal_packages` repository; `repository:` link now resolves.
-
