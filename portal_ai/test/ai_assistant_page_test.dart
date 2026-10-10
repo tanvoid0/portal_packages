@@ -533,6 +533,51 @@ void main() {
     expect(find.byType(AiConsentCard), findsNothing);
     expect(tester.widget<TextField>(find.byType(TextField)).enabled, isTrue);
   });
+
+  testWidgets('initialSessionId opens that thread; resume still opens newest', (
+    tester,
+  ) async {
+    final store = _MemoryStore();
+    for (final (id, day) in [('a', 1), ('b', 2)]) {
+      await store.save(
+        AiChatSession(
+          id: id,
+          title: id,
+          createdAt: DateTime(2026, 10, day),
+          updatedAt: DateTime(2026, 10, day),
+          turns: [AiChatTurn(role: 'user', content: 'question $id')],
+        ),
+      );
+    }
+    // A fresh key each time: pumping the same type again would update the old
+    // State and never run initState.
+    Future<void> open({String? id, bool resume = false}) => tester.pumpWidget(
+      MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
+        home: Scaffold(
+          body: AiAssistantPage(
+            key: UniqueKey(),
+            runtime: PortalAiRuntime(client: _ScriptedClient(const [])),
+            store: store,
+            resumeLastSession: resume,
+            initialSessionId: id,
+          ),
+        ),
+      ),
+    );
+
+    await open(resume: true);
+    expect(find.text('question b'), findsOneWidget);
+
+    // The picked thread wins over "newest".
+    await open(id: 'a', resume: true);
+    expect(find.text('question a'), findsOneWidget);
+    expect(find.text('question b'), findsNothing);
+
+    // A thread deleted since the list was drawn opens blank, not as another one.
+    await open(id: 'gone', resume: true);
+    expect(find.textContaining('question'), findsNothing);
+  });
 }
 
 /// A store that keeps threads in memory, so the page records turns without

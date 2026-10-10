@@ -13,8 +13,10 @@ import 'ai_chat_labels.dart';
 /// Rows are grouped by day and carry the last thing said, because a list of
 /// first-messages-and-a-count made every thread look alike after a week --
 /// finding one meant opening three. Pinned threads sit in their own group
-/// above the days, and search reads whole transcripts where the store fills
-/// [AiChatSessionSummary.searchText].
+/// above the days, then Today, Yesterday, Previous 7 days, Previous 30 days
+/// and Older -- the buckets a portal_assistant sidebar full of months of
+/// threads actually needs, not just yesterday-or-not. Search reads whole
+/// transcripts where the store fills [AiChatSessionSummary.searchText].
 class AiChatHistoryList extends StatefulWidget {
   const AiChatHistoryList({
     super.key,
@@ -29,6 +31,8 @@ class AiChatHistoryList extends StatefulWidget {
     this.onSetPinned,
     this.labels = const AiChatLabels(),
     this.width = 280,
+    this.previous7DaysLabel = 'Previous 7 days',
+    this.previous30DaysLabel = 'Previous 30 days',
   });
 
   final List<AiChatSessionSummary> sessions;
@@ -58,6 +62,12 @@ class AiChatHistoryList extends StatefulWidget {
 
   final AiChatLabels labels;
   final double width;
+
+  /// [AiChatLabels] has no field for these two -- they're new with the
+  /// finer-grained grouping, so they land here rather than growing a package
+  /// this widget doesn't own.
+  final String previous7DaysLabel;
+  final String previous30DaysLabel;
 
   @override
   State<AiChatHistoryList> createState() => _AiChatHistoryListState();
@@ -209,7 +219,7 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
                 decoration: InputDecoration(
                   isDense: true,
                   hintText: labels.searchHint,
-                  prefixIcon: const Icon(Icons.search, size: 18),
+                  prefixIcon: const Icon(Icons.search_rounded, size: 18),
                   border: const OutlineInputBorder(),
                 ),
               ),
@@ -220,13 +230,32 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
                 ? Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
-                      child: Text(
-                        widget.sessions.isEmpty
-                            ? labels.historyEmpty
-                            : labels.noMatches,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodySmall,
-                      ),
+                      // No PortalEmptyState: this package doesn't depend on
+                      // portal_ui_core. Only the truly-empty case (no
+                      // sessions at all) gets the icon -- a search with no
+                      // hits is a filter result, not a nothing-here state.
+                      child: widget.sessions.isEmpty
+                          ? Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.forum_rounded,
+                                  size: 32,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  labels.historyEmpty,
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                              ],
+                            )
+                          : Text(
+                              labels.noMatches,
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodySmall,
+                            ),
                     ),
                   )
                 : ListView.builder(
@@ -234,10 +263,9 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
                     itemCount: matches.length,
                     itemBuilder: (context, index) {
                       final item = matches[index];
-                      final group = _groupOf(item, labels);
+                      final bucket = _bucketOf(item);
                       final newGroup =
-                          index == 0 ||
-                          _groupOf(matches[index - 1], labels) != group;
+                          index == 0 || _bucketOf(matches[index - 1]) != bucket;
                       final row = _Row(
                         item: item,
                         selected: item.id == widget.selectedId,
@@ -260,11 +288,23 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
                         children: [
                           Padding(
                             padding: const EdgeInsets.fromLTRB(8, 12, 8, 4),
+                            // No PortalSectionHeader here: this package
+                            // doesn't depend on portal_ui_core. This is an
+                            // overline, not a section header (it labels a
+                            // group of rows, doesn't title content), so it's
+                            // upper-cased and tracked rather than styled like
+                            // `subtitle`.
                             child: Text(
-                              group,
+                              // Not upper-cased. The eyebrow treatment is the letter-spacing
+                              // and the muted weight, not CAPS -- which a
+                              // screen reader may spell out letter by letter
+                              // and which no translation of these labels asked
+                              // for.
+                              _labelFor(bucket),
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                                 fontWeight: FontWeight.w600,
+                                letterSpacing: 0.6,
                               ),
                             ),
                           ),
@@ -285,8 +325,19 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
     return '${item.turnCount} ${widget.labels.messages}';
   }
 
-  static String _groupOf(AiChatSessionSummary item, AiChatLabels labels) {
-    if (item.pinned) return labels.pinned;
+  String _labelFor(_Group group) => switch (group) {
+    _Group.pinned => widget.labels.pinned,
+    _Group.today => widget.labels.today,
+    _Group.yesterday => widget.labels.yesterday,
+    _Group.previous7 => widget.previous7DaysLabel,
+    _Group.previous30 => widget.previous30DaysLabel,
+    _Group.older => widget.labels.earlier,
+  };
+
+  /// Calendar-day buckets, not elapsed hours -- 23:00 last night is
+  /// Yesterday, not "22 hours ago and still Today".
+  static _Group _bucketOf(AiChatSessionSummary item) {
+    if (item.pinned) return _Group.pinned;
     final at = item.updatedAt;
     final now = DateTime.now();
     final days = DateTime(
@@ -295,12 +346,16 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
       now.day,
     ).difference(DateTime(at.year, at.month, at.day)).inDays;
     return switch (days) {
-      <= 0 => labels.today,
-      1 => labels.yesterday,
-      _ => labels.earlier,
+      <= 0 => _Group.today,
+      1 => _Group.yesterday,
+      <= 7 => _Group.previous7,
+      <= 30 => _Group.previous30,
+      _ => _Group.older,
     };
   }
 }
+
+enum _Group { pinned, today, yesterday, previous7, previous30, older }
 
 /// Owns its own controller so it is disposed with the route rather than the
 /// moment `showDialog` returns -- the field is still on screen while the

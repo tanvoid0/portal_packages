@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../clients/ollama_model_manager.dart';
 import '../clients/openai_compatible_completion_client.dart';
 import '../discovery/ai_backend_discovery.dart';
+import '../local/local_llm_engine.dart';
 import '../discovery/ollama_lan_scan.dart';
 import '../models/ai_backend_kind.dart';
 import '../models/ai_backend_labels.dart';
 import '../models/ai_backend_option.dart';
 import '../models/ai_backend_option_models.dart';
+import '../models/ai_model_manager.dart';
 import '../models/ai_routing_mode.dart';
 import '../platform/edge_gallery_launcher.dart';
 import '../platform/portal_ai_platform.dart';
 import '../prefs/ai_backend_store.dart';
+import 'ai_model_manager_sheet.dart';
 
 /// The whole AI group for a settings screen: which provider, which of that
 /// provider's models, and the one setting a provider needs to be reachable.
@@ -32,6 +36,8 @@ class AiSettingsSection extends StatefulWidget {
     this.trailingBuilder,
     this.onRescan,
     this.hasServer = false,
+    this.localLlm,
+    this.showRouting = true,
   });
 
   final AiBackendStore store;
@@ -54,8 +60,17 @@ class AiSettingsSection extends StatefulWidget {
   /// server exists.
   final bool hasServer;
 
+  /// False hides the routing control even with [hasServer], for a host that
+  /// shows routing as a row of its own ([AiSettingsGroup]).
+  final bool showRouting;
+
   final Widget? Function(AiBackendOption option)? trailingBuilder;
   final VoidCallback? onRescan;
+
+  /// The in-process inference engine, in an app that bundles one. Supplying
+  /// it here is what puts the on-device provider in the list and gives its
+  /// row a Models button; without it the row is absent.
+  final LocalLlmEngine? localLlm;
 
   /// Opens shared preferences and builds the store, for an app that has no
   /// [AiBackendStore] of its own to hand in.
@@ -90,7 +105,8 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
   @override
   void initState() {
     super.initState();
-    _discovery = widget.discovery ?? AiBackendDiscovery();
+    _discovery =
+        widget.discovery ?? AiBackendDiscovery(localLlm: widget.localLlm);
     _scan();
   }
 
@@ -178,6 +194,28 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     await _scan();
   }
 
+  /// The backends that keep model files of their own get one shared sheet.
+  /// Ollama's host can change between builds of this widget, so its manager
+  /// is built per call rather than held.
+  AiModelManager? _managerFor(AiBackendOption option) => switch (option.kind) {
+    AiBackendKind.ollama =>
+      option.available
+          ? OllamaModelManager(baseUrl: widget.store.ollamaHost)
+          : null,
+    AiBackendKind.localLlm => widget.localLlm,
+    _ => null,
+  };
+
+  Future<void> _manageModels(AiModelManager manager) async {
+    final changed = await AiModelManagerSheet.show(
+      context,
+      manager: manager,
+      labels: widget.labels,
+    );
+    if (!changed || !mounted) return;
+    await _scan();
+  }
+
   Future<void> _download() async {
     setState(() => _downloading = true);
     await PortalAiPlatform.downloadSystemAi();
@@ -192,12 +230,19 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
   Widget? _trailingFor(AiBackendOption option) {
     final custom = widget.trailingBuilder?.call(option);
     if (custom != null) return custom;
-    if (option.kind != AiBackendKind.systemOnDevice) return null;
-    if (option.metadata['downloadable'] != true) return null;
-    return _DownloadButton(
-      busy: _downloading,
-      labels: widget.labels,
-      onPressed: _download,
+    if (option.kind == AiBackendKind.systemOnDevice) {
+      if (option.metadata['downloadable'] != true) return null;
+      return _DownloadButton(
+        busy: _downloading,
+        labels: widget.labels,
+        onPressed: _download,
+      );
+    }
+    final manager = _managerFor(option);
+    if (manager == null) return null;
+    return TextButton(
+      onPressed: () => _manageModels(manager),
+      child: Text(widget.labels.manageModels),
     );
   }
 
@@ -259,7 +304,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
             const SizedBox(height: 8),
             ...delegates.map(_tile),
           ],
-          if (widget.hasServer && widget.showModelConfig) ...[
+          if (widget.hasServer && widget.showRouting && widget.showModelConfig) ...[
             const SizedBox(height: 16),
             Text(labels.routingTitle, style: titleStyle),
             const SizedBox(height: 8),
@@ -499,7 +544,10 @@ class _OptionTile extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  maxLines: 1,
+                  // Two lines, not one: the row carries a status badge and
+                  // now a Models button too, and at that width a one-line
+                  // title ellipses to "Ollama (lo...".
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w600,

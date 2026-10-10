@@ -28,6 +28,7 @@ class AiBackendOption {
       kind == AiBackendKind.cloudGemini ||
       kind == AiBackendKind.ollama ||
       kind == AiBackendKind.systemOnDevice ||
+      kind == AiBackendKind.localLlm ||
       kind == AiBackendKind.openAiCompatible;
 
   AiBackendOption copyWith({

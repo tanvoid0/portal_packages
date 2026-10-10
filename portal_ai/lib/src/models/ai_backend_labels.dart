@@ -9,7 +9,7 @@ class AiBackendLabels {
     this.cloudGeminiTitle = 'Portal Cloud (Gemini)',
     this.cloudGeminiDescription =
         'Uses Structured Cloud. Requires sign-in and AI terms.',
-    this.ollamaTitle = 'Ollama (local)',
+    this.ollamaTitle = 'Ollama',
     this.ollamaDescription =
         'Runs on this device via Ollama. Private and offline-capable.',
     this.onDeviceTitle = 'On-device model',
@@ -18,6 +18,10 @@ class AiBackendLabels {
     this.edgeGalleryTitle = 'Google AI Edge Gallery',
     this.edgeGalleryDescription =
         'Opens the Edge Gallery app for on-device chat (external).',
+    this.localLlmTitle = 'On this device',
+    this.localLlmDescription =
+        'Runs a model you download here, inside this app. Private, offline, '
+        'no server and no other app.',
     this.openAiCompatibleTitle = 'OpenAI-compatible API',
     this.openAiCompatibleDescription =
         'Any provider that speaks the OpenAI chat API — OpenAI, Groq, '
@@ -58,9 +62,28 @@ class AiBackendLabels {
     this.external = 'External',
     this.findOllama = 'Find on my network',
     this.searchingOllama = 'Looking for Ollama…',
+    this.manageModels = 'Models',
+    this.manageModelsTitle = 'Models',
+    this.installedModels = 'On this device',
+    this.availableModels = 'Available to download',
+    this.noInstalledModels = 'No models downloaded yet.',
+    this.install = 'Download',
+    this.installing = 'Downloading…',
+    this.installFailed = 'Download failed',
+    this.removeModel = 'Delete',
+    this.removeModelConfirm =
+        'Delete this model from the device? It can be downloaded again.',
+    this.cancel = 'Cancel',
+    this.customModelHint = 'Or type a model name',
     this.ollamaNotFound =
         'No Ollama found on this network. Check it is running and reachable, '
         'then enter its address above.',
+    this.assistantTitle = 'Assistant',
+    this.providerRow = 'AI provider',
+    this.routingRow = 'Routing',
+    this.modelsRow = 'On-device models',
+    this.cloudNote = 'Sign in to use Portal Cloud',
+    this.apply = 'Apply',
   });
 
   final String cloudGeminiTitle;
@@ -71,6 +94,8 @@ class AiBackendLabels {
   final String onDeviceDescription;
   final String edgeGalleryTitle;
   final String edgeGalleryDescription;
+  final String localLlmTitle;
+  final String localLlmDescription;
   final String openAiCompatibleTitle;
   final String openAiCompatibleDescription;
   final String openAiPreset;
@@ -105,12 +130,33 @@ class AiBackendLabels {
   final String findOllama;
   final String searchingOllama;
   final String ollamaNotFound;
+  final String manageModels;
+  final String manageModelsTitle;
+  final String installedModels;
+  final String availableModels;
+  final String noInstalledModels;
+  final String install;
+  final String installing;
+  final String installFailed;
+  final String removeModel;
+  final String removeModelConfirm;
+  final String cancel;
+  final String customModelHint;
+  final String assistantTitle;
+  final String providerRow;
+  final String routingRow;
+  final String modelsRow;
+  final String cloudNote;
+  final String apply;
+
+  String modelsInstalled(int n) => '$n installed';
 
   String titleFor(AiBackendKind kind) => switch (kind) {
     AiBackendKind.cloudGemini => cloudGeminiTitle,
     AiBackendKind.ollama => ollamaTitle,
     AiBackendKind.systemOnDevice => onDeviceTitle,
     AiBackendKind.edgeGalleryDelegate => edgeGalleryTitle,
+    AiBackendKind.localLlm => localLlmTitle,
     AiBackendKind.openAiCompatible => openAiCompatibleTitle,
   };
 
@@ -119,6 +165,7 @@ class AiBackendLabels {
     AiBackendKind.ollama => ollamaDescription,
     AiBackendKind.systemOnDevice => onDeviceDescription,
     AiBackendKind.edgeGalleryDelegate => edgeGalleryDescription,
+    AiBackendKind.localLlm => localLlmDescription,
     AiBackendKind.openAiCompatible => openAiCompatibleDescription,
   };
 
@@ -129,6 +176,7 @@ class AiBackendLabels {
     AiBackendKind.ollama => Icons.dns_outlined,
     AiBackendKind.systemOnDevice => Icons.phone_iphone_outlined,
     AiBackendKind.edgeGalleryDelegate => Icons.open_in_new_rounded,
+    AiBackendKind.localLlm => Icons.memory_outlined,
     AiBackendKind.openAiCompatible => Icons.api_outlined,
   };
 

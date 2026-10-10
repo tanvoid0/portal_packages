@@ -15,6 +15,10 @@ enum AiBackendKind {
   /// Opens Google AI Edge Gallery when installed (delegation, not in-app).
   edgeGalleryDelegate,
 
+  /// Weights on this device, run in-process by an engine the host app
+  /// supplies (see `LocalLlmEngine`). No daemon, no second app.
+  localLlm,
+
   /// Any provider that speaks the OpenAI chat API -- OpenAI, Groq,
   /// OpenRouter, DeepSeek, Mistral, xAI, Together, LM Studio, Ollama -- with
   /// a user- or developer-supplied key.
@@ -27,6 +31,7 @@ extension AiBackendKindIds on AiBackendKind {
     AiBackendKind.ollama => 'ollama',
     AiBackendKind.systemOnDevice => 'system_on_device',
     AiBackendKind.edgeGalleryDelegate => 'edge_gallery',
+    AiBackendKind.localLlm => 'local_llm',
     AiBackendKind.openAiCompatible => 'openai_compatible',
   };
 

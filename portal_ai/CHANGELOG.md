@@ -1,3 +1,20 @@
+## Unreleased
+
+- `AiSettingsGroup`: the assistant's settings as a grouped list of rows --
+  provider, routing (only with `hasServer`) and on-device models -- each with
+  its current value, each opening its own sheet. Takes the same arguments as
+  `AiSettingsSection` plus `onModels` for a host with a models screen of its
+  own. The provider row reuses `AiSettingsSection` inside a sheet.
+- `AiRoutingSheet`: pick a routing mode and Apply it; Apply stays off until the
+  pick differs from the stored mode, and "Server only" is disabled with
+  `cloudNote` for an account that cannot use the cloud.
+- `aiInstalledModelsLabel`: the models row's value -- installed total size when
+  the manager's catalog knows every installed model, else a count.
+- `AiSettingsSection.showRouting` (default `true`) hides the routing control
+  without touching `hasServer`.
+- `AiBackendLabels`: `assistantTitle`, `providerRow`, `routingRow`,
+  `modelsRow`, `cloudNote`, `apply` and `modelsInstalled(n)`.
+
 ## 0.2.0
 
 - `OpenAiCompatibleCompletionClient`: one client for any provider that speaks

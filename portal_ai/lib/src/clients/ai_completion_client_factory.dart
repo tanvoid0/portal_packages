@@ -1,4 +1,5 @@
 import '../config/gemini_model_catalog.dart';
+import '../local/local_llm_engine.dart';
 import '../models/ai_backend_kind.dart';
 import '../models/ai_backend_option.dart';
 import '../models/ai_dev_env_keys.dart';
@@ -11,9 +12,13 @@ import 'system_ai_completion_client.dart';
 
 /// Builds an [AiCompletionClient] for the selected backend.
 class AiCompletionClientFactory {
-  AiCompletionClientFactory({this._geminiCatalog});
+  AiCompletionClientFactory({this._geminiCatalog, this._localLlm});
 
   final GeminiModelCatalog? _geminiCatalog;
+
+  /// Supplied only by an app that bundles an inference engine; null elsewhere,
+  /// which is what makes [AiBackendKind.localLlm] unselectable there.
+  final LocalLlmEngine? _localLlm;
 
   AiCompletionClient create({
     required AiBackendKind kind,
@@ -49,6 +54,22 @@ class AiCompletionClientFactory {
         throw const AiCompletionException(
           'Edge Gallery is an external app, not an in-app backend.',
         );
+      case AiBackendKind.localLlm:
+        final engine = _localLlm;
+        if (engine == null) {
+          throw const AiCompletionException(
+            'This app does not bundle an on-device inference engine.',
+          );
+        }
+        final localModel =
+            store.modelFor(AiBackendKind.localLlm) ??
+            (option?.models.isNotEmpty == true ? option!.models.first : null);
+        if (localModel == null || localModel.isEmpty) {
+          throw const AiCompletionException(
+            'Download an on-device model in AI settings.',
+          );
+        }
+        return engine.clientFor(localModel);
       case AiBackendKind.openAiCompatible:
         final baseUrl = store.openAiBaseUrl.isNotEmpty
             ? store.openAiBaseUrl

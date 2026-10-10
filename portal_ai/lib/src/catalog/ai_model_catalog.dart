@@ -42,6 +42,7 @@ class AiModelCatalog {
       case AiBackendKind.ollama:
       case AiBackendKind.systemOnDevice:
       case AiBackendKind.edgeGalleryDelegate:
+      case AiBackendKind.localLlm:
       case AiBackendKind.openAiCompatible:
         final options =
             cachedOptions ??

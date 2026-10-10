@@ -65,6 +65,7 @@ class AiAssistantPage extends StatefulWidget {
     this.initialPrompt,
     this.autoSend = false,
     this.resumeLastSession = false,
+    this.initialSessionId,
     this.consent,
     this.onAttach,
     this.documents,
@@ -87,6 +88,12 @@ class AiAssistantPage extends StatefulWidget {
   /// a [store]; ignored when [initialPrompt] is set, since an explicit
   /// question is the user asking for a new one.
   final bool resumeLastSession;
+
+  /// Opens this stored thread (a host's history screen picks one) instead of
+  /// the newest, so it wins over [resumeLastSession]. An id the [store] no
+  /// longer holds opens a blank deck. An [initialPrompt] is then asked in
+  /// that thread. Null leaves the other two as they were.
+  final String? initialSessionId;
 
   /// Drives the agent loop. Null when [onSend] answers instead.
   final PortalAiRuntime? runtime;
@@ -506,7 +513,12 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     _reloadSessions();
     final initial = widget.initialPrompt?.trim();
     final hasInitial = initial != null && initial.isNotEmpty;
-    if (widget.resumeLastSession && !hasInitial) _resumeLastSession();
+    final sessionId = widget.initialSessionId;
+    if (sessionId != null) {
+      _adoptSession(sessionId);
+    } else if (widget.resumeLastSession && !hasInitial) {
+      _resumeLastSession();
+    }
     // After the resume: whether the deck shows at all depends on whether a
     // thread was restored, and the rotation timer only runs while it does.
     _syncRotation();

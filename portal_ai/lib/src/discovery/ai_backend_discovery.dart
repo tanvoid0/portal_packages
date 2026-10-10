@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../config/gemini_model_catalog.dart';
+import '../local/local_llm_engine.dart';
 import '../models/ai_backend_kind.dart';
 import '../models/ai_backend_option.dart';
 import 'edge_gallery_probe.dart';
@@ -14,6 +15,7 @@ class AiBackendDiscovery {
     EdgeGalleryProbe? edgeGalleryProbe,
     SystemAiProbe? systemAiProbe,
     this._geminiCatalog,
+    this._localLlm,
   }) : _ollamaProbe = ollamaProbe ?? OllamaProbe(),
        _edgeGalleryProbe = edgeGalleryProbe ?? EdgeGalleryProbe(),
        _systemAiProbe = systemAiProbe ?? SystemAiProbe();
@@ -22,6 +24,10 @@ class AiBackendDiscovery {
   final EdgeGalleryProbe _edgeGalleryProbe;
   final SystemAiProbe _systemAiProbe;
   final GeminiModelCatalog? _geminiCatalog;
+
+  /// Null in an app that bundles no inference engine, which is why the
+  /// on-device row is absent there rather than present and broken.
+  final LocalLlmEngine? _localLlm;
 
   Future<List<AiBackendOption>> discover({
     bool includeCloud = true,
@@ -69,6 +75,9 @@ class AiBackendDiscovery {
       ),
     );
 
+    final localLlm = await _localLlmOption();
+    if (localLlm != null) options.add(localLlm);
+
     if (includeEdgeGalleryDelegate) {
       final edgeResult = await _edgeGalleryProbe.probe();
       options.add(
@@ -82,6 +91,47 @@ class AiBackendDiscovery {
     }
 
     return _sortOptions(options);
+  }
+
+  /// Absent entirely when no engine was supplied -- an app that ships no
+  /// runtime should not show a provider it can never select.
+  Future<AiBackendOption?> _localLlmOption() async {
+    final engine = _localLlm;
+    if (engine == null) return null;
+
+    final unsupported = await engine.unsupportedReason();
+    if (unsupported != null) {
+      return AiBackendOption(
+        kind: AiBackendKind.localLlm,
+        available: false,
+        unavailableReason: unsupported,
+      );
+    }
+
+    // A failure here is a missing or unreadable model directory, not a
+    // missing engine: report it on the row instead of dropping the provider,
+    // so the Models button is still reachable.
+    List<String> models;
+    try {
+      models = await engine.installed();
+    } catch (e) {
+      return AiBackendOption(
+        kind: AiBackendKind.localLlm,
+        available: false,
+        unavailableReason: '$e',
+        metadata: const {'manageable': true},
+      );
+    }
+
+    return AiBackendOption(
+      kind: AiBackendKind.localLlm,
+      available: models.isNotEmpty,
+      unavailableReason: models.isEmpty
+          ? 'No model downloaded yet. Tap Models to get one.'
+          : null,
+      models: models,
+      metadata: const {'manageable': true},
+    );
   }
 
   AiBackendOption _cloudOption(bool cloudEligible) {

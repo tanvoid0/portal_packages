@@ -251,6 +251,7 @@ class PortalAiRuntime {
       AiBackendKind.ollama => 'Ollama',
       AiBackendKind.systemOnDevice => 'On-device',
       AiBackendKind.edgeGalleryDelegate => 'Edge Gallery',
+      AiBackendKind.localLlm => 'On-device model',
       AiBackendKind.openAiCompatible => 'OpenAI-compatible',
     };
   }
