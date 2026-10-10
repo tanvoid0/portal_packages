@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 /// The model's reasoning, folded away.
 ///
@@ -24,60 +25,66 @@ class _AiThinkingTileState extends State<AiThinkingTile> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final muted = theme.colorScheme.onSurfaceVariant;
+    final tokens = PortalUiTheme.of(context).tokens;
+    final cs = Theme.of(context).colorScheme;
+    final caption = tokens.textStyles.caption.copyWith(
+      color: cs.onSurfaceVariant,
+    );
+    final spacing = tokens.spacing;
+    final motion = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : tokens.motion.fast;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        InkWell(
-          onTap: () => setState(() => _open = !_open),
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.psychology_outlined, size: 15, color: muted),
-                const SizedBox(width: 6),
-                Text(
-                  widget.label,
-                  style: theme.textTheme.labelSmall?.copyWith(color: muted),
-                ),
-                Icon(
-                  _open ? Icons.expand_less : Icons.expand_more,
-                  size: 16,
-                  color: muted,
-                ),
-              ],
+        Semantics(
+          button: true,
+          expanded: _open,
+          child: InkWell(
+            onTap: () => setState(() => _open = !_open),
+            borderRadius: BorderRadius.circular(tokens.radii.sm),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: tokens.minTapTarget),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedRotation(
+                    turns: _open ? .25 : 0,
+                    duration: motion,
+                    child: Icon(
+                      PortalIcons.chevron_right_rounded,
+                      size: tokens.iconSizes.sm,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                  SizedBox(width: spacing.xs),
+                  Text(widget.label, style: caption),
+                ],
+              ),
             ),
           ),
         ),
         AnimatedSize(
-          duration: const Duration(milliseconds: 160),
+          duration: motion,
           curve: Curves.easeOut,
           alignment: Alignment.topLeft,
           child: _open
               ? Container(
                   width: double.infinity,
-                  margin: const EdgeInsets.only(top: 2, bottom: 4),
-                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                  margin: EdgeInsets.only(bottom: spacing.xs),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: spacing.md,
+                    vertical: spacing.sm,
+                  ),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
                     border: Border(
                       left: BorderSide(
-                        color: theme.colorScheme.outlineVariant,
-                        width: 2,
+                        color: cs.outlineVariant,
+                        width: tokens.borderWidth * 2,
                       ),
                     ),
                   ),
-                  child: Text(
-                    widget.thinking,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: muted,
-                      height: 1.4,
-                      fontSize: 12,
-                    ),
-                  ),
+                  child: Text(widget.thinking, style: caption),
                 )
               : const SizedBox(width: double.infinity),
         ),
