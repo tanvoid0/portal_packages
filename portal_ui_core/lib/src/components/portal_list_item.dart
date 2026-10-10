@@ -1059,6 +1059,7 @@ class PortalListSection extends StatelessWidget {
     this.captionHeader = false,
     this.style = PortalListStyle.inset,
     this.detail = false,
+    this.onReorder,
     required this.children,
   })  : selected = null,
         _selectable = false;
@@ -1074,6 +1075,7 @@ class PortalListSection extends StatelessWidget {
   })  : captionHeader = false,
         style = PortalListStyle.inset,
         detail = false,
+        onReorder = null,
         _selectable = true;
 
   final String? header;
@@ -1089,6 +1091,16 @@ class PortalListSection extends StatelessWidget {
   /// Label-to-value rows with no leading: the label muted, the value ink.
   final bool detail;
 
+  /// Drag-to-reorder: the rows become a reorderable list. Each of [children]
+  /// needs a key and carries its own [PortalReorderHandle] (so the drag is the
+  /// handle's, never the row's, and a row's swipe still works). Called with
+  /// the index the row left and the one it lands at, once the row is out of
+  /// the list: `list.insert(to, list.removeAt(from))`. Null, the default, is
+  /// a plain column.
+  // ponytail: the list is its own (non-scrolling) Scrollable, so a drag does
+  // not autoscroll the page; fine for a short section.
+  final void Function(int from, int to)? onReorder;
+
   /// Usually [PortalListItem]s; any widget (a foreign `ListTile`, a platform
   /// control) may sit in a section and gets the same dividers, which start at
   /// a row's text column and at the edge for anything that is not one.
@@ -1098,6 +1110,8 @@ class PortalListSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    assert(onReorder == null || children.every((c) => c.key != null),
+        'onReorder needs a key on every child');
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
     final cs = Theme.of(context).colorScheme;
@@ -1129,7 +1143,42 @@ class PortalListSection extends StatelessWidget {
       }
     }
 
-    Widget body = _ListScope(detail: detail, child: Column(children: rows));
+    Widget list = Column(children: rows);
+    final reorder = onReorder;
+    if (reorder != null) {
+      // [rows] alternates row, divider (never selectable here): each row is
+      // one keyed cell with its divider, so a lifted row carries its rule.
+      list = ReorderableListView(
+        shrinkWrap: true,
+        primary: false,
+        physics: const NeverScrollableScrollPhysics(),
+        buildDefaultDragHandles: false,
+        onReorderItem: reorder,
+        // The lifted row is drawn in the overlay, off the card: give it the
+        // card's surface and a soft shadow, not Material's.
+        proxyDecorator: (child, _, __) => DecoratedBox(
+          decoration: BoxDecoration(
+            boxShadow: tokens.elevation.soft(Theme.of(context).brightness),
+          ),
+          child: Material(
+            color: inset
+                ? portal.card
+                : Theme.of(context).scaffoldBackgroundColor,
+            child: child,
+          ),
+        ),
+        children: [
+          for (var i = 0; i < rows.length; i += 2)
+            Column(
+              key: ValueKey(children[i ~/ 2].key),
+              mainAxisSize: MainAxisSize.min,
+              children: rows.skip(i).take(2).toList(),
+            ),
+        ],
+      );
+    }
+
+    Widget body = _ListScope(detail: detail, child: list);
     if (inset) {
       body = Material(
         color: portal.card,

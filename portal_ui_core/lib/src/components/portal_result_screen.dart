@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/portal_ui_theme.dart';
+import 'portal_progress.dart';
 
 enum PortalResultState { success, error, pending }
 
@@ -18,6 +19,7 @@ class PortalResultScreen extends StatelessWidget {
     required this.title,
     required this.body,
     this.art,
+    this.progress,
     this.dock,
     this.onClose,
   });
@@ -28,6 +30,10 @@ class PortalResultScreen extends StatelessWidget {
 
   /// The app's illustration for this state (G8), or an icon.
   final Widget? art;
+
+  /// How far a pending state is, 0..1, as a [PortalProgress] under the body.
+  /// Null (default) draws no meter.
+  final double? progress;
 
   /// A `PortalButtonDock`: a primary (Done, Retry) and an optional secondary.
   final Widget? dock;
@@ -92,6 +98,14 @@ class PortalResultScreen extends StatelessWidget {
                           textAlign: TextAlign.center,
                           style: styles.body.copyWith(color: cs.onSurfaceVariant),
                         ),
+                        if (progress != null) ...[
+                          SizedBox(height: tokens.spacing.lg),
+                          // Full width: the bar has no width of its own.
+                          SizedBox(
+                            width: double.infinity,
+                            child: PortalProgress(value: progress),
+                          ),
+                        ],
                       ],
                     ),
                   ),

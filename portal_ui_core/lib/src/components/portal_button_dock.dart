@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../theme/portal_ui_theme.dart';
+import 'portal_button.dart';
+import 'portal_prompt.dart';
 
 /// Tells a [PortalButtonDock] whether content scrolls beneath it. A
 /// `PortalScrollPage(bottom:)` provides it; a dock outside one passes
@@ -51,6 +53,67 @@ class PortalButtonDock extends StatelessWidget {
     this.inline = false,
   })  : primary = null,
         secondary = null;
+
+  /// The dock a form saves from: a large primary [PortalButton] named [label],
+  /// with an inline prompt over it while there is something to say. [errors]
+  /// above zero says how many fields need fixing; otherwise [failed], once the
+  /// save has come back, says why, with a Retry that calls [onSave] again - a
+  /// failed save is never left looking like a success. While [saving] the
+  /// button spins as [busyLabel] and refuses taps, and a stale [failed] is
+  /// not shown. [secondary] sits under it as in the plain dock.
+  factory PortalButtonDock.save({
+    required String label,
+    String? busyLabel,
+    bool saving = false,
+    int errors = 0,
+    String? failed,
+    VoidCallback? onSave,
+    Widget? secondary,
+  }) {
+    assert(errors >= 0);
+    final save = PortalButton(
+      label: label,
+      size: PortalButtonSize.lg,
+      expand: true,
+      isLoading: saving,
+      busyLabel: busyLabel,
+      onPressed: onSave,
+    );
+    final prompt = errors > 0
+        ? PortalPrompt(
+            size: PortalPromptSize.inline,
+            sentiment: PortalSentiment.negative,
+            message: errors == 1
+                ? '1 field needs fixing before this saves.'
+                : '$errors fields need fixing before this saves.',
+          )
+        : failed != null && !saving
+            ? PortalPrompt(
+                size: PortalPromptSize.inline,
+                sentiment: PortalSentiment.negative,
+                message: failed,
+                action: onSave == null
+                    ? null
+                    : (label: 'Retry', onPressed: onSave),
+              )
+            : null;
+    return PortalButtonDock(
+      primary: prompt == null
+          ? save
+          : Builder(
+              builder: (context) => Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  prompt,
+                  SizedBox(height: PortalUiTheme.of(context).tokens.spacing.md),
+                  save,
+                ],
+              ),
+            ),
+      secondary: secondary,
+    );
+  }
 
   final Widget? primary;
 

@@ -18,6 +18,7 @@ class PortalButton extends StatelessWidget {
     this.leading,
     this.expand = false,
     this.isLoading = false,
+    this.busyLabel,
     this.backgroundColor,
     this.foregroundColor,
   })  : tooltip = null,
@@ -47,6 +48,7 @@ class PortalButton extends StatelessWidget {
   })  : assert((icon == null) != (iconWidget == null),
             'pass exactly one of icon and iconWidget'),
         label = '',
+        busyLabel = null,
         leading = iconWidget ?? Icon(icon, fill: selected == true ? 1 : 0),
         expand = false,
         _circular = true;
@@ -62,6 +64,10 @@ class PortalButton extends StatelessWidget {
   /// is in flight - a button left tappable during an async action is how you
   /// get two of whatever it creates.
   final bool isLoading;
+
+  /// What the button says while [isLoading]: it replaces [label] and a screen
+  /// reader announces the change ("Saving"). Null keeps [label] throughout.
+  final String? busyLabel;
 
   /// Replace the variant's fill and ink for this one button; the widget beats
   /// the theme. Pick a pair that contrasts.
@@ -107,6 +113,7 @@ class PortalButton extends StatelessWidget {
     );
 
     final showLabel = label.isNotEmpty;
+    final busyName = isLoading ? busyLabel : null;
     final leadingWidget = isLoading
         ? SizedBox(
             width: labelFontSize,
@@ -114,6 +121,10 @@ class PortalButton extends StatelessWidget {
             child: CircularProgressIndicator(
               strokeWidth: 2,
               color: style.foreground,
+              // Reduce motion: a still arc instead of one that spins forever,
+              // and no "25%" read out for it.
+              value: MediaQuery.disableAnimationsOf(context) ? .25 : null,
+              semanticsValue: '',
             ),
           )
         : leading;
@@ -129,7 +140,7 @@ class PortalButton extends StatelessWidget {
           Flexible(
             fit: expand ? FlexFit.tight : FlexFit.loose,
             child: Text(
-              label,
+              busyName ?? label,
               style: textStyle,
               textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
@@ -143,7 +154,9 @@ class PortalButton extends StatelessWidget {
       style: textStyle,
       child: IconTheme.merge(
         data: IconThemeData(color: style.foreground, size: 18),
-        child: content,
+        child: busyName == null
+            ? content
+            : Semantics(liveRegion: true, child: content),
       ),
     );
 

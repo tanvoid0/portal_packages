@@ -23,6 +23,11 @@ import 'portal_card.dart';
 /// The body is deliberately optional (a state on a page with its own
 /// explanation does not repeat it) and the action deliberately singular: an
 /// empty state that offers three ways forward is a menu, not an empty state.
+/// The one addition is [secondaryActionLabel]/[onSecondaryAction], a ghost
+/// under the first for a way back ("Clear search") or a second way to start.
+///
+/// A load that failed is [PortalEmptyState.error], the fourth of the four
+/// states.
 class PortalEmptyState extends StatelessWidget {
   const PortalEmptyState({
     super.key,
@@ -33,10 +38,35 @@ class PortalEmptyState extends StatelessWidget {
     this.actionLabel,
     this.onAction,
     this.actionIcon,
+    this.secondaryActionLabel,
+    this.onSecondaryAction,
     this.example,
     this.iconWellColor,
     this.inCard = true,
-  }) : assert(title != null || message != null, 'give a title or a message');
+  })  : _error = false,
+        assert(title != null || message != null, 'give a title or a message');
+
+  /// A load that failed: what happened, what to do, and a retry. Announced
+  /// politely when it appears. [icon] names the cause: the connection by
+  /// default, a document when the file itself is the problem. The retry is a
+  /// secondary button, as it is a way back rather than a way to start.
+  const PortalEmptyState.error({
+    super.key,
+    this.title = "Couldn't load this",
+    this.message,
+    required VoidCallback onRetry,
+    String retryLabel = 'Retry',
+    this.icon = Icons.cloud_off_rounded,
+    this.inCard = true,
+  })  : iconWidget = null,
+        actionLabel = retryLabel,
+        onAction = onRetry,
+        actionIcon = null,
+        secondaryActionLabel = null,
+        onSecondaryAction = null,
+        example = null,
+        iconWellColor = null,
+        _error = true;
 
   final IconData? icon;
 
@@ -54,6 +84,10 @@ class PortalEmptyState extends StatelessWidget {
   final VoidCallback? onAction;
   final IconData? actionIcon;
 
+  /// A ghost button under the primary action; both must be set to render.
+  final String? secondaryActionLabel;
+  final VoidCallback? onSecondaryAction;
+
   /// What will be here, shown instead of (or beside) an action on a first-run
   /// state — one sample row, card or chart, drawn at the size it will really
   /// be. Dim or label it in the caller if it should read as a sample; this
@@ -66,6 +100,7 @@ class PortalEmptyState extends StatelessWidget {
   /// Wraps the content in a [PortalCard]. Set false when the state already
   /// sits inside a card or fills the page.
   final bool inCard;
+  final bool _error;
 
   @override
   Widget build(BuildContext context) {
@@ -121,21 +156,34 @@ class PortalEmptyState extends StatelessWidget {
           PortalButton(
             label: actionLabel!,
             leading: actionIcon == null ? null : Icon(actionIcon),
+            variant: _error
+                ? PortalButtonVariant.secondary
+                : PortalButtonVariant.primary,
             onPressed: onAction,
+          ),
+        ],
+        if (secondaryActionLabel != null && onSecondaryAction != null) ...[
+          SizedBox(height: tokens.spacing.sm),
+          PortalButton(
+            label: secondaryActionLabel!,
+            variant: PortalButtonVariant.ghost,
+            onPressed: onSecondaryAction,
           ),
         ],
       ],
     );
+    final announced =
+        _error ? Semantics(liveRegion: true, child: content) : content;
 
     if (!inCard) {
       return Center(
         child: Padding(
           padding: EdgeInsets.all(tokens.spacing.xxl),
-          child: content,
+          child: announced,
         ),
       );
     }
 
-    return PortalCard(variant: PortalCardVariant.glass, child: content);
+    return PortalCard(variant: PortalCardVariant.glass, child: announced);
   }
 }

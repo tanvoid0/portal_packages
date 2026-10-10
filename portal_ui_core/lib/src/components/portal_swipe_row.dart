@@ -6,6 +6,7 @@ import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 
 import '../motion/portal_haptics.dart';
 import '../motion/portal_spring_curve.dart';
+import '../theme/portal_icons.dart';
 import '../theme/portal_ui_theme.dart';
 import '../tokens/design_tokens.dart';
 
@@ -406,6 +407,42 @@ class _PortalSwipeRowState extends State<PortalSwipeRow>
                 SizedBox(width: tokens.spacing.sm),
                 if (startToEnd) label else icon,
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Drag handle for a row of a [PortalListSection] with `onReorder`: put it at
+/// the row's end (`PortalListAccessory.widget(…, interactive: true)`), [index]
+/// being the row's place in the section.
+///
+/// The drag starts on the handle alone, never the whole row, so it cannot
+/// fight the row's horizontal [PortalSwipeRow] (or its tap). Named "Reorder"
+/// for the screen reader; the hit area is `tokens.minTapTarget`. A screen
+/// reader cannot drag: the list itself gives every row "Move up / down / to
+/// the start / to the end" actions.
+class PortalReorderHandle extends StatelessWidget {
+  const PortalReorderHandle({super.key, required this.index});
+
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = PortalUiTheme.of(context).tokens;
+    return ReorderableDragStartListener(
+      index: index,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.grab,
+        child: Tooltip(
+          message: 'Reorder',
+          child: SizedBox.square(
+            dimension: tokens.minTapTarget,
+            child: Icon(
+              PortalIcons.drag_indicator_rounded,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ),
