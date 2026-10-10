@@ -20,9 +20,15 @@ class PortalResultScreen extends StatelessWidget {
     required this.body,
     this.art,
     this.progress,
+    this.progressStartLabel,
+    this.progressEndLabel,
     this.dock,
     this.onClose,
-  });
+  }) : assert(
+          progress != null ||
+              (progressStartLabel == null && progressEndLabel == null),
+          'progress labels need a progress value',
+        );
 
   final PortalResultState state;
   final String title;
@@ -34,6 +40,12 @@ class PortalResultScreen extends StatelessWidget {
   /// How far a pending state is, 0..1, as a [PortalProgress] under the body.
   /// Null (default) draws no meter.
   final double? progress;
+
+  /// Captions under the [progress] meter, start and end (e.g. "240 MB of
+  /// 586 MB", "About 2 min left"), passed to [PortalProgress]. Only meaningful
+  /// with a [progress]; null (default) draws none.
+  final String? progressStartLabel;
+  final String? progressEndLabel;
 
   /// A `PortalButtonDock`: a primary (Done, Retry) and an optional secondary.
   final Widget? dock;
@@ -103,7 +115,11 @@ class PortalResultScreen extends StatelessWidget {
                           // Full width: the bar has no width of its own.
                           SizedBox(
                             width: double.infinity,
-                            child: PortalProgress(value: progress),
+                            child: PortalProgress(
+                              value: progress,
+                              startLabel: progressStartLabel,
+                              endLabel: progressEndLabel,
+                            ),
                           ),
                         ],
                       ],

@@ -25,6 +25,23 @@ void main() {
     expect(find.byType(PortalProgress), findsOneWidget);
   });
 
+  testWidgets('result screen: progress labels render under the meter',
+      (t) async {
+    await t.pumpWidget(MaterialApp(
+      theme: buildPortalTheme(brightness: Brightness.light),
+      home: const PortalResultScreen(
+        state: PortalResultState.pending,
+        title: 'Downloading',
+        body: 'Keep the app open.',
+        progress: 0.6,
+        progressStartLabel: '293 MB of 586 MB',
+        progressEndLabel: 'About 2 min left',
+      ),
+    ));
+    expect(find.textContaining('293 MB of 586 MB'), findsWidgets);
+    expect(find.textContaining('About 2 min left'), findsWidgets);
+  });
+
   testWidgets('empty state: error shows its message and a working Retry',
       (t) async {
     var retried = false;

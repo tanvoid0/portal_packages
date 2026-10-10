@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/portal_icons.dart';
 import '../theme/portal_semantic_colors.dart';
 import '../theme/portal_ui_theme.dart';
 import '../tokens/design_tokens.dart';
@@ -400,17 +401,21 @@ class PortalListItem extends StatelessWidget {
     this.subtitleSpans,
     this.done = false,
     this.edit,
+    this.remove,
   })  : _skeleton = false,
         _skeletonLeading = null,
         _skeletonMeter = false;
 
   /// A checklist row (a subtask): a switch for the control and [done] striking
   /// and muting the title, together so no call site can pair the one without
-  /// the other. The whole row is the target.
+  /// the other. The whole row is the target. [checkbox] draws a Material
+  /// checkbox instead of the switch, same place, same [onChanged]; the row
+  /// still announces its checked state.
   ///
-  /// [onEdit] adds a pencil button after the switch, its own target and its
+  /// [onEdit] adds a pencil button after the control, its own target and its
   /// own node, named [editTooltip] ("Rename subtask"): the row's one accessory
-  /// is the switch, so the edit control sits beside the row.
+  /// is the control, so the edit control sits beside the row. [onRemove] does
+  /// the same with an X after it, named [removeTooltip] ("Remove subtask").
   factory PortalListItem.checklist({
     Key? key,
     required String title,
@@ -418,8 +423,11 @@ class PortalListItem extends StatelessWidget {
     required ValueChanged<bool>? onChanged,
     String? subtitle,
     PortalListLeading? leading,
+    bool checkbox = false,
     VoidCallback? onEdit,
     String editTooltip = 'Edit',
+    VoidCallback? onRemove,
+    String removeTooltip = 'Remove',
   }) =>
       PortalListItem(
         key: key,
@@ -427,14 +435,23 @@ class PortalListItem extends StatelessWidget {
         subtitle: subtitle,
         leading: leading,
         done: done,
-        trailing: PortalListAccessory.switchControl(
-            checked: done, onChanged: onChanged),
+        trailing: checkbox
+            ? PortalListAccessory.checkbox(checked: done, onChanged: onChanged)
+            : PortalListAccessory.switchControl(
+                checked: done, onChanged: onChanged),
         edit: onEdit == null
             ? null
             : PortalListIconAction(
                 icon: Icons.edit_outlined,
                 tooltip: editTooltip,
                 onPressed: onEdit,
+              ),
+        remove: onRemove == null
+            ? null
+            : PortalListIconAction(
+                icon: PortalIcons.close_rounded,
+                tooltip: removeTooltip,
+                onPressed: onRemove,
               ),
       );
 
@@ -474,6 +491,7 @@ class PortalListItem extends StatelessWidget {
         subtitleSpans = null,
         done = false,
         edit = null,
+        remove = null,
         _skeleton = true,
         _skeletonLeading = leading,
         _skeletonMeter = meter;
@@ -558,6 +576,9 @@ class PortalListItem extends StatelessWidget {
   /// An icon button after the trailing, beside the row rather than in it; its
   /// [PortalListIconAction.tooltip] is its name and it keeps its own node.
   final PortalListIconAction? edit;
+
+  /// [edit]'s sibling, after it: an X that removes the row. Same node rules.
+  final PortalListIconAction? remove;
 
   final bool _skeleton;
   final PortalSkeletonLeading? _skeletonLeading;
@@ -938,8 +959,10 @@ class PortalListItem extends StatelessWidget {
       if (isNew) 'new',
     ].whereType<String>().where((s) => s.isNotEmpty);
 
-    final keepsSemantics =
-        acc._keepsSemantics || leading?.interactive == true || edit != null;
+    final keepsSemantics = acc._keepsSemantics ||
+        leading?.interactive == true ||
+        edit != null ||
+        remove != null;
 
     Widget row = ConstrainedBox(
       constraints: BoxConstraints(minHeight: tapTarget + sp.md),
@@ -982,15 +1005,16 @@ class PortalListItem extends StatelessWidget {
                         : accessory,
                   ),
                 ],
-                if (edit != null)
-                  Opacity(
-                    opacity: disabled ? .38 : 1,
-                    child: IconButton(
-                      icon: Icon(edit!.icon),
-                      tooltip: edit!.tooltip,
-                      onPressed: disabled ? null : edit!.onPressed,
+                for (final a in [edit, remove])
+                  if (a != null)
+                    Opacity(
+                      opacity: disabled ? .38 : 1,
+                      child: IconButton(
+                        icon: Icon(a.icon),
+                        tooltip: a.tooltip,
+                        onPressed: disabled ? null : a.onPressed,
+                      ),
                     ),
-                  ),
               ],
             ),
             if (progress != null) ...[
