@@ -65,6 +65,7 @@ export 'src/components/portal_choice_grid.dart';
 export 'src/components/portal_day_strip.dart';
 export 'src/components/portal_icon_tile.dart';
 export 'src/components/portal_list_item.dart';
+export 'src/components/portal_media_tile.dart';
 export 'src/components/portal_shelf.dart';
 export 'src/components/portal_list_skeleton.dart';
 export 'src/components/portal_pressable.dart';

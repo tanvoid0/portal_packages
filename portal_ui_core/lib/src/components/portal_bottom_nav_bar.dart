@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../contrast_gate.dart';
 import '../motion/portal_haptics.dart';
 import '../theme/portal_component_extensions.dart';
 import '../theme/portal_ui_theme.dart';
@@ -27,6 +28,12 @@ class PortalNavDestination {
   final int? badgeCount;
 }
 
+/// [PortalBottomNavBar.variant]: [standard] is the shipped docked-well bar
+/// (unchanged); [pill] is the 2026-10 redesign — a fully-rounded pill with a
+/// single capsule that slides to the selected tab (covering icon *and*
+/// label) and a scrim that fades page content out behind it.
+enum PortalBottomNavVariant { standard, pill }
+
 /// Floating pill navigation — icon over an **always-visible** label.
 ///
 /// Extracted from portal_recipe so every Portal app navigates the same way.
@@ -49,6 +56,7 @@ class PortalBottomNavBar extends StatelessWidget {
     this.selectedMarkColor,
     this.boxShadow,
     this.height = barHeight,
+    this.variant = PortalBottomNavVariant.standard,
   });
 
   final int selectedIndex;
@@ -72,6 +80,10 @@ class PortalBottomNavBar extends StatelessWidget {
   final List<BoxShadow>? boxShadow;
   final double height;
 
+  /// Defaults to [PortalBottomNavVariant.standard] — every existing caller
+  /// renders exactly as before. Pass `.pill` for the redesign.
+  final PortalBottomNavVariant variant;
+
   static const double barHeight = 68;
   static const double outerBottomPadding = 10;
   static const double outerHorizontalPadding = 20;
@@ -89,7 +101,12 @@ class PortalBottomNavBar extends StatelessWidget {
       fabBottomPadding + 56 + 12;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => switch (variant) {
+        PortalBottomNavVariant.standard => _buildStandard(context),
+        PortalBottomNavVariant.pill => _buildPill(context),
+      };
+
+  Widget _buildStandard(BuildContext context) {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
     final brightness = Theme.of(context).brightness;
@@ -141,6 +158,203 @@ class PortalBottomNavBar extends StatelessWidget {
                   curve: tokens.motion.standard,
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The redesign: one capsule slides behind the selected tab and holds its
+  /// icon *and* label (the standard variant's well sits behind the icon
+  /// alone); the selected glyph fills and its label goes bold, in the
+  /// selected mark color. A scrim fades page content out behind the pill so
+  /// rows no longer hit a hard edge under it.
+  Widget _buildPill(BuildContext context) {
+    final portal = PortalUiTheme.of(context);
+    final tokens = portal.tokens;
+    final theme = Theme.of(context);
+    final skin = PortalNavBarTheme.of(context);
+    const side = outerHorizontalPadding;
+    const floor = outerBottomPadding;
+    const bottom = 18.0;
+    const inner = 8.0;
+    const thumbInset = 8.0;
+    const scrim = 28.0;
+    final mark = markColor ?? skin.markColor ?? portal.onCard;
+    final selectedMark = selectedMarkColor ?? skin.selectedMarkColor ?? mark;
+    final bg = backgroundColor ?? skin.backgroundColor ?? portal.card;
+    final well =
+        selectedWellColor ??
+        skin.selectedWellColor ??
+        portalWellOn(bg, selectedMark);
+    final n = destinations.length;
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : tokens.motion.medium;
+    final page = theme.scaffoldBackgroundColor;
+    final x = n < 2 ? 0.0 : -1 + 2 * selectedIndex / (n - 1);
+
+    Widget tab(int i) {
+      final d = destinations[i];
+      final on = i == selectedIndex;
+      final count = d.badgeCount ?? 0;
+      final fg = on ? selectedMark : mark.withValues(alpha: 0.68);
+      return Expanded(
+        child: Semantics(
+          button: true,
+          selected: on,
+          label: count > 0 ? '${d.label}, $count' : d.label,
+          excludeSemantics: true,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                if (!on) PortalHaptics.selection();
+                onDestinationSelected(i);
+              },
+              borderRadius: BorderRadius.circular(tokens.radii.full),
+              splashColor: mark.withValues(alpha: 0.12),
+              highlightColor: mark.withValues(alpha: 0.08),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      TweenAnimationBuilder<double>(
+                        tween: Tween(end: on ? 1.0 : 0.0),
+                        duration: duration,
+                        curve: tokens.motion.standard,
+                        builder: (_, fill, __) => Icon(
+                          on ? d.selectedIcon ?? d.icon : d.icon,
+                          fill: fill,
+                          size: 24,
+                          color: fg,
+                        ),
+                      ),
+                      if (count > 0)
+                        Positioned(
+                          right: -8,
+                          top: -4,
+                          child: _Badge(count: count),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    d.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: tokens.textStyles.caption.copyWith(
+                      fontSize: 12,
+                      height: 1.1,
+                      letterSpacing: 0,
+                      fontWeight: on ? FontWeight.w700 : FontWeight.w500,
+                      color: fg,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return MediaQuery.removePadding(
+      context: context,
+      removeBottom: true,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: bottom - floor),
+        child: Stack(
+          // The pill's shadow must show past the Stack.
+          clipBehavior: Clip.none,
+          children: [
+            // Content fades out under the pill; never takes a tap.
+            Positioned(
+              left: 0,
+              right: 0,
+              top: -scrim,
+              bottom: -(bottom - floor),
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        page.withValues(alpha: 0),
+                        page.withValues(alpha: .94),
+                      ],
+                      stops: const [0, .55],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned.fill(
+              left: side,
+              right: side,
+              bottom: floor,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: bg,
+                  borderRadius: BorderRadius.circular(tokens.radii.full),
+                  border: Border.all(
+                    color: borderColor ?? skin.borderColor ?? portal.border,
+                  ),
+                  boxShadow: boxShadow ??
+                      skin.boxShadow ??
+                      tokens.elevation.medium(theme.brightness),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                side + inner,
+                0,
+                side + inner,
+                floor,
+              ),
+              child: SizedBox(
+                height: height,
+                child: Stack(
+                  children: [
+                    // One capsule slides to the selected tab.
+                    Positioned.fill(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: thumbInset,
+                        ),
+                        child: AnimatedAlign(
+                          duration: duration,
+                          curve: tokens.motion.standard,
+                          alignment: AlignmentDirectional(x, 0),
+                          child: FractionallySizedBox(
+                            widthFactor: 1 / n,
+                            heightFactor: 1,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 2,
+                              ),
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: well,
+                                  borderRadius: BorderRadius.circular(
+                                    tokens.radii.full,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Row(children: [for (var i = 0; i < n; i++) tab(i)]),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
