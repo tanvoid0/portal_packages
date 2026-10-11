@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../services/api_client.dart';
+import 'google_glyph_colors.dart';
 import 'portal_auth_config.dart';
 import 'portal_auth_controller.dart';
 import 'portal_password_reset_view.dart';
@@ -331,10 +332,10 @@ class _GoogleGlyphPainter extends CustomPainter {
       canvas.drawArc(ring, from * math.pi / 180, sweep * math.pi / 180, false, paint..color = color);
     }
 
-    arc(const Color(0xFFEA4335), 195, 120); // red, top
-    arc(const Color(0xFFFBBC05), 150, 45); // yellow, left
-    arc(const Color(0xFF34A853), 45, 105); // green, bottom
-    arc(const Color(0xFF4285F4), -45, 90); // blue, right
+    arc(GoogleGlyphColors.red, 195, 120); // top
+    arc(GoogleGlyphColors.yellow, 150, 45); // left
+    arc(GoogleGlyphColors.green, 45, 105); // bottom
+    arc(GoogleGlyphColors.blue, -45, 90); // right
     canvas.drawRect(
       Rect.fromLTRB(r, r - stroke / 2, size.width, r + stroke / 2),
       paint..style = PaintingStyle.fill,

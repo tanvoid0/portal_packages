@@ -6,6 +6,7 @@ import '../motion/portal_haptics.dart';
 import '../theme/portal_icons.dart';
 import '../theme/portal_ui_theme.dart';
 import '../tokens/design_tokens.dart';
+import '../tokens/portal_contrast.dart';
 import 'portal_pressable.dart';
 
 /// One cell of a [PortalChoiceGrid]: a colour disc, a glyph, an emoji or any
@@ -121,11 +122,7 @@ class PortalChoiceGrid extends StatelessWidget {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
     final accent = selectedColor ?? portal.primary;
-    final onAccent = selectedColor == null
-        ? portal.onPrimary
-        : (ThemeData.estimateBrightnessForColor(accent) == Brightness.dark
-            ? Colors.white
-            : Colors.black);
+    final onAccent = selectedColor == null ? portal.onPrimary : portalOnColorFor(accent);
     final radius = BorderRadius.circular(tokens.radii.md);
     final glyph = TextStyle(fontSize: IconTheme.of(context).size, height: 1);
     return Opacity(
