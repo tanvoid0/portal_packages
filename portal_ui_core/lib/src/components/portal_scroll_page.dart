@@ -29,9 +29,19 @@ class PortalScrollPage extends StatelessWidget {
     this.bottomNavigationBar,
     this.bottom,
     this.controller,
-  }) : assert(
+    this.titleWidget,
+    this.leading,
+    this.count,
+    this.status,
+    this.statusIcon,
+    this.grouped = false,
+  })  : assert(
           bottom == null || bottomNavigationBar == null,
           'a page has one bottom bar: pass bottom or bottomNavigationBar',
+        ),
+        assert(
+          title == null || titleWidget == null,
+          'give a title or a titleWidget, not both',
         );
 
   /// A [PortalButtonDock] (or any bar) pinned under the content. The dock
@@ -49,6 +59,29 @@ class PortalScrollPage extends StatelessWidget {
   /// Title for the default [PortalSliverAppBar]. Ignored when [appBar] is given.
   final String? title;
   final String? subtitle;
+
+  /// In place of [title] in the default bar -- a model switcher, say -- and
+  /// centred. A control rather than the page's heading is the caller's to
+  /// name.
+  final Widget? titleWidget;
+
+  /// Replaces the default bar's automatic back button (centred in its slot).
+  final Widget? leading;
+
+  /// A count and/or a one-line status under the default bar's title
+  /// (`12 items · Synced just now`), muted, a polite live region. [statusIcon]
+  /// leads the line. A bar has a [subtitle] or this, not both.
+  // ponytail: the bar draws one status line, so [count] joins it as text with
+  // no tabular figures and the icon leads the whole line; split them if a
+  // second app wants the icon between the two.
+  final String? count;
+  final String? status;
+  final IconData? statusIcon;
+
+  /// `.scr.grouped`: in light the page (and its default bar) steps one tone
+  /// under `portal.card` -- `surfaceContainerHigh` -- so inset sections read;
+  /// dark keeps the scaffold. [backgroundColor] wins.
+  final bool grouped;
 
   /// The large-title header — `PortalHeader.large(title: …)` — in place of
   /// the compact bar. Carries its own title and actions, so [title],
@@ -82,13 +115,30 @@ class PortalScrollPage extends StatelessWidget {
     final tokens = portal.tokens;
     final layout = tokens.layout;
 
+    final theme = Theme.of(context);
+    final pageColor = backgroundColor ??
+        (grouped && theme.brightness == Brightness.light
+            ? theme.colorScheme.surfaceContainerHigh
+            : null);
+    final statusLine = [count, status]
+        .where((s) => s != null && s.isNotEmpty)
+        .join(' · ');
+
     final bar = appBar ??
         header ??
-        (title == null
+        (title == null && titleWidget == null
             ? null
             : PortalSliverAppBar(
-                title: title!,
+                title: title,
+                titleWidget: titleWidget,
                 subtitle: subtitle,
+                status: statusLine.isEmpty ? null : statusLine,
+                statusIcon: statusIcon,
+                leading: leading,
+                centerTitle: titleWidget == null ? null : true,
+                // Only a grouped page tints its bar: a plain page's bar keeps
+                // the theme's, whatever [backgroundColor] says.
+                backgroundColor: grouped ? pageColor : null,
                 actions: actions,
                 trailing: trailing,
               ));
@@ -114,7 +164,7 @@ class PortalScrollPage extends StatelessWidget {
     );
 
     Widget page(Widget Function(Widget) track) => Scaffold(
-      backgroundColor: backgroundColor ?? portal.surface,
+      backgroundColor: pageColor ?? portal.surface,
       floatingActionButton: floatingActionButton,
       bottomNavigationBar: bottom ?? bottomNavigationBar,
       body: onRefresh == null

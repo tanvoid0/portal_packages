@@ -36,6 +36,9 @@ Color _sentimentColor(BuildContext context, PortalSentiment s, Color neutral) =>
 /// [endLabel] sit under the bar; only the end label's first word (its
 /// figure) takes the sentiment colour.
 ///
+/// [PortalProgress.banded] is a scale in ranges instead (BMI's Under /
+/// Healthy / Over / Obese).
+///
 /// Parts of a whole are [PortalSegmentedProgress]; one bar per step is
 /// [PortalStepProgress].
 class PortalProgress extends StatelessWidget {
@@ -50,7 +53,32 @@ class PortalProgress extends StatelessWidget {
     this.sentiment,
     this.startLabel,
     this.endLabel,
-  }) : _skeleton = false;
+    this.semanticValue,
+  })  : _skeleton = false,
+        bands = null,
+        bandLabels = null;
+
+  /// A scale in ranges: the track split at [bands] (0..1 stops), the band
+  /// holding [value] in the fill and the rest on the track, and a marker at
+  /// [value] -- never a fill that reads as "done". [bandLabels] (one per band)
+  /// sit centred under the bands; [startLabel] / [endLabel] name the scale's
+  /// ends ('15', '35'). [value] is 0..1 along the scale and clamps to it; say
+  /// the range in [semanticValue] ('Healthy'), the percentage means little.
+  const PortalProgress.banded({
+    super.key,
+    required double this.value,
+    required List<double> this.bands,
+    this.bandLabels,
+    this.height,
+    this.fillColor,
+    this.trackColor,
+    this.semanticLabel,
+    this.semanticValue,
+    this.startLabel,
+    this.endLabel,
+  })  : _skeleton = false,
+        overflowColor = null,
+        sentiment = null;
 
   /// The meter while it loads: its track, and a bar at the labels' line
   /// height for each label the data has. Hidden from screen readers.
@@ -65,7 +93,10 @@ class PortalProgress extends StatelessWidget {
         trackColor = null,
         overflowColor = null,
         semanticLabel = null,
+        semanticValue = null,
         sentiment = null,
+        bands = null,
+        bandLabels = null,
         startLabel = hasStartLabel ? '' : null,
         endLabel = hasEndLabel ? '' : null;
 
@@ -75,6 +106,15 @@ class PortalProgress extends StatelessWidget {
   final Color? trackColor;
   final Color? overflowColor;
   final String? semanticLabel;
+
+  /// What a screen reader hears for the value when the labels abbreviate
+  /// ("about 1 minute left" for "About 1 min left"); else the labels, or the
+  /// percentage with none.
+  final String? semanticValue;
+
+  /// [PortalProgress.banded] only: the stops between bands, and a name per band.
+  final List<double>? bands;
+  final List<String>? bandLabels;
 
   /// Colours the fill (over [fillColor]) and opts into the over-limit
   /// rescale; null keeps the plain bar. Neutral is the normal fill.
@@ -108,7 +148,8 @@ class PortalProgress extends StatelessWidget {
     return Semantics(
       container: true,
       label: semanticLabel,
-      value: [startLabel, endLabel].whereType<String>().join(', '),
+      value: semanticValue ??
+          [startLabel, endLabel].whereType<String>().join(', '),
       child: ExcludeSemantics(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -194,6 +235,88 @@ class PortalProgress extends StatelessWidget {
     );
   }
 
+  Widget _buildBanded(BuildContext context, List<double> stops, double v,
+      double h, Color fill, Color track) {
+    final portal = PortalUiTheme.of(context);
+    final tokens = portal.tokens;
+    final edges = [0.0, ...stops, 1.0];
+    final gap = SizedBox(width: tokens.borderWidth * 2);
+    final marker = h + tokens.spacing.sm;
+    final radius = BorderRadius.circular(tokens.radii.full);
+    int flex(int i) => ((edges[i + 1] - edges[i]) * 1000).round();
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: marker,
+          child: LayoutBuilder(
+            builder: (context, c) => Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                Row(children: [
+                  for (var i = 0; i < edges.length - 1; i++) ...[
+                    if (i > 0) gap,
+                    Expanded(
+                      flex: flex(i),
+                      child: Container(
+                        height: h,
+                        decoration: BoxDecoration(
+                          borderRadius: radius,
+                          color: v >= edges[i] &&
+                                  (v < edges[i + 1] || i == edges.length - 2)
+                              ? fill
+                              : track,
+                        ),
+                      ),
+                    ),
+                  ],
+                ]),
+                PositionedDirectional(
+                  start: v * c.maxWidth - marker / 2,
+                  child: Container(
+                    width: marker,
+                    height: marker,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: fill,
+                      // Ringed in the card so it reads over any band.
+                      border: Border.all(
+                        width: tokens.borderWidth * 2,
+                        color: portal.card,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (bandLabels case final names?) ...[
+          SizedBox(height: tokens.spacing.xs),
+          Row(children: [
+            for (var i = 0; i < names.length && i < edges.length - 1; i++) ...[
+              if (i > 0) gap,
+              Expanded(
+                flex: flex(i),
+                child: Text(
+                  names[i],
+                  style: tokens.textStyles.caption
+                      .copyWith(color: portal.onSurfaceVariant),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ]),
+        ],
+      ],
+    );
+  }
+
   Widget _buildBar(BuildContext context) {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
@@ -206,6 +329,7 @@ class PortalProgress extends StatelessWidget {
     if (value == null) {
       return Semantics(
         label: semanticLabel,
+        value: semanticValue,
         child: ClipRRect(
           borderRadius: radius,
           child: LinearProgressIndicator(
@@ -218,6 +342,17 @@ class PortalProgress extends StatelessWidget {
     }
 
     final safe = value!.isFinite ? value! : 0.0;
+    final percent = semanticValue ?? '${(safe * 100).round()}%';
+    if (bands case final stops?) {
+      return Semantics(
+        label: semanticLabel,
+        value: percent,
+        child: ExcludeSemantics(
+          child: _buildBanded(
+              context, stops, safe.clamp(0.0, 1.0), h, fill, track),
+        ),
+      );
+    }
     final s = sentiment;
     final color = safe > 1
         ? (overflowColor ??
@@ -233,7 +368,7 @@ class PortalProgress extends StatelessWidget {
       final tick = h + tokens.spacing.sm;
       return Semantics(
         label: semanticLabel,
-        value: '${(safe * 100).round()}%',
+        value: percent,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -281,7 +416,7 @@ class PortalProgress extends StatelessWidget {
 
     return Semantics(
       label: semanticLabel,
-      value: '${(safe * 100).round()}%',
+      value: percent,
       child: ClipRRect(
         borderRadius: radius,
         child: SizedBox(

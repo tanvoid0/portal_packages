@@ -48,6 +48,7 @@ class PortalTextField extends StatefulWidget {
     this.errorText,
     this.required = false,
     this.obscureText = false,
+    this.obscureToggle = false,
     this.keyboardType,
     this.textInputAction,
     this.onChanged,
@@ -82,6 +83,7 @@ class PortalTextField extends StatefulWidget {
         errorText = null,
         required = false,
         obscureText = false,
+        obscureToggle = false,
         keyboardType = null,
         textInputAction = null,
         onChanged = null,
@@ -128,6 +130,7 @@ class PortalTextField extends StatefulWidget {
         unit = null,
         readOnlyReason = null,
         obscureText = false,
+        obscureToggle = false,
         keyboardType = TextInputType.numberWithOptions(
           decimal: true,
           signed: signed,
@@ -159,6 +162,11 @@ class PortalTextField extends StatefulWidget {
   /// Draws the `*` beside the label.
   final bool required;
   final bool obscureText;
+
+  /// A password: obscured to start, with an eye at the end that shows and
+  /// hides it. Wins over [obscureText]; a [suffix] or [readOnlyReason] lock
+  /// takes the eye's place. Single line, as [obscureText] is.
+  final bool obscureToggle;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onChanged;
@@ -222,6 +230,7 @@ class PortalTextField extends StatefulWidget {
 
 class _PortalTextFieldState extends State<PortalTextField> {
   FocusNode? _ownFocus;
+  bool _hidden = true;
 
   FocusNode? get _focus => widget.focusNode ?? _ownFocus;
 
@@ -313,7 +322,17 @@ class _PortalTextFieldState extends State<PortalTextField> {
               ? const ExcludeSemantics(
                   child: Icon(Icons.lock_outline_rounded),
                 )
-              : null),
+              : widget.obscureToggle
+                  ? IconButton(
+                      tooltip: _hidden ? 'Show password' : 'Hide password',
+                      icon: Icon(_hidden
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded),
+                      onPressed: widget.enabled
+                          ? () => setState(() => _hidden = !_hidden)
+                          : null,
+                    )
+                  : null),
       constraints: BoxConstraints(minHeight: tokens.minTapTarget),
       // The theme's border carries error and focus; only a filled pill drops it.
       filled: widget.filled ? true : null,
@@ -342,7 +361,7 @@ class _PortalTextFieldState extends State<PortalTextField> {
           controller: widget.controller,
           focusNode: _focus,
           initialValue: widget.controller == null ? widget.initialValue : null,
-          obscureText: widget.obscureText,
+          obscureText: widget.obscureToggle ? _hidden : widget.obscureText,
           keyboardType: widget.keyboardType,
           // obscureText implies a single line, so this covers a password too.
           textInputAction: widget.textInputAction ??

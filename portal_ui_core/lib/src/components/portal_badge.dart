@@ -12,7 +12,16 @@ enum PortalBadgeTone {
   success,
   warning,
   danger,
-  info;
+  info,
+
+  /// Not done yet, in the scheme's tertiary. Like [primary], [secondary] and
+  /// [info] it never reads as a [success] container: see
+  /// [PortalBadge.containerTone].
+  pending,
+
+  /// The primary container unconditionally, where [primary] stands aside for
+  /// a skin whose primary sits at success's hue.
+  accent;
 
   /// A 1-based priority or difficulty [level] of [max] as a tone: the top third
   /// shouts (danger), the middle warns, the rest stays neutral. The label must
@@ -41,7 +50,10 @@ bool _tooAlike(Color a, Color b) {
 /// on glass and solid surfaces alike. [outlined] adds a hairline in the tone
 /// for a status that must not read by colour alone. [containerTone] swaps the
 /// tint for the tone's solid container behind its on-container ink; [compact]
-/// is the denser pill for a row's chip. Not [PortalCountBadge],
+/// is the denser pill for a row's chip (with [minHeight] 22 and [iconSize] 14
+/// for the Kit's). A status in container tones is [PortalBadgeTone.success] /
+/// `pending` / `accent` / `warning` / `neutral` / `danger` with
+/// [containerTone]. Not [PortalCountBadge],
 /// which sits on another widget's corner; this one is a word. Re-skin
 /// app-wide with [PortalBadgeTheme].
 class PortalBadge extends StatelessWidget {
@@ -56,6 +68,9 @@ class PortalBadge extends StatelessWidget {
     this.backgroundColor,
     this.compact = false,
     this.containerTone = false,
+    this.minHeight,
+    this.iconSize,
+    this.onWash = false,
   });
 
   /// A badge for a 1-based priority or difficulty [level] of [max]; see
@@ -101,6 +116,18 @@ class PortalBadge extends StatelessWidget {
   /// alpha tint. A [foregroundColor] has no container, so it keeps the tint.
   final bool containerTone;
 
+  /// The pill's least height, label and glyph centred in it. Null is the
+  /// padding's own height.
+  final double? minHeight;
+
+  /// Glyph size for [icon] and [leading] alike. Null follows [compact].
+  final double? iconSize;
+
+  /// A neutral pill lifted off a tinted card: the surface at 70% in place of
+  /// the muted fill. Ignored with a [backgroundColor], a [foregroundColor] or
+  /// [containerTone], and for any tone but neutral.
+  final bool onWash;
+
   /// The container and ink for [tone]. Primary, secondary and info are the
   /// "not done" tones: a skin whose container sits at success's hue ('Active'
   /// beside 'Paid') would draw both the same pale green, so they fall back to
@@ -137,6 +164,9 @@ class PortalBadge extends StatelessWidget {
         (semantic.dangerContainer, semantic.onDangerContainer),
       PortalBadgeTone.info =>
         notDone((semantic.infoContainer, semantic.onInfoContainer)),
+      PortalBadgeTone.pending =>
+        notDone((cs.tertiaryContainer, cs.onTertiaryContainer)),
+      PortalBadgeTone.accent => (cs.primaryContainer, cs.onPrimaryContainer),
     };
   }
 
@@ -146,7 +176,8 @@ class PortalBadge extends StatelessWidget {
     final tokens = portal.tokens;
     final skin = PortalBadgeTheme.of(context);
     final semantic = PortalSemanticColors.of(context);
-    final dark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
+    final dark = cs.brightness == Brightness.dark;
 
     final toned = switch (tone) {
       PortalBadgeTone.neutral => portal.onMuted,
@@ -156,6 +187,8 @@ class PortalBadge extends StatelessWidget {
       PortalBadgeTone.warning => semantic.warning,
       PortalBadgeTone.danger => semantic.danger,
       PortalBadgeTone.info => semantic.info,
+      PortalBadgeTone.pending => cs.tertiary,
+      PortalBadgeTone.accent => portal.primary,
     };
     final container =
         containerTone && foregroundColor == null ? _container(context) : null;
@@ -163,15 +196,16 @@ class PortalBadge extends StatelessWidget {
     final bg = backgroundColor ??
         container?.$1 ??
         (tone == PortalBadgeTone.neutral && foregroundColor == null
-            ? portal.muted
+            ? (onWash ? cs.surface.withValues(alpha: 0.7) : portal.muted)
             : fg.withValues(alpha: skin.tintAlpha ?? (dark ? 0.22 : 0.14)));
 
-    final glyph = compact ? tokens.typeScale.xs : tokens.typeScale.sm;
+    final glyph =
+        iconSize ?? (compact ? tokens.typeScale.xs : tokens.typeScale.sm);
     final style = (skin.textStyle ??
             tokens.textStyles.caption.copyWith(fontWeight: FontWeight.w600))
         .copyWith(color: fg);
 
-    return DecoratedBox(
+    final pill = DecoratedBox(
       decoration: BoxDecoration(
         color: bg,
         borderRadius:
@@ -205,5 +239,11 @@ class PortalBadge extends StatelessWidget {
         ),
       ),
     );
+    return minHeight == null
+        ? pill
+        : ConstrainedBox(
+            constraints: BoxConstraints(minHeight: minHeight!),
+            child: pill,
+          );
   }
 }

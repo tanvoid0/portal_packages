@@ -47,6 +47,8 @@ class PortalCard extends StatelessWidget {
     this.backgroundColor,
     this.borderRadius,
     this.heroTag,
+    this.selected,
+    this.gutter = false,
   });
 
   final Widget child;
@@ -75,6 +77,16 @@ class PortalCard extends StatelessWidget {
   /// Wraps the card in a [PortalHero] with this tag, so it flies to a
   /// matching hero on the next route keeping its corners on the way.
   final Object? heroTag;
+
+  /// For a card that is one of a set (the current shopping list, the open
+  /// cookbook): heard as selected. Selection never lives in fill alone, so the
+  /// card still marks itself visually. Null leaves it out of the set.
+  final bool? selected;
+
+  /// [margin] as the page's card gutter -- 16 either side, 8 above, none
+  /// below -- for a card placed straight on a page that brings no gutter of
+  /// its own. An explicit [margin] wins.
+  final bool gutter;
 
   @override
   Widget build(BuildContext context) {
@@ -235,12 +247,20 @@ class PortalCard extends StatelessWidget {
         child: decorated,
       );
     }
+    if (selected != null) {
+      decorated = Semantics(selected: selected, child: decorated);
+    }
     if (heroTag != null) {
       decorated =
           PortalHero(tag: heroTag!, borderRadius: radius, child: decorated);
     }
-    if (margin != null) {
-      return Padding(padding: margin!, child: decorated);
+    final outer = margin ??
+        (gutter
+            ? EdgeInsets.fromLTRB(
+                t.spacing.lg, t.spacing.sm, t.spacing.lg, 0)
+            : null);
+    if (outer != null) {
+      return Padding(padding: outer, child: decorated);
     }
     return decorated;
   }

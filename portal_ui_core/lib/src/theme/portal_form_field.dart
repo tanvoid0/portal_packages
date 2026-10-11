@@ -14,6 +14,7 @@ class PortalFormField extends StatelessWidget {
     this.error,
     this.required = false,
     this.excludeLabelSemantics = false,
+    this.stretch = false,
   });
 
   final Widget child;
@@ -26,6 +27,11 @@ class PortalFormField extends StatelessWidget {
   /// not read a second time.
   final bool excludeLabelSemantics;
 
+  /// Gives [child] the full width, for a control that is not width-greedy
+  /// itself (a stepper, a choice grid) and names itself, so pair it with
+  /// [excludeLabelSemantics]. [description] is the note under it.
+  final bool stretch;
+
   @override
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
@@ -33,7 +39,8 @@ class PortalFormField extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment:
+          stretch ? CrossAxisAlignment.stretch : CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         if (label != null) ...[

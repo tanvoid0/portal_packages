@@ -15,14 +15,21 @@ import 'portal_skeleton.dart';
 import 'portal_typing_dots.dart';
 
 /// How a [PortalListItem.value] reads. Never the only signal: pair
-/// positive/negative with a sign or an icon.
-enum PortalValueSentiment { neutral, positive, negative, dim, meta }
+/// positive/negative/warning with a sign or an icon.
+enum PortalValueSentiment { neutral, positive, negative, dim, meta, warning }
+
+/// Where a step of [PortalListSection.steps] stands. [failed] is a step that
+/// stopped: an error ring with a '!', title 600, read "Failed:" -- never the
+/// [now] dot beside a prompt saying it failed. [skipped] is a muted ring round
+/// a remove glyph, no fill and no rail colour, read "Skipped:".
+enum PortalStepState { done, now, next, failed, skipped }
 
 /// What leads a row. One size per page: when any section has a 40 leading,
 /// icon rows take [PortalListLeading.tile].
 class PortalListLeading {
   const PortalListLeading._(this.extent, this._build,
-      {this.interactive = false});
+      {this.interactive = false, PortalStepState? stepState})
+      : _stepState = stepState;
 
   /// The painted width; [PortalListSection] insets its dividers by it.
   final double extent;
@@ -30,6 +37,10 @@ class PortalListLeading {
 
   /// True when the child is a control that keeps its own semantics.
   final bool interactive;
+
+  /// Set by [PortalListLeading.step]: the row reads its state first, sits its
+  /// circle 8 from the text, and sets a step's title and subtitle.
+  final PortalStepState? _stepState;
 
   /// A bare 24 dp icon, for dense or utility lists. [color] defaults to
   /// `onSurfaceVariant`.
@@ -79,6 +90,79 @@ class PortalListLeading {
           backgroundColor: backgroundColor,
           foregroundColor: foregroundColor,
         ),
+      );
+
+  /// [PortalListLeading.tile] with an emoji in the glyph's place (a habit's
+  /// own mark), at the symbol's optical size and silent.
+  factory PortalListLeading.emoji(
+    String emoji, {
+    PortalListTone tone = PortalListTone.primary,
+    Color? backgroundColor,
+    Color? foregroundColor,
+    PortalIconTileShape shape = PortalIconTileShape.roundedSquare,
+  }) =>
+      PortalListLeading._(
+        40,
+        (c) => PortalIconTile.emoji(
+          emoji,
+          tone: tone,
+          shape: shape,
+          backgroundColor: backgroundColor,
+          foregroundColor: foregroundColor,
+        ),
+      );
+
+  /// The 24 status circle of a [PortalListSection.steps] row: primary and
+  /// checked once done, a primary ring round a dot for the step in progress,
+  /// an error '!' for a failed one, a muted remove glyph for a skipped one and
+  /// an outline ring for the rest. The row reads the state first ("Done: ...")
+  /// and sits the circle 8 from its text, where other leadings sit 16.
+  factory PortalListLeading.step(PortalStepState state) => PortalListLeading._(
+        24,
+        (c) {
+          final cs = Theme.of(c).colorScheme;
+          final done = state == PortalStepState.done;
+          return ExcludeSemantics(
+            child: Container(
+              width: 24,
+              height: 24,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: done ? cs.primary : PortalUiTheme.of(c).card,
+                border: done
+                    ? null
+                    : Border.all(
+                        width: 2,
+                        color: switch (state) {
+                          PortalStepState.now => cs.primary,
+                          PortalStepState.failed => cs.error,
+                          PortalStepState.skipped => cs.onSurfaceVariant,
+                          _ => cs.outline,
+                        },
+                      ),
+              ),
+              child: switch (state) {
+                PortalStepState.done => Icon(PortalIcons.check_rounded,
+                    size: 16, color: cs.onPrimary),
+                PortalStepState.now => Container(
+                    width: 10,
+                    height: 10,
+                    decoration:
+                        BoxDecoration(shape: BoxShape.circle, color: cs.primary),
+                  ),
+                PortalStepState.next => null,
+                PortalStepState.failed => Icon(
+                    PortalIcons.priority_high_rounded,
+                    size: 16,
+                    color: cs.error),
+                PortalStepState.skipped => Icon(PortalIcons.remove_rounded,
+                    size: 16, color: cs.onSurfaceVariant),
+              },
+            ),
+          );
+        },
+        stepState: state,
       );
 
   /// Any widget (a logo plate, a mark), [extent] wide. Decorative: it is
@@ -409,9 +493,15 @@ class PortalListItem extends StatelessWidget {
     this.done = false,
     this.edit,
     this.remove,
+    this.enabled = true,
+    this.below,
   })  : _skeleton = false,
         _skeletonLeading = null,
-        _skeletonMeter = false;
+        _skeletonMeter = false,
+        _skeletonMeterLabels = PortalSkeletonMeterLabels.start,
+        _skeletonTrailing = PortalSkeletonTrailing.value,
+        _skeletonValue = null,
+        _skeletonLines = null;
 
   /// A checklist row (a subtask): a switch for the control and [done] striking
   /// and muting the title, together so no call site can pair the one without
@@ -465,14 +555,22 @@ class PortalListItem extends StatelessWidget {
       );
 
   /// Shaped like the row, its leading too: [PortalSkeletonLeading.avatar]
-  /// (default), `.tile` or `.none`. [meter] adds the track and label of a row's
-  /// [progress] under the text.
-  // ponytail: one label bar; a [meter] row with two caption labels would want
-  // the kit's none/start/both choice.
+  /// (default), `.tile` or `.none`. [meter] adds the track and the caption
+  /// labels [meterLabels] says the data has (one, at the start, by default) of
+  /// a row's [progress] under the text.
+  ///
+  /// [trailing] shapes the end (a [value] bar by default), [value] being the
+  /// width in dp of that bar or of the button pill. [lines] are the text
+  /// column's bars as fractions of its width -- 1 title, 2 with a subtitle, 3
+  /// with a meta line; null is the default two bars at 160 and 100 dp.
   const PortalListItem.skeleton({
     super.key,
     PortalSkeletonLeading leading = PortalSkeletonLeading.avatar,
     bool meter = false,
+    PortalSkeletonMeterLabels meterLabels = PortalSkeletonMeterLabels.start,
+    PortalSkeletonTrailing trailing = PortalSkeletonTrailing.value,
+    double? value,
+    List<double>? lines,
   })  : title = '',
         subtitle = null,
         meta = null,
@@ -501,9 +599,15 @@ class PortalListItem extends StatelessWidget {
         done = false,
         edit = null,
         remove = null,
+        enabled = true,
+        below = null,
         _skeleton = true,
         _skeletonLeading = leading,
-        _skeletonMeter = meter;
+        _skeletonMeter = meter,
+        _skeletonMeterLabels = meterLabels,
+        _skeletonTrailing = trailing,
+        _skeletonValue = value,
+        _skeletonLines = lines;
 
   final String title;
 
@@ -523,6 +627,14 @@ class PortalListItem extends StatelessWidget {
 
   /// Disables the row and says why, under the subtitle, as an inline prompt.
   final String? disabledReason;
+
+  /// false: dimmed and inert as [disabledReason] leaves it, with no reason
+  /// line -- a form that is saving, where the busy button says why.
+  final bool enabled;
+
+  /// One widget on the text column, under the text (a meter). It is not in the
+  /// row's label; [progress] is the track across the full row.
+  final Widget? below;
 
   /// Title and meta go to 700, and the label says "new" so colour is not alone.
   final bool isNew;
@@ -592,12 +704,48 @@ class PortalListItem extends StatelessWidget {
   final bool _skeleton;
   final PortalSkeletonLeading? _skeletonLeading;
   final bool _skeletonMeter;
+  final PortalSkeletonMeterLabels _skeletonMeterLabels;
+  final PortalSkeletonTrailing _skeletonTrailing;
+  final double? _skeletonValue;
+  final List<double>? _skeletonLines;
+
+  /// Search marks for [text], to pass as [titleSpans] / [subtitleSpans]: every
+  /// match of [query] washed in tertiaryContainer. Null for an empty query.
+  static List<InlineSpan>? searchSpans(
+    BuildContext context,
+    String text,
+    String query,
+  ) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return null;
+    final cs = Theme.of(context).colorScheme;
+    final low = text.toLowerCase();
+    final spans = <InlineSpan>[];
+    var at = 0;
+    for (var h = low.indexOf(q); h >= 0; h = low.indexOf(q, at)) {
+      if (h > at) spans.add(TextSpan(text: text.substring(at, h)));
+      at = h + q.length;
+      spans.add(
+        TextSpan(
+          text: text.substring(h, at),
+          style: TextStyle(
+            color: cs.onTertiaryContainer,
+            backgroundColor: cs.tertiaryContainer,
+          ),
+        ),
+      );
+    }
+    if (at < text.length) spans.add(TextSpan(text: text.substring(at)));
+    return spans;
+  }
 
   /// Where a section's divider starts: the text column.
   double get textInset => switch ((_skeleton, leading, _skeletonLeading)) {
         (true, _, PortalSkeletonLeading.none) => 0,
-        (true, _, _) => 40 + 16,
-        (_, final PortalListLeading l, _) => l.extent + 16,
+        (true, _, final PortalSkeletonLeading l) =>
+          _skeletonExtent(l) + (l == PortalSkeletonLeading.step ? 8 : 16),
+        (_, final PortalListLeading l, _) =>
+          l.extent + (l._stepState == null ? 16 : 8),
         _ => 0,
       };
 
@@ -608,40 +756,92 @@ class PortalListItem extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final sp = tokens.spacing;
     final styles = tokens.textStyles;
-    final disabled = disabledReason != null;
+    final disabled = disabledReason != null || !enabled;
     final detail = _ListScope.detailOf(context);
+    final step = leading?._stepState;
 
     if (_skeleton) {
+      final lead = _skeletonLeading!;
+      final stepLead = lead == PortalSkeletonLeading.step;
+      final extent = _skeletonExtent(lead);
+      final shape = _skeletonLines;
+      final List<Widget> bars = shape == null
+          ? const [PortalSkeleton(width: 160), PortalSkeleton(width: 100, height: 11)]
+          : [
+              for (final (i, f) in shape.indexed)
+                FractionallySizedBox(
+                  widthFactor: f,
+                  child: PortalSkeleton(height: i == 0 ? 14 : 11),
+                ),
+            ];
+      final Widget? end = switch (_skeletonTrailing) {
+        PortalSkeletonTrailing.none => null,
+        PortalSkeletonTrailing.value =>
+          PortalSkeleton(width: _skeletonValue ?? 48),
+        PortalSkeletonTrailing.radio =>
+          const PortalSkeleton(width: 24, height: 24, shape: BoxShape.circle),
+        PortalSkeletonTrailing.checkbox => PortalSkeleton(
+            width: 24, height: 24, borderRadius: BorderRadius.circular(4)),
+        PortalSkeletonTrailing.toggle => PortalSkeleton(
+            width: 52,
+            height: 32,
+            borderRadius: BorderRadius.circular(tokens.radii.full)),
+        PortalSkeletonTrailing.button => PortalSkeleton(
+            width: _skeletonValue ?? 64,
+            height: tokens.componentSizes.buttonHeightSm,
+            borderRadius: BorderRadius.circular(tokens.radii.full)),
+      };
       final skeleton = ExcludeSemantics(
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: sp.lg, vertical: sp.md),
-          child: Row(children: [
-            if (_skeletonLeading != PortalSkeletonLeading.none) ...[
-              PortalSkeleton(
-                width: 40,
-                height: 40,
-                shape: _skeletonLeading == PortalSkeletonLeading.avatar
-                    ? BoxShape.circle
-                    : BoxShape.rectangle,
-                borderRadius: BorderRadius.circular(tokens.radii.sm),
+          padding: EdgeInsets.symmetric(
+              horizontal: sp.lg,
+              vertical: lead == PortalSkeletonLeading.avatarLarge
+                  ? sp.lg
+                  : sp.md),
+          child: Row(
+            // A step's circle sits 2 under the row's top, as the data's.
+            crossAxisAlignment:
+                stepLead ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+            children: [
+              if (lead != PortalSkeletonLeading.none) ...[
+                switch (lead) {
+                  PortalSkeletonLeading.order => SizedBox(width: extent),
+                  PortalSkeletonLeading.step => Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: PortalSkeleton(
+                          width: extent,
+                          height: extent,
+                          shape: BoxShape.circle),
+                    ),
+                  _ => PortalSkeleton(
+                      width: extent,
+                      height: extent,
+                      shape: lead == PortalSkeletonLeading.tile
+                          ? BoxShape.rectangle
+                          : BoxShape.circle,
+                      borderRadius: BorderRadius.circular(tokens.radii.sm),
+                    ),
+                },
+                SizedBox(width: stepLead ? sp.sm : sp.lg),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final (i, b) in bars.indexed) ...[
+                      if (i > 0) const SizedBox(height: 8),
+                      b,
+                    ],
+                  ],
+                ),
               ),
-              SizedBox(width: sp.lg),
+              if (end != null) ...[SizedBox(width: sp.lg), end],
             ],
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  PortalSkeleton(width: 160),
-                  SizedBox(height: 8),
-                  PortalSkeleton(width: 100, height: 11),
-                ],
-              ),
-            ),
-            const PortalSkeleton(width: 48),
-          ]),
+          ),
         ),
       );
       if (!_skeletonMeter) return skeleton;
+      final labels = _skeletonMeterLabels;
       return Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -658,11 +858,22 @@ class PortalListItem extends StatelessWidget {
                     height: sp.xs,
                     borderRadius: BorderRadius.circular(tokens.radii.full),
                   ),
-                  SizedBox(height: sp.sm),
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: PortalSkeleton(width: sp.xxxl * 2, height: sp.md),
-                  ),
+                  if (labels != PortalSkeletonMeterLabels.none) ...[
+                    SizedBox(height: sp.sm),
+                    labels == PortalSkeletonMeterLabels.both
+                        ? Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              PortalSkeleton(width: sp.xxxl * 2, height: sp.md),
+                              PortalSkeleton(width: sp.xxxl, height: sp.md),
+                            ],
+                          )
+                        : Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: PortalSkeleton(
+                                width: sp.xxxl * 2, height: sp.md),
+                          ),
+                  ],
                 ],
               ),
             ),
@@ -671,7 +882,7 @@ class PortalListItem extends StatelessWidget {
       );
     }
 
-    Text text(String s, List<InlineSpan>? spans, int lines, TextStyle style) =>
+    Text text(String s, List<InlineSpan>? spans, int? lines, TextStyle style) =>
         spans == null
             ? Text(s,
                 maxLines: lines, overflow: TextOverflow.ellipsis, style: style)
@@ -679,6 +890,12 @@ class PortalListItem extends StatelessWidget {
                 maxLines: lines, overflow: TextOverflow.ellipsis, style: style);
 
     final heavy = isNew ? FontWeight.w700 : null;
+    // A step's title is muted (a failed one keeps ink) and the now/failed
+    // subtitle carries the ink; the step in progress, or the one that stopped,
+    // is 600.
+    final stepLit =
+        step == PortalStepState.now || step == PortalStepState.failed;
+    final stepMuted = step != null && step != PortalStepState.failed;
     final titleText = text(
       title,
       titleSpans,
@@ -689,10 +906,15 @@ class PortalListItem extends StatelessWidget {
             ? cs.onSurface.withValues(alpha: 0.38)
             : destructive
                 ? cs.error
-                : done || detail
+                : done || detail || stepMuted
                     ? cs.onSurfaceVariant
                     : cs.onSurface,
-        fontWeight: heavy ?? (detail ? FontWeight.w400 : FontWeight.w500),
+        fontWeight: heavy ??
+            (stepLit
+                ? FontWeight.w600
+                : detail
+                    ? FontWeight.w400
+                    : FontWeight.w500),
       ),
     );
     final subtitleText = live != null
@@ -717,9 +939,12 @@ class PortalListItem extends StatelessWidget {
                 : text(
                     subtitle!,
                     subtitleSpans,
-                    2,
+                    // A step's detail is the whole instruction: no clamp.
+                    step == null ? 2 : null,
                     styles.caption.copyWith(
-                      color: isNew ? cs.onSurface : cs.onSurfaceVariant,
+                      color: isNew || stepLit
+                          ? cs.onSurface
+                          : cs.onSurfaceVariant,
                     ),
                   ));
     final textColumn = Column(
@@ -747,7 +972,7 @@ class PortalListItem extends StatelessWidget {
         else if (meta != null)
           Text(meta!,
               style: styles.caption.copyWith(color: cs.onSurfaceVariant)),
-        if (disabled)
+        if (disabledReason != null)
           Padding(
             padding: EdgeInsets.only(top: sp.xs + 2),
             // The row's hint carries it, so it is not a live region of its own.
@@ -758,6 +983,8 @@ class PortalListItem extends StatelessWidget {
               ),
             ),
           ),
+        if (below != null)
+          Padding(padding: EdgeInsets.only(top: sp.sm - 2), child: below),
       ],
     );
 
@@ -768,6 +995,7 @@ class PortalListItem extends StatelessWidget {
       final sem = PortalSemanticColors.of(context);
       final color = switch (acc.sentiment) {
         PortalValueSentiment.positive => sem.success,
+        PortalValueSentiment.warning => sem.warning,
         PortalValueSentiment.negative => cs.error,
         PortalValueSentiment.dim ||
         PortalValueSentiment.meta =>
@@ -954,9 +1182,17 @@ class PortalListItem extends StatelessWidget {
           );
     }
 
+    final stepWord = switch (step) {
+      PortalStepState.done => 'Done: ',
+      PortalStepState.now => 'Now: ',
+      PortalStepState.next => 'Next: ',
+      PortalStepState.failed => 'Failed: ',
+      PortalStepState.skipped => 'Skipped: ',
+      null => '',
+    };
     final labelParts = [
       overline,
-      title,
+      '$stepWord$title',
       if (acc._kind == _Kind.value || acc._kind == _Kind.valueAndAction)
         acc.text,
       if (acc._kind == _Kind.navigate ||
@@ -981,24 +1217,34 @@ class PortalListItem extends StatelessWidget {
       constraints: BoxConstraints(minHeight: tapTarget + sp.md),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: sp.lg, vertical: sp.sm),
-        // A disabled row dims to 38% and top-aligns its leading and trailing to
-        // the title line, so the reason under the subtitle reads at full
-        // contrast.
+        // A row with a reason dims to 38% and top-aligns its leading and
+        // trailing to the title line, so the reason under the subtitle reads at
+        // full contrast; so does a step, whose detail may run to many lines.
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
-              crossAxisAlignment: disabled
+              crossAxisAlignment: disabledReason != null || step != null
                   ? CrossAxisAlignment.start
                   : CrossAxisAlignment.center,
               children: [
                 if (leading != null) ...[
-                  Opacity(
-                    opacity: disabled ? .38 : 1,
-                    child: leading!._build(context),
-                  ),
-                  SizedBox(width: sp.lg),
+                  if (step == null)
+                    Opacity(
+                      opacity: disabled ? .38 : 1,
+                      child: leading!._build(context),
+                    )
+                  else
+                    // A step's circle sits 2 under the title's top.
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Opacity(
+                        opacity: disabled ? .38 : 1,
+                        child: leading!._build(context),
+                      ),
+                    ),
+                  SizedBox(width: step == null ? sp.lg : sp.sm),
                 ],
                 Expanded(
                   // The row's label already says it; a control beside it
@@ -1078,8 +1324,24 @@ class PortalListItem extends StatelessWidget {
   }
 }
 
-/// What the skeleton row draws in the leading slot.
-enum PortalSkeletonLeading { avatar, tile, none }
+/// What the skeleton row draws in the leading slot. [avatarLarge] is the
+/// account cell's 56; [order] holds an order numeral's 24 column, blank;
+/// [step] is a steps list's 24 circle, 8 from the text.
+enum PortalSkeletonLeading { avatar, tile, none, avatarLarge, order, step }
+
+/// What a skeleton row carries at its end, shaped like the row to come.
+enum PortalSkeletonTrailing { none, value, radio, checkbox, toggle, button }
+
+/// Which caption labels a skeleton row's meter stands in for.
+enum PortalSkeletonMeterLabels { none, start, both }
+
+/// A skeleton leading's painted width.
+double _skeletonExtent(PortalSkeletonLeading l) => switch (l) {
+      PortalSkeletonLeading.none => 0,
+      PortalSkeletonLeading.order || PortalSkeletonLeading.step => 24,
+      PortalSkeletonLeading.avatarLarge => 56,
+      PortalSkeletonLeading.avatar || PortalSkeletonLeading.tile => 40,
+    };
 
 /// How a [PortalListSection] frames its rows.
 enum PortalListStyle { inset, fullBleed }
@@ -1098,8 +1360,16 @@ class PortalListSection extends StatelessWidget {
     this.detail = false,
     this.onReorder,
     required this.children,
-  })  : selected = null,
-        _selectable = false;
+    this.headerValue,
+    this.actionLabel,
+    this.onAction,
+  })  : assert(
+          headerValue == null || (headerAction == null && actionLabel == null),
+          'a header value is not a control: never with an action',
+        ),
+        selected = null,
+        _selectable = false,
+        _steps = const [];
 
   /// An inset option list for radio / checkbox rows, outlined when selected
   /// rather than filled alone. Pass [selected] to say which row.
@@ -1113,12 +1383,47 @@ class PortalListSection extends StatelessWidget {
         style = PortalListStyle.inset,
         detail = false,
         onReorder = null,
-        _selectable = true;
+        headerValue = null,
+        actionLabel = null,
+        onAction = null,
+        _selectable = true,
+        _steps = const [];
+
+  /// A numbered procedure: a [PortalListLeading.step] status circle per step
+  /// joined by a connector, primary once done; the step in progress is 600 and
+  /// its detail ink. Each step reads "Done: / Now: / Next:" first. Always an
+  /// inset card, with no dividers -- the connector is the rule.
+  const PortalListSection.steps({
+    super.key,
+    this.header,
+    required List<PortalListStep> steps,
+  })  : _steps = steps,
+        headerAction = null,
+        captionHeader = false,
+        style = PortalListStyle.inset,
+        detail = false,
+        onReorder = null,
+        children = const [],
+        headerValue = null,
+        actionLabel = null,
+        onAction = null,
+        selected = null,
+        _selectable = false;
 
   final String? header;
 
   /// A text action at the header's end, e.g. "See all".
   final Widget? headerAction;
+
+  /// A muted row-size value at the header's end, preformatted -- a day's net,
+  /// a group's total. Read with the title as one header ("Today, -£42.10").
+  /// Not a control: never with [headerAction] or [actionLabel].
+  final String? headerValue;
+
+  /// [headerAction] as a primary text action named by its own label, with a
+  /// `minTapTarget` hit area. A null [onAction] draws it disabled.
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   /// The caption header style, for a feed's date buckets only; section headers
   /// stay subtitle.
@@ -1144,6 +1449,41 @@ class PortalListSection extends StatelessWidget {
   final List<Widget> children;
   final int? selected;
   final bool _selectable;
+  final List<PortalListStep> _steps;
+
+  /// The rows of [PortalListSection.steps], each over the connector that
+  /// joins its circle to its neighbours'.
+  Widget _stepList(BuildContext context, DesignTokens tokens, ColorScheme cs) {
+    final sp = tokens.spacing;
+    // The circle sits 2 under the row's padding; the line stops 2 short of it
+    // above and starts 2 under it below.
+    final reach = sp.sm;
+    Color rail(PortalListStep s) =>
+        s.state == PortalStepState.done ? cs.primary : cs.outlineVariant;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final (i, s) in _steps.indexed)
+          CustomPaint(
+            painter: _StepRail(
+              top: i == 0 ? null : rail(_steps[i - 1]),
+              bottom: i == _steps.length - 1 ? null : rail(s),
+              x: sp.lg + 12,
+              from: reach + 2 + 24 + 2,
+              reach: reach,
+              textDirection: Directionality.of(context),
+            ),
+            child: PortalListItem(
+              title: s.title,
+              subtitle: s.subtitle,
+              trailing: s.trailing,
+              leading: PortalListLeading.step(s.state),
+            ),
+          ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1180,7 +1520,9 @@ class PortalListSection extends StatelessWidget {
       }
     }
 
-    Widget list = Column(children: rows);
+    Widget list = _steps.isEmpty
+        ? Column(children: rows)
+        : _stepList(context, tokens, cs);
     final reorder = onReorder;
     if (reorder != null) {
       // [rows] alternates row, divider (never selectable here): each row is
@@ -1229,7 +1571,10 @@ class PortalListSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (header != null)
-          _sectionHeader(tokens, cs, header!, captionHeader, headerAction),
+          _sectionHeader(tokens, cs, header!, captionHeader, headerAction,
+              value: headerValue,
+              actionLabel: actionLabel,
+              onAction: onAction),
         Padding(
           padding:
               inset ? EdgeInsets.symmetric(horizontal: sp.lg) : EdgeInsets.zero,
@@ -1243,6 +1588,67 @@ class PortalListSection extends StatelessWidget {
       ],
     );
   }
+}
+
+/// One step of [PortalListSection.steps].
+class PortalListStep {
+  const PortalListStep(
+    this.title, {
+    this.subtitle,
+    this.state = PortalStepState.next,
+    this.trailing = PortalListAccessory.none,
+  });
+
+  final String title;
+  final String? subtitle;
+  final PortalStepState state;
+  final PortalListAccessory trailing;
+}
+
+/// The steps' connector: [top] runs from the row's top to [reach] (2 short of
+/// this step's circle), [bottom] from under the circle ([from]) to the row's
+/// end.
+class _StepRail extends CustomPainter {
+  const _StepRail({
+    required this.top,
+    required this.bottom,
+    required this.x,
+    required this.from,
+    required this.reach,
+    required this.textDirection,
+  });
+
+  final Color? top;
+  final Color? bottom;
+  final double x;
+  final double from;
+  final double reach;
+  final TextDirection textDirection;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = textDirection == TextDirection.ltr ? x : size.width - x;
+    // Butt caps: the line stops 2 short of each circle.
+    final paint = Paint()
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.butt;
+    if (top case final c?) {
+      canvas.drawLine(Offset(cx, 0), Offset(cx, reach), paint..color = c);
+    }
+    if (bottom case final c?) {
+      canvas.drawLine(
+          Offset(cx, from), Offset(cx, size.height), paint..color = c);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_StepRail old) =>
+      top != old.top ||
+      bottom != old.bottom ||
+      x != old.x ||
+      from != old.from ||
+      reach != old.reach ||
+      textDirection != old.textDirection;
 }
 
 /// Tells the rows of a `detail` section to read as label-to-value.
@@ -1261,15 +1667,52 @@ class _ListScope extends InheritedWidget {
 double _textInset(Widget w) => w is PortalListItem ? w.textInset : 0;
 
 Widget _sectionHeader(DesignTokens tokens, ColorScheme cs, String header,
-    bool caption, Widget? action) {
+    bool caption, Widget? action,
+    {String? value, String? actionLabel, VoidCallback? onAction}) {
   final sp = tokens.spacing;
+  final heading = caption
+      ? Text(header,
+          style: tokens.textStyles.caption.copyWith(color: cs.onSurfaceVariant))
+      : PortalSectionHeader(
+          title: header,
+          trailing: action,
+          actionLabel: actionLabel,
+          onAction: onAction);
   return Padding(
     padding: EdgeInsets.fromLTRB(sp.lg, sp.lg, sp.lg, sp.sm),
-    child: caption
-        ? Text(header,
-            style:
-                tokens.textStyles.caption.copyWith(color: cs.onSurfaceVariant))
-        : PortalSectionHeader(title: header, trailing: action),
+    child: value == null
+        ? heading
+        // The title and its value on one baseline, one header to a reader.
+        : Semantics(
+            header: true,
+            label: '$header, $value',
+            child: ExcludeSemantics(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Expanded(child: heading),
+                  SizedBox(width: sp.sm),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    softWrap: false,
+                    // A caption header's total ranks under the rows' values:
+                    // the caption's own size and weight.
+                    style: (caption
+                            ? tokens.textStyles.caption.copyWith(
+                                fontWeight: tokens.textStyles.subtitle.fontWeight)
+                            : tokens.textStyles.body
+                                .copyWith(fontWeight: FontWeight.w500))
+                        .copyWith(
+                      color: cs.onSurfaceVariant,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
   );
 }
 
@@ -1290,12 +1733,23 @@ class PortalSliverListSection extends StatelessWidget {
     this.captionHeader = false,
     this.style = PortalListStyle.inset,
     this.detail = false,
-  });
+    this.headerValue,
+    this.actionLabel,
+    this.onAction,
+  }) : assert(
+          headerValue == null || (headerAction == null && actionLabel == null),
+          'a header value is not a control: never with an action',
+        );
 
   final int itemCount;
   final NullableIndexedWidgetBuilder itemBuilder;
   final String? header;
   final Widget? headerAction;
+
+  /// See [PortalListSection.headerValue] and [PortalListSection.actionLabel].
+  final String? headerValue;
+  final String? actionLabel;
+  final VoidCallback? onAction;
   final bool captionHeader;
   final PortalListStyle style;
   final bool detail;
@@ -1344,8 +1798,8 @@ class PortalSliverListSection extends StatelessWidget {
     return SliverMainAxisGroup(slivers: [
       if (header != null)
         SliverToBoxAdapter(
-          child:
-              _sectionHeader(tokens, cs, header!, captionHeader, headerAction),
+          child: _sectionHeader(tokens, cs, header!, captionHeader, headerAction,
+              value: headerValue, actionLabel: actionLabel, onAction: onAction),
         ),
       inset
           ? SliverPadding(

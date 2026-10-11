@@ -4,12 +4,18 @@ import '../theme/portal_component_extensions.dart';
 import '../theme/portal_semantic_colors.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_card.dart';
+import 'portal_icon_tile.dart';
+import 'portal_skeleton.dart';
 
 /// One metric: glyph, value, label, optional footer.
 ///
 /// The value carries the weight — tabular figures in `textStyles.title`, or
 /// `textStyles.hero` when [hero] is set; the label is `overline`. Anything
 /// richer than a footer belongs in a real card, not here.
+///
+/// [PortalStatCard.tile] is the landing-page form -- a round mark, the figure
+/// large, what it counts and what changed lately -- and two or three of them
+/// sit in a [PortalStatRow]. [PortalStatCard.skeleton] is that tile loading.
 class PortalStatCard extends StatelessWidget {
   const PortalStatCard({
     super.key,
@@ -24,7 +30,48 @@ class PortalStatCard extends StatelessWidget {
     this.valueColor,
     this.backgroundColor,
     this.margin,
-  });
+  })  : note = null,
+        _tile = false,
+        _skeleton = false;
+
+  /// A tile of a [PortalStatRow]: a 36 round mark in [accentColor] (the
+  /// primary when null), [value] large on one line (scaled down to fit its
+  /// third of the row, never broken mid-word), [label] under it and [note]
+  /// under that. An [accentColor] also washes the card.
+  const PortalStatCard.tile({
+    super.key,
+    required IconData this.icon,
+    required this.value,
+    required this.label,
+    this.note,
+    this.accentColor,
+    this.onTap,
+  })  : delta = null,
+        footer = null,
+        hero = false,
+        valueColor = null,
+        backgroundColor = null,
+        margin = null,
+        _tile = true,
+        _skeleton = false;
+
+  /// A [PortalStatCard.tile] while it loads: a mark, a figure bar and a label
+  /// bar at the data tile's own heights. Hidden from screen readers.
+  const PortalStatCard.skeleton({super.key})
+      : value = '',
+        label = '',
+        icon = null,
+        accentColor = null,
+        delta = null,
+        footer = null,
+        onTap = null,
+        hero = false,
+        valueColor = null,
+        backgroundColor = null,
+        margin = null,
+        note = null,
+        _tile = true,
+        _skeleton = true;
 
   final String value;
   final String label;
@@ -39,6 +86,10 @@ class PortalStatCard extends StatelessWidget {
   // ponytail: the sign decides the colour; add a trend enum when an app
   // needs "down is good" (weight loss) — none does yet.
   final String? delta;
+
+  /// What changed lately ('+2 this month'), muted whatever its sign:
+  /// [PortalStatCard.tile]'s line, where [delta] is the sign-coloured one.
+  final String? note;
 
   /// Sparkline or any small trailing widget.
   final Widget? footer;
@@ -58,10 +109,14 @@ class PortalStatCard extends StatelessWidget {
 
   final EdgeInsetsGeometry? margin;
 
+  final bool _tile;
+  final bool _skeleton;
+
   @override
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
+    if (_tile) return _buildTile(context);
     final skin = PortalStatCardTheme.of(context);
     final tint = accentColor ?? skin.accentColor ?? portal.primary;
 
@@ -116,6 +171,144 @@ class PortalStatCard extends StatelessWidget {
             footer!,
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildTile(BuildContext context) {
+    final portal = PortalUiTheme.of(context);
+    final t = portal.tokens;
+    final mark = t.componentSizes.iconContainerSm;
+    final tint = accentColor ?? portal.primary;
+
+    if (_skeleton) {
+      return PortalCard(
+        backgroundColor: portal.card,
+        padding: EdgeInsets.all(t.spacing.lg),
+        child: ExcludeSemantics(
+          child: PortalSkeletonTone(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                PortalSkeleton(
+                    width: mark, height: mark, shape: BoxShape.circle),
+                SizedBox(height: t.spacing.md),
+                FractionallySizedBox(
+                  widthFactor: 0.6,
+                  child: PortalSkeleton(
+                    height: t.textStyles.display.fontSize!,
+                    borderRadius: BorderRadius.circular(t.radii.sm),
+                  ),
+                ),
+                SizedBox(height: t.spacing.xs),
+                FractionallySizedBox(
+                  widthFactor: 0.8,
+                  child: PortalSkeleton(
+                    height: t.textStyles.subtitle.fontSize!,
+                    borderRadius: BorderRadius.circular(t.radii.sm),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return PortalCard(
+      onTap: onTap,
+      backgroundColor: accentColor == null
+          ? portal.card
+          : Color.alphaBlend(tint.withValues(alpha: 0.12), portal.surface),
+      padding: EdgeInsets.all(t.spacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          PortalIconTile(
+            icon!,
+            size: mark,
+            shape: PortalIconTileShape.circle,
+            glyphSize: mark / 2,
+            backgroundColor: tint.withValues(alpha: 0.18),
+            foregroundColor: tint,
+          ),
+          SizedBox(height: t.spacing.md),
+          // A figure carries its unit on a non-breaking space ('35 min'), so
+          // one too wide for its third of the row broke mid-word. One line,
+          // scaled down to fit instead.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(
+              value,
+              maxLines: 1,
+              softWrap: false,
+              style: t.textStyles.numeric(t.textStyles.display).copyWith(
+                    color: portal.onSurface,
+                    fontWeight: FontWeight.w800,
+                    height: 1,
+                  ),
+            ),
+          ),
+          SizedBox(height: t.spacing.xs),
+          Text(
+            label,
+            style: t.textStyles.subtitle.copyWith(color: portal.onSurface),
+          ),
+          if (note != null)
+            Text(
+              note!,
+              style: t.textStyles.caption
+                  .copyWith(color: portal.onSurfaceVariant),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Two or three [PortalStatCard.tile]s side by side, each the height of the
+/// tallest and a third of the width. [PortalStatRow.skeleton] is the row while
+/// it loads.
+class PortalStatRow extends StatelessWidget {
+  const PortalStatRow({super.key, required this.stats, this.padding})
+      : _cells = null;
+
+  /// [cells] [PortalStatCard.skeleton]s.
+  const PortalStatRow.skeleton({super.key, int cells = 3, this.padding})
+      : stats = const [],
+        _cells = cells;
+
+  final List<PortalStatCard> stats;
+
+  /// Defaults to the page's card gutter: 16 either side, 8 above, none below.
+  /// Pass `EdgeInsets.zero` inside a page that already has one.
+  final EdgeInsetsGeometry? padding;
+
+  final int? _cells;
+
+  @override
+  Widget build(BuildContext context) {
+    final sp = PortalUiTheme.of(context).tokens.spacing;
+    final n = _cells ?? stats.length;
+    return Padding(
+      padding: padding ?? EdgeInsets.fromLTRB(sp.lg, sp.sm, sp.lg, 0),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < n; i++) ...[
+              if (i > 0) SizedBox(width: sp.sm),
+              Expanded(
+                child: _cells != null
+                    ? const PortalStatCard.skeleton()
+                    : stats[i],
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

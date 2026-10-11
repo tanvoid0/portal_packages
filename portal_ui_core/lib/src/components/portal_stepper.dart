@@ -14,9 +14,14 @@ import 'portal_button.dart';
 /// [label] replaces the number with your own text (`2/4`, `Level 3`); [unit]
 /// follows the number in the caption style. The tooltips are the buttons'
 /// only names: pass them localised and from what the tap does ("Remove one").
-/// The text is a live region, so a change is announced. State stays with the
-/// caller: it passes [value] and takes [onChanged]. Not a typed-in number
-/// field, which is `PortalTextField`.
+/// The text is a live region, so a change is announced -- unless
+/// [semanticLabel] names what is counted ('Servings'), when it is one
+/// adjustable node ("Servings, 4 pcs") that swipes up and down by [step].
+/// [grouped] seats both buttons and the value in one high pill, as the search
+/// field and the composer are. [enabled] false (while its form saves) dims the
+/// buttons and stops the value adjusting. State stays with the caller: it
+/// passes [value] and takes [onChanged]. Whole numbers only; not a typed-in
+/// number field, which is `PortalTextField`.
 class PortalStepper extends StatelessWidget {
   const PortalStepper({
     super.key,
@@ -33,6 +38,9 @@ class PortalStepper extends StatelessWidget {
     this.size = PortalButtonSize.md,
     this.variant = PortalButtonVariant.ghost,
     this.foregroundColor,
+    this.semanticLabel,
+    this.grouped = false,
+    this.enabled = true,
   })  : assert(step > 0, 'step moves the value; it must be positive'),
         assert(min <= max, 'min must not exceed max');
 
@@ -61,6 +69,19 @@ class PortalStepper extends StatelessWidget {
   /// Ink of both buttons; defaults to the variant's.
   final Color? foregroundColor;
 
+  /// What is being counted, sentence case ('Servings', 'Weight'). The value
+  /// text then becomes one adjustable node under this name instead of a live
+  /// region; write the tooltips from it too ("Decrease servings").
+  final String? semanticLabel;
+
+  /// One high pill around the buttons and the value, so they read as one
+  /// control.
+  final bool grouped;
+
+  /// False disables both buttons and the adjustable value (while a form
+  /// saves).
+  final bool enabled;
+
   @override
   Widget build(BuildContext context) {
     final tokens = PortalUiTheme.of(context).tokens;
@@ -69,8 +90,27 @@ class PortalStepper extends StatelessWidget {
       fontFeatures: const [FontFeature.tabularFigures()],
     );
     final shown = label ?? '$value';
+    final down = enabled && value > min
+        ? () => onChanged((value - step).clamp(min, max))
+        : null;
+    final up = enabled && value < max
+        ? () => onChanged((value + step).clamp(min, max))
+        : null;
+    String say(int v) => unit == null ? '$v' : '$v $unit';
 
-    return Row(
+    final text = Text.rich(
+      TextSpan(children: [
+        TextSpan(text: shown, style: style),
+        if (label == null && unit != null)
+          TextSpan(
+            text: ' $unit',
+            style:
+                tokens.textStyles.caption.copyWith(color: cs.onSurfaceVariant),
+          ),
+      ]),
+    );
+
+    final row = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         PortalButton.icon(
@@ -79,24 +119,26 @@ class PortalStepper extends StatelessWidget {
           variant: variant,
           size: size,
           foregroundColor: foregroundColor,
-          onPressed:
-              value > min ? () => onChanged((value - step).clamp(min, max)) : null,
+          onPressed: down,
         ),
         SizedBox(width: tokens.spacing.xs),
-        Semantics(
-          liveRegion: true,
-          child: Text.rich(
-            TextSpan(children: [
-              TextSpan(text: shown, style: style),
-              if (label == null && unit != null)
-                TextSpan(
-                  text: ' $unit',
-                  style: tokens.textStyles.caption
-                      .copyWith(color: cs.onSurfaceVariant),
-                ),
-            ]),
-          ),
-        ),
+        semanticLabel == null
+            ? Semantics(liveRegion: true, child: text)
+            : Semantics(
+                label: semanticLabel,
+                value: label ?? say(value),
+                // With [label] in the number's place there is no figure to
+                // say the next value with: the platform reads it as it lands.
+                increasedValue: up == null || label != null
+                    ? null
+                    : say((value + step).clamp(min, max)),
+                decreasedValue: down == null || label != null
+                    ? null
+                    : say((value - step).clamp(min, max)),
+                onIncrease: up,
+                onDecrease: down,
+                child: ExcludeSemantics(child: text),
+              ),
         SizedBox(width: tokens.spacing.xs),
         PortalButton.icon(
           icon: PortalIcons.add_rounded,
@@ -104,10 +146,18 @@ class PortalStepper extends StatelessWidget {
           variant: variant,
           size: size,
           foregroundColor: foregroundColor,
-          onPressed:
-              value < max ? () => onChanged((value + step).clamp(min, max)) : null,
+          onPressed: up,
         ),
       ],
     );
+    return grouped
+        ? DecoratedBox(
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(tokens.radii.full),
+            ),
+            child: row,
+          )
+        : row;
   }
 }

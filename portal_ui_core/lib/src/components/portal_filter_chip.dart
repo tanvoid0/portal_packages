@@ -2,14 +2,29 @@ import 'package:flutter/material.dart';
 
 import '../motion/portal_haptics.dart';
 import '../theme/portal_component_extensions.dart';
+import '../theme/portal_icons.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_pressable.dart';
+import 'portal_skeleton.dart';
+
+/// [PortalFilterChip.status]: progress on a strip, apart from selection. [now]
+/// is the current step, selected but with no mark (a check would read as
+/// already done).
+enum PortalChipStatus { done, skipped, now }
 
 /// Selectable pill.
 ///
 /// Selected state is carried by fill *and* border, never by fill alone — a
 /// chip that only changes tint disappears for anyone who cannot separate the
 /// two colours.
+///
+/// [exclusive] is one choice of several (a month): announced in a mutually
+/// exclusive group, which [PortalFilterChipRow.semanticLabel] names. [menu]
+/// adds a trailing chevron for a chip that opens an option sheet. [status]
+/// marks progress on a strip. [enabled] false dims the chip, makes it inert
+/// and announces it disabled; a null [onTap] alone keeps the enabled look.
+/// [PortalFilterChip.action] is the chip that is never selected (a muscle that
+/// opens the library, a search suggestion): heard as a button only.
 class PortalFilterChip extends StatelessWidget {
   const PortalFilterChip({
     super.key,
@@ -27,11 +42,39 @@ class PortalFilterChip extends StatelessWidget {
     this.compact = false,
     this.onDeleted,
     this.deleteTooltip,
-  }) : assert(onDeleted == null || deleteTooltip != null,
+    this.exclusive = false,
+    this.menu = false,
+    this.status,
+    this.enabled = true,
+  })  : _action = false,
+        assert(onDeleted == null || deleteTooltip != null,
             'a delete control needs deleteTooltip: it is its only name');
+
+  const PortalFilterChip.action({
+    super.key,
+    required this.label,
+    this.onTap,
+    this.icon,
+    this.leading,
+    this.onLongPress,
+    this.compact = false,
+    this.menu = false,
+    this.enabled = true,
+  })  : selected = false,
+        selectedColor = null,
+        onSelectedColor = null,
+        unselectedColor = null,
+        onUnselectedColor = null,
+        borderColor = null,
+        onDeleted = null,
+        deleteTooltip = null,
+        exclusive = false,
+        status = null,
+        _action = true;
 
   final String label;
   final bool selected;
+  final bool _action;
 
   /// Null for a chip that only displays state -- a metadata label rendered as
   /// a pill. It then takes no ink and does not announce as a button.
@@ -73,6 +116,23 @@ class PortalFilterChip extends StatelessWidget {
   /// Required with [onDeleted].
   final String? deleteTooltip;
 
+  /// One choice of several: announced in a mutually exclusive group. Keep
+  /// independent toggles out of it.
+  final bool exclusive;
+
+  /// A trailing chevron: this chip opens an option sheet.
+  final bool menu;
+
+  /// Progress on a strip, in place of [icon] ([leading] still wins): a done
+  /// check, a skipped dash. Heard as "<label>, done" / "skipped" / "current".
+  final PortalChipStatus? status;
+
+  /// False refuses taps, dims to 38% and announces disabled.
+  final bool enabled;
+
+  /// The painted height of a [compact] chip.
+  static const double _compactHeight = 32;
+
   @override
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
@@ -87,21 +147,39 @@ class PortalFilterChip extends StatelessWidget {
         : (onUnselectedColor ??
             skin.onUnselectedColor ??
             portal.onSurfaceVariant);
-    final painted = compact ? 32.0 : (skin.minHeight ?? tokens.minTapTarget);
+    final painted =
+        compact ? _compactHeight : (skin.minHeight ?? tokens.minTapTarget);
     final radius = BorderRadius.circular(tokens.radii.full);
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : tokens.motion.fast;
+
+    final mark = switch (status) {
+      PortalChipStatus.done => Icon(PortalIcons.check_circle_rounded,
+          size: tokens.typeScale.md, color: portal.primary),
+      PortalChipStatus.skipped => Icon(PortalIcons.remove_rounded,
+          size: tokens.typeScale.md, color: portal.onSurfaceVariant),
+      _ => null,
+    };
+    final lead = leading ?? mark;
 
     // Selection has to reach a screen reader too: the pressable announces
     // the button, but the state the fill and border carry visually would
     // otherwise be invisible to TalkBack.
     final chip = Semantics(
       container: onDeleted != null,
-      selected: selected,
+      selected: _action ? null : selected,
+      inMutuallyExclusiveGroup: exclusive ? true : null,
+      label: switch (status) {
+        PortalChipStatus.done => '$label, done',
+        PortalChipStatus.skipped => '$label, skipped',
+        PortalChipStatus.now => '$label, current',
+        null => null,
+      },
       child: PortalPressable(
         onTap: onTap,
         onLongPress: onLongPress,
+        enabled: enabled,
         haptic: PortalHapticKind.selection,
         borderRadius: radius,
         child: _hitArea(
@@ -113,7 +191,9 @@ class PortalFilterChip extends StatelessWidget {
             constraints: BoxConstraints(minHeight: painted),
             padding: EdgeInsetsDirectional.only(
               start: tokens.spacing.md,
-              end: onDeleted == null ? tokens.spacing.md : tokens.spacing.sm,
+              end: onDeleted == null && !menu
+                  ? tokens.spacing.md
+                  : tokens.spacing.sm,
             ),
             decoration: BoxDecoration(
               color: fill,
@@ -128,8 +208,8 @@ class PortalFilterChip extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (leading != null) ...[
-                  leading!,
+                if (lead != null) ...[
+                  lead,
                   SizedBox(width: tokens.spacing.xs),
                 ] else if (icon != null) ...[
                   TweenAnimationBuilder<double>(
@@ -145,10 +225,19 @@ class PortalFilterChip extends StatelessWidget {
                   ),
                   SizedBox(width: tokens.spacing.xs),
                 ],
-                Text(
-                  label,
-                  style: tokens.textStyles.caption.copyWith(color: ink),
+                // With a status the label above already says the text.
+                ExcludeSemantics(
+                  excluding: status != null,
+                  child: Text(
+                    label,
+                    style: tokens.textStyles.caption.copyWith(color: ink),
+                  ),
                 ),
+                if (menu) ...[
+                  SizedBox(width: tokens.spacing.xs),
+                  Icon(PortalIcons.expand_more_rounded,
+                      size: tokens.typeScale.md, color: ink),
+                ],
                 // The glyph's own box is as wide as the delete target less the
                 // chip's end padding, so the target never reaches the label.
                 if (onDeleted != null)
@@ -163,14 +252,15 @@ class PortalFilterChip extends StatelessWidget {
         ),
       ),
     );
-    if (onDeleted == null) return chip;
+    final shown = enabled ? chip : Opacity(opacity: 0.38, child: chip);
+    if (onDeleted == null) return shown;
 
     // The close glyph is painted by the chip; the target is laid over its end
     // as a sibling, so the two buttons announce separately.
     final tap = tokens.minTapTarget;
     return Stack(
       children: [
-        chip,
+        shown,
         PositionedDirectional(
           end: 0,
           top: 0,
@@ -182,6 +272,7 @@ class PortalFilterChip extends StatelessWidget {
               message: deleteTooltip!,
               child: PortalPressable(
                 onTap: onDeleted,
+                enabled: enabled,
                 haptic: PortalHapticKind.selection,
                 borderRadius: radius,
                 child: const SizedBox.expand(),
@@ -203,38 +294,154 @@ class PortalFilterChip extends StatelessWidget {
 
 /// Horizontally scrolling row of [PortalFilterChip]s, inset to the page
 /// gutter so the first chip aligns with the content column.
+///
+/// [semanticLabel] names a group of [PortalFilterChip.exclusive] chips
+/// ('Month'); [trailing] chips follow a hairline, outside the group (an
+/// independent 'Over budget' toggle). The selected chip of an exclusive group
+/// is brought to the middle of the strip when it becomes selected -- the
+/// strip only, never the page.
 class PortalFilterChipRow extends StatelessWidget {
   const PortalFilterChipRow({
     super.key,
     required this.children,
     this.padding,
-  });
+    this.semanticLabel,
+    this.trailing = const [],
+  })  : _skeleton = null,
+        _compact = false;
+
+  /// The chips while they load: a pill at each of [widths], wrapping as a chip
+  /// group does, as tall as the chips that replace it ([compact] if they are).
+  /// Hidden from screen readers.
+  const PortalFilterChipRow.skeleton({
+    super.key,
+    required List<double> widths,
+    bool compact = false,
+    this.padding,
+  })  : _skeleton = widths,
+        _compact = compact,
+        children = const [],
+        semanticLabel = null,
+        trailing = const [];
 
   final List<Widget> children;
   final EdgeInsetsGeometry? padding;
+  final String? semanticLabel;
+  final List<Widget> trailing;
+  final List<double>? _skeleton;
+  final bool _compact;
 
   @override
   Widget build(BuildContext context) {
-    final tokens = PortalUiTheme.of(context).tokens;
+    final portal = PortalUiTheme.of(context);
+    final tokens = portal.tokens;
     final gap = tokens.spacing.sm;
+    final inset = padding ??
+        EdgeInsets.fromLTRB(
+          tokens.layout.pageHorizontal,
+          0,
+          tokens.layout.pageHorizontal,
+          tokens.spacing.md,
+        );
 
+    if (_skeleton case final widths?) {
+      final paint = _compact
+          ? PortalFilterChip._compactHeight
+          : (PortalFilterChipTheme.of(context).minHeight ??
+              tokens.minTapTarget);
+      final hit = paint < tokens.minTapTarget ? tokens.minTapTarget : paint;
+      return ExcludeSemantics(
+        child: PortalSkeletonTone(
+          child: Padding(
+            padding: inset,
+            child: Wrap(
+              spacing: gap,
+              children: [
+                for (final w in widths)
+                  SizedBox(
+                    width: w,
+                    height: hit,
+                    child: Center(
+                      child: PortalSkeleton(
+                        height: paint,
+                        borderRadius: BorderRadius.circular(tokens.radii.full),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    Widget group = Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: gap,
+      children: [
+        for (final c in children)
+          if (c is PortalFilterChip && c.exclusive && c.selected)
+            _InView(key: ValueKey(('portal.chipRow.inView', c.label)), child: c)
+          else
+            c,
+      ],
+    );
+    if (semanticLabel case final label?) {
+      group = Semantics(
+        container: true,
+        explicitChildNodes: true,
+        label: label,
+        child: group,
+      );
+    }
+    if (trailing.isNotEmpty) {
+      group = Row(
+        spacing: gap,
+        children: [
+          group,
+          SizedBox(
+            height: tokens.spacing.xl,
+            child: VerticalDivider(
+              width: tokens.borderWidth,
+              thickness: tokens.borderWidth,
+              color: portal.outline,
+            ),
+          ),
+          ...trailing,
+        ],
+      );
+    }
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: padding ??
-          EdgeInsets.fromLTRB(
-            tokens.layout.pageHorizontal,
-            0,
-            tokens.layout.pageHorizontal,
-            tokens.spacing.md,
-          ),
-      child: Row(
-        children: [
-          for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) SizedBox(width: gap),
-            children[i],
-          ],
-        ],
-      ),
+      padding: inset,
+      child: group,
     );
   }
+}
+
+/// Brings its child to the middle of its own horizontal strip once, when it
+/// is built (a newly selected chip keys a new one).
+class _InView extends StatefulWidget {
+  const _InView({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<_InView> createState() => _InViewState();
+}
+
+class _InViewState extends State<_InView> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Scrollable.maybeOf(context)
+          ?.position
+          .ensureVisible(context.findRenderObject()!, alignment: .5);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
