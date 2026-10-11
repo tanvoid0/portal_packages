@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -237,7 +239,7 @@ class PortalAuthView extends GetView<PortalAuthController> {
           if (controller.canUseGoogleSignIn) ...[
             OutlinedButton.icon(
               onPressed: busy ? null : controller.signInWithGoogle,
-              icon: const Icon(Icons.g_mobiledata_rounded, size: 22),
+              icon: const _GoogleGlyph(),
               label: const Text('Continue with Google'),
             ),
             const SizedBox(height: 10),
@@ -300,4 +302,45 @@ class PortalAuthView extends GetView<PortalAuthController> {
       ),
     );
   }
+}
+
+/// The Google "G" in its four brand colours, for the Google sign-in button.
+/// A one-colour icon doesn't read as the Google mark; drawn as four arcs and
+/// the crossbar so the colours hold in both themes. Single consumer here —
+/// not promoted to portal_ui_core.
+class _GoogleGlyph extends StatelessWidget {
+  const _GoogleGlyph();
+
+  @override
+  Widget build(BuildContext context) =>
+      SizedBox.square(dimension: 18, child: CustomPaint(painter: _GoogleGlyphPainter()));
+}
+
+class _GoogleGlyphPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = size.width / 2;
+    final stroke = size.width * .2;
+    final ring = Rect.fromCircle(center: Offset(r, r), radius: r - stroke / 2);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke;
+
+    // Angles run clockwise from the right, as the canvas does.
+    void arc(Color color, double from, double sweep) {
+      canvas.drawArc(ring, from * math.pi / 180, sweep * math.pi / 180, false, paint..color = color);
+    }
+
+    arc(const Color(0xFFEA4335), 195, 120); // red, top
+    arc(const Color(0xFFFBBC05), 150, 45); // yellow, left
+    arc(const Color(0xFF34A853), 45, 105); // green, bottom
+    arc(const Color(0xFF4285F4), -45, 90); // blue, right
+    canvas.drawRect(
+      Rect.fromLTRB(r, r - stroke / 2, size.width, r + stroke / 2),
+      paint..style = PaintingStyle.fill,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
