@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import 'portal_app_identity.dart';
+
 /// One named piece of startup work.
 ///
 /// The label is what the person waiting reads, so name the thing being done
@@ -22,21 +24,32 @@ class PortalStartupStep {
 class PortalStartupSplash extends StatefulWidget {
   const PortalStartupSplash({
     super.key,
-    required this.icon,
-    required this.title,
+    this.identity,
+    @Deprecated('Pass identity instead') this.icon,
+    @Deprecated('Pass identity instead') this.title,
     required this.stepCount,
     required this.stepIndex,
     required this.stepLabel,
-    this.subtitle,
+    @Deprecated('Pass identity instead') this.subtitle,
     this.error,
     this.traceId,
     this.traceIdLabel,
     this.onCopyTraceId,
     this.onRetry,
-  });
+  }) : assert(
+         identity != null || (icon != null && title != null),
+         'pass identity, or both icon and title',
+       );
 
-  final IconData icon;
-  final String title;
+  /// The app's mark, name and line. Preferred over [icon] / [title] /
+  /// [subtitle], which stay for callers that have not moved yet.
+  final PortalAppIdentity? identity;
+
+  @Deprecated('Pass identity instead')
+  final IconData? icon;
+  @Deprecated('Pass identity instead')
+  final String? title;
+  @Deprecated('Pass identity instead')
   final String? subtitle;
 
   /// Total steps, and the index of the one running now (0-based).
@@ -102,6 +115,13 @@ class _PortalStartupSplashState extends State<PortalStartupSplash>
     final colors = theme.colorScheme;
     final failed = widget.error != null;
     final still = MediaQuery.disableAnimationsOf(context);
+    final identity = widget.identity;
+    // ignore: deprecated_member_use_from_same_package
+    final title = identity?.name ?? widget.title!;
+    // ignore: deprecated_member_use_from_same_package
+    final subtitle = identity?.tagline ?? widget.subtitle;
+    // ignore: deprecated_member_use_from_same_package
+    final icon = identity?.icon ?? widget.icon!;
 
     return Scaffold(
       backgroundColor: colors.surface,
@@ -112,22 +132,23 @@ class _PortalStartupSplashState extends State<PortalStartupSplash>
             children: [
               const Spacer(flex: 3),
               _Mark(
-                icon: failed ? Symbols.error_rounded : widget.icon,
+                icon: failed ? Symbols.error_rounded : icon,
+                logo: failed ? null : identity?.logo,
                 color: failed ? colors.error : colors.primary,
                 pulse: still || failed ? null : _pulse,
               ),
               const SizedBox(height: 24),
               Text(
-                widget.title,
+                title,
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
                 textAlign: TextAlign.center,
               ),
-              if (widget.subtitle != null) ...[
+              if (subtitle != null) ...[
                 const SizedBox(height: 8),
                 Text(
-                  widget.subtitle!,
+                  subtitle,
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colors.onSurfaceVariant,
@@ -161,10 +182,13 @@ class _PortalStartupSplashState extends State<PortalStartupSplash>
 
 /// The app glyph, breathing inside a soft well.
 class _Mark extends StatelessWidget {
-  const _Mark({required this.icon, required this.color, this.pulse});
+  const _Mark({required this.icon, required this.color, this.logo, this.pulse});
 
   final IconData icon;
   final Color color;
+
+  /// Drawn instead of [icon] when given (an app's own mark image).
+  final ImageProvider? logo;
   final Animation<double>? pulse;
 
   @override
@@ -176,7 +200,9 @@ class _Mark extends StatelessWidget {
         shape: BoxShape.circle,
         color: color.withValues(alpha: 0.12),
       ),
-      child: Icon(icon, size: 52, color: color),
+      child: logo != null
+          ? ClipOval(child: Image(image: logo!, fit: BoxFit.cover))
+          : Icon(icon, size: 52, color: color),
     );
 
     final animation = pulse;

@@ -1,5 +1,17 @@
 ## Unreleased
 
+- `PortalAppIdentity(icon, name, tagline, logo)`: an app's mark, name and line,
+  with no colour field (the app's own `colorScheme.primary` already is the
+  brand). `PortalStartupSplash` and `PortalStartupGate` take an optional
+  `identity:` and prefer it over their `icon`/`title`/`subtitle` params, which
+  are now `@Deprecated('Pass identity instead')` but still work.
+  `PortalOnboardingPage(identity:, greeting:, question:, onSignIn:)`: the
+  signed-out start screen -- identity's mark (or a given `hero`) centred above
+  a `PortalButtonDock` with one primary Sign in action, a compact offline
+  warning over the dock when `offline: true` (and Sign in disabled), and an
+  optional `footnote`. Ported from the design kit's `KitOnboarding` onto
+  ui_core primitives.
+
 Fix: `PortalButtonDock` gaps come from `tokens.spacing.sm`; the secondary action in `PortalPrompt` takes its height, padding and font size from `minTapTarget`, `spacing.lg` and `typeScale.md` instead of 36 / 16 / 14 (default tokens: 36 becomes 48 painted).
 
 Fix: `PortalStepProgress` announces a done step (`doneLabel`, default `done`) and draws done, current and upcoming bars at three heights; `PortalAppFeedback.messageFrom` shows a `String` error as it is and the fallback for any other (no raw `Exception.toString()`), and a resolver that throws falls back; the per-component theme extensions snap at the midpoint when one side leaves a colour or size unset, instead of blending it to transparent or zero.

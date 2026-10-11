@@ -68,4 +68,30 @@ void main() {
     expect(attempts, 2);
     expect(find.text('booted'), findsOneWidget);
   });
+
+  testWidgets('identity supplies the title shown on the splash', (
+    tester,
+  ) async {
+    final first = Completer<void>();
+
+    await tester.pumpWidget(
+      PortalStartupGate(
+        identity: const PortalAppIdentity(
+          icon: Icons.check,
+          name: 'Identity App',
+          tagline: 'Does the thing',
+        ),
+        steps: [
+          PortalStartupStep('Step one', () => first.future),
+        ],
+        builder: (_) => const MaterialApp(home: Text('booted')),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Identity App'), findsOneWidget);
+
+    first.complete();
+    await tester.pumpAndSettle();
+  });
 }

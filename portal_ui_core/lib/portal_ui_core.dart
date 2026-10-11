@@ -85,6 +85,8 @@ export 'src/components/portal_skeleton.dart';
 export 'src/components/portal_stat_card.dart';
 export 'src/components/portal_stepper.dart';
 export 'src/components/portal_text_field.dart';
+export 'src/components/portal_app_identity.dart';
+export 'src/components/portal_onboarding_page.dart';
 export 'src/components/portal_startup_gate.dart';
 export 'src/components/portal_startup_splash.dart';
 export 'src/components/portal_swipe_row.dart';

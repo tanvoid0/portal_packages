@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'portal_app_identity.dart';
 import 'portal_startup_splash.dart';
 
 /// Runs an app's startup steps *after* `runApp`, showing [PortalStartupSplash]
@@ -35,19 +36,29 @@ import 'portal_startup_splash.dart';
 class PortalStartupGate extends StatefulWidget {
   const PortalStartupGate({
     super.key,
-    required this.icon,
-    required this.title,
+    this.identity,
+    @Deprecated('Pass identity instead') this.icon,
+    @Deprecated('Pass identity instead') this.title,
     required this.steps,
     required this.builder,
-    this.subtitle,
+    @Deprecated('Pass identity instead') this.subtitle,
     this.theme,
     this.darkTheme,
     this.themeMode = ThemeMode.system,
     this.onError,
-  });
+  }) : assert(
+         identity != null || (icon != null && title != null),
+         'pass identity, or both icon and title',
+       );
 
-  final IconData icon;
-  final String title;
+  /// The app's mark, name and line, forwarded to [PortalStartupSplash].
+  final PortalAppIdentity? identity;
+
+  @Deprecated('Pass identity instead')
+  final IconData? icon;
+  @Deprecated('Pass identity instead')
+  final String? title;
+  @Deprecated('Pass identity instead')
   final String? subtitle;
 
   /// Startup work, run in order. A step that throws stops the run and shows
@@ -125,8 +136,12 @@ class _PortalStartupGateState extends State<PortalStartupGate> {
       darkTheme: widget.darkTheme,
       themeMode: widget.themeMode,
       home: PortalStartupSplash(
+        identity: widget.identity,
+        // ignore: deprecated_member_use_from_same_package
         icon: widget.icon,
+        // ignore: deprecated_member_use_from_same_package
         title: widget.title,
+        // ignore: deprecated_member_use_from_same_package
         subtitle: widget.subtitle,
         stepCount: steps.length,
         stepIndex: _index,
