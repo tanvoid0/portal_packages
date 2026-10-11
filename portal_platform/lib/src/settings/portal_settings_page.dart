@@ -17,10 +17,22 @@ import 'portal_theme_controller.dart';
 
 /// One group of rows on [PortalSettingsPage].
 class PortalSettingsSection {
-  const PortalSettingsSection({required this.title, required this.children});
+  const PortalSettingsSection({
+    required this.title,
+    required this.children,
+    this.slot = PortalSettingsGroup.custom,
+  });
 
   final String title;
   final List<Widget> children;
+
+  /// Where this section renders relative to the page's own groups. Default
+  /// [PortalSettingsGroup.custom] renders where it always has — grouped with
+  /// the other custom sections, in [PortalSettingsPage.order]'s own slot for
+  /// it. Any other group renders this section immediately after that group's
+  /// built-in content, so e.g. an app can slide a section in right under
+  /// Appearance without displacing it.
+  final PortalSettingsGroup slot;
 }
 
 /// The groups this page can build for itself, in the order it builds them.
@@ -51,7 +63,9 @@ enum PortalSettingsGroup { profile, appearance, custom, assistant, status, apps,
 ///
 /// An app whose settings screen is too different to mount this at all can
 /// still use the pieces: [PortalStatusSection], [PortalAppsSection] and
-/// [PortalUpdateTile] each stand alone, which is how `portal_task` uses them.
+/// [PortalUpdateTile] each stand alone. [header] covers the more common case
+/// of an app wanting this page embedded under its own chrome rather than the
+/// standalone pieces.
 ///
 /// See `docs/SETTINGS.md`.
 class PortalSettingsPage extends StatefulWidget {
@@ -69,6 +83,7 @@ class PortalSettingsPage extends StatefulWidget {
     this.backgroundColor,
     this.onChangePassword,
     this.onSignIn,
+    this.header,
   });
 
   final PortalSettingsLabels labels;
@@ -118,6 +133,16 @@ class PortalSettingsPage extends StatefulWidget {
   /// Shows a Sign in row in the profile's place while signed out. Null shows
   /// nothing there: only the app knows how to reach its login.
   final VoidCallback? onSignIn;
+
+  /// Given, this page builds just its `ListView` with [header] as the first
+  /// child -- no `Scaffold`, no [PortalAppBar] -- so a caller already inside
+  /// its own Scaffold/AppBar/tab shell (e.g. a tab of a bottom-nav page) can
+  /// embed these settings without a second app bar on top of its own.
+  ///
+  /// Embedded mode drops the app bar's cloud-outage status line along with
+  /// the bar itself. Nothing is silently lost: the Status group's own "Mode"
+  /// row already reports the same reachability, with the page visible.
+  final Widget? header;
 
   @override
   State<PortalSettingsPage> createState() => _PortalSettingsPageState();
@@ -468,6 +493,7 @@ class _PortalSettingsPageState extends State<PortalSettingsPage> {
 
         case PortalSettingsGroup.custom:
           for (final section in widget.sections) {
+            if (section.slot != PortalSettingsGroup.custom) continue;
             children.add(buildSection(section.title, section.children));
           }
 
@@ -511,6 +537,23 @@ class _PortalSettingsPageState extends State<PortalSettingsPage> {
             children.add(_account(Get.find<SessionController>()));
           }
       }
+      // A section slotted to this group (not the default `custom`, which
+      // rendered above in its own case) lands right after the group's own
+      // content -- so e.g. an app can slide a section under Appearance
+      // without displacing it.
+      if (group != PortalSettingsGroup.custom) {
+        for (final section in widget.sections) {
+          if (section.slot != group) continue;
+          children.add(buildSection(section.title, section.children));
+        }
+      }
+    }
+
+    if (widget.header case final header?) {
+      return ListView(
+        padding: EdgeInsets.only(top: sp.lg, bottom: sp.xxl),
+        children: [header, ...children],
+      );
     }
 
     final unreachable = _reachable == false;

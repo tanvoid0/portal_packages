@@ -1013,7 +1013,7 @@ packages:
       path: "../portal_ui_core"
       relative: true
     source: path
-    version: "0.2.1"
+    version: "0.3.0"
   pub_semver:
     dependency: transitive
     description:

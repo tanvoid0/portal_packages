@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 /// Branding and feature configuration for the shared auth UI.
 ///
@@ -43,4 +44,26 @@ class PortalAuthConfig {
   /// shared [PortalPasswordResetView]. Set it when the app has its own reset
   /// route (e.g. Portal Task).
   final VoidCallback? onForgotPassword;
+
+  /// Builds a config from a shared [PortalAppIdentity] so an app doesn't
+  /// restate its icon/name/tagline a second time for the auth screen.
+  ///
+  /// [PortalAppIdentity.logo] is an [ImageProvider], but [appIconImage] here
+  /// is an asset path (`Image.asset` in [PortalAuthView]) — the two aren't
+  /// the same type, so a logo on the identity is not forwarded; [appIcon]
+  /// is used instead. Pass [appIconImage] on the plain constructor directly
+  /// if an app needs its logo asset on the auth screen.
+  factory PortalAuthConfig.of(
+    PortalAppIdentity identity, {
+    bool showTestServer = false,
+    VoidCallback? onForgotPassword,
+    bool allowRegistration = true,
+  }) => PortalAuthConfig(
+    appIcon: identity.icon,
+    appTitle: identity.name,
+    appSubtitle: identity.tagline,
+    showTestServer: showTestServer,
+    onForgotPassword: onForgotPassword,
+    allowRegistration: allowRegistration,
+  );
 }

@@ -207,6 +207,52 @@ void main() {
       expect(find.text('Appearance'), findsNothing);
     });
 
+    testWidgets('a slotted section renders right after its named group',
+        (tester) async {
+      await pump(
+        tester,
+        PortalSettingsPage(
+          themeController: Get.put(PortalThemeController()),
+          sections: const [
+            PortalSettingsSection(
+              title: 'Mine',
+              children: [Text('row')],
+              slot: PortalSettingsGroup.appearance,
+            ),
+          ],
+        ),
+      );
+
+      final order = [
+        top(tester, 'Appearance'),
+        top(tester, 'Mine'),
+        top(tester, 'Status'),
+      ];
+      expect(order, [...order]..sort());
+    });
+
+    testWidgets('header given: no Scaffold/app bar, header is first',
+        (tester) async {
+      await pump(
+        tester,
+        const PortalSettingsPage(
+          include: [PortalSettingsGroup.custom],
+          header: Text('My header'),
+          sections: [
+            PortalSettingsSection(title: 'Only me', children: [Text('row')]),
+          ],
+        ),
+      );
+
+      expect(find.byType(PortalAppBar), findsNothing);
+      expect(find.byType(Scaffold), findsNothing);
+      expect(find.text('My header'), findsOneWidget);
+      expect(
+        top(tester, 'My header'),
+        lessThan(top(tester, 'Only me')),
+      );
+    });
+
     testWidgets('include: [status] hides Appearance and Assistant',
         (tester) async {
       await pump(

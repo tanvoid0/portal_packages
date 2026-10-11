@@ -1,5 +1,9 @@
 ## Unreleased
 
+- `PortalAuthConfig.of(identity)`: builds a config from a `portal_ui_core` `PortalAppIdentity` so an app states its icon/name/tagline once. `identity.logo` isn't forwarded — `appIconImage` is an asset path, not an `ImageProvider` — pass it on the plain constructor if needed. Needs `portal_ui_core` 0.3.0 (`PortalAppIdentity`); the constraint is raised to match.
+- `PortalSettingsSection.slot` (new, defaults to `PortalSettingsGroup.custom`): a section can render right after a named group's own content instead of only in the `custom` slot.
+- `PortalSettingsPage.header` (new): given, the page is just its `ListView` with `header` first — no `Scaffold`/`PortalAppBar` — for a caller embedding it under its own chrome. Loses the app bar's cloud-outage line; the Status group's own Mode row still reports it.
+
 - `PortalSettingsPage` rebuilt as the grouped kit page: inset sections from `portal_ui_core`, a tonal tile on every row, headers as written (no longer upper-cased), and Portal Cloud's outage in the bar's status line. Needs `portal_ui_core` 0.2.1 (`PortalListAccessory.navigate(swatch:)`, `PortalAppBar(status:)`); the constraint is raised to match.
   - Profile is an account cell that opens an Edit name sheet; signed out, `onSignIn` (new) adds a Sign in row.
   - Appearance: Theme and Accent colour rows open sheets that apply on tap. The accent row shows the first of `palettes` while the controller holds no id.
