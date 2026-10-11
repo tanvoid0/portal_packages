@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/portal_ui_theme.dart';
 import 'portal_pressable.dart';
+import 'portal_skeleton.dart';
 
 /// A titled break inside a scroll page.
 ///
@@ -20,7 +21,28 @@ class PortalSectionHeader extends StatelessWidget {
     this.actionLabel,
     this.onAction,
     this.overline = false,
-  });
+    this.headerValue,
+  })  : assert(
+          headerValue == null ||
+              (trailing == null && actionLabel == null),
+          'a header value is not a control: never with trailing or an action',
+        ),
+        _skeleton = false;
+
+  /// Shaped like the header: a skeleton bar in place of [title], and one
+  /// beside it in place of [headerValue] when [hasValue].
+  const PortalSectionHeader.skeleton({super.key, bool hasValue = false})
+      : title = '',
+        icon = null,
+        trailing = null,
+        foregroundColor = null,
+        iconColor = null,
+        caption = null,
+        actionLabel = null,
+        onAction = null,
+        overline = false,
+        headerValue = hasValue ? '' : null,
+        _skeleton = true;
 
   final String title;
 
@@ -53,6 +75,13 @@ class PortalSectionHeader extends StatelessWidget {
   final String? actionLabel;
   final VoidCallback? onAction;
 
+  /// A muted row-size value at the end, preformatted — a day's net, a
+  /// group's total. Read with the title as one header. Not a control: never
+  /// with [trailing] or [actionLabel].
+  final String? headerValue;
+
+  final bool _skeleton;
+
   @override
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
@@ -62,8 +91,53 @@ class PortalSectionHeader extends StatelessWidget {
     final style = (overline ? tokens.textStyles.overline : tokens.textStyles.subtitle)
         .copyWith(color: ink);
 
+    if (_skeleton) {
+      return ExcludeSemantics(
+        child: Row(
+          children: [
+            Expanded(child: PortalSkeleton(height: style.fontSize ?? 16, width: 120)),
+            if (headerValue != null) ...[
+              SizedBox(width: tokens.spacing.sm),
+              PortalSkeleton(height: style.fontSize ?? 16, width: 48),
+            ],
+          ],
+        ),
+      );
+    }
+
     final heading = Text(title, style: style);
     final action = actionLabel;
+
+    if (headerValue case final value?) {
+      return Semantics(
+        header: true,
+        label: '$title, $value',
+        child: ExcludeSemantics(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: style.fontSize, color: iconColor ?? ink),
+                SizedBox(width: tokens.spacing.sm),
+              ],
+              Expanded(child: heading),
+              SizedBox(width: tokens.spacing.sm),
+              Text(
+                value,
+                maxLines: 1,
+                softWrap: false,
+                style: tokens.textStyles.body.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: portal.onSurfaceVariant,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Row(
       children: [

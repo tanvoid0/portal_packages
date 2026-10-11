@@ -1372,18 +1372,27 @@ class PortalListSection extends StatelessWidget {
           'a header value is not a control: never with an action',
         ),
         selected = null,
+        selectedIndices = null,
         _selectable = false,
-        _steps = const [];
+        _steps = const [],
+        _skeletonHeader = false;
 
   /// An inset option list for radio / checkbox rows, outlined when selected
-  /// rather than filled alone. Pass [selected] to say which row.
+  /// rather than filled alone. Pass [selected] to say which row, or
+  /// [selectedIndices] for a multi-select list (checkboxes) — give one or
+  /// the other, never both.
   const PortalListSection.selectable({
     super.key,
     this.header,
     this.headerAction,
     required this.children,
     this.selected,
-  })  : captionHeader = false,
+    this.selectedIndices,
+  })  : assert(
+          selected == null || selectedIndices == null,
+          'give selected or selectedIndices, not both',
+        ),
+        captionHeader = false,
         style = PortalListStyle.inset,
         detail = false,
         onReorder = null,
@@ -1391,7 +1400,37 @@ class PortalListSection extends StatelessWidget {
         actionLabel = null,
         onAction = null,
         _selectable = true,
-        _steps = const [];
+        _steps = const [],
+        _skeletonHeader = false;
+
+  /// Shaped like the section: [rows] copies of [PortalListItem.skeleton]
+  /// (same [leading]/[trailing] shape every row, the common case), inset,
+  /// with the same dividers a real section draws. [hasHeader] draws a
+  /// [PortalSectionHeader.skeleton] in place of a real one.
+  PortalListSection.skeleton({
+    super.key,
+    int rows = 3,
+    bool hasHeader = false,
+    PortalSkeletonLeading leading = PortalSkeletonLeading.avatar,
+    PortalSkeletonTrailing trailing = PortalSkeletonTrailing.value,
+  })  : header = null,
+        headerAction = null,
+        captionHeader = false,
+        style = PortalListStyle.inset,
+        detail = false,
+        onReorder = null,
+        headerValue = null,
+        actionLabel = null,
+        onAction = null,
+        selected = null,
+        selectedIndices = null,
+        _selectable = false,
+        _steps = const [],
+        _skeletonHeader = hasHeader,
+        children = [
+          for (var i = 0; i < rows; i++)
+            PortalListItem.skeleton(leading: leading, trailing: trailing),
+        ];
 
   /// A numbered procedure: a [PortalListLeading.step] status circle per step
   /// joined by a connector, primary once done; the step in progress is 600 and
@@ -1412,7 +1451,9 @@ class PortalListSection extends StatelessWidget {
         actionLabel = null,
         onAction = null,
         selected = null,
-        _selectable = false;
+        selectedIndices = null,
+        _selectable = false,
+        _skeletonHeader = false;
 
   final String? header;
 
@@ -1452,8 +1493,12 @@ class PortalListSection extends StatelessWidget {
   /// a row's text column and at the edge for anything that is not one.
   final List<Widget> children;
   final int? selected;
+
+  /// Multi-select form of [selected]: every outlined row's index.
+  final Set<int>? selectedIndices;
   final bool _selectable;
   final List<PortalListStep> _steps;
+  final bool _skeletonHeader;
 
   /// The rows of [PortalListSection.steps], each over the connector that
   /// joins its circle to its neighbours'.
@@ -1503,7 +1548,8 @@ class PortalListSection extends StatelessWidget {
     for (var i = 0; i < children.length; i++) {
       final item = children[i];
       Widget w = item;
-      if (_selectable && selected == i) {
+      if (_selectable &&
+          (selected == i || (selectedIndices?.contains(i) ?? false))) {
         w = DecoratedBox(
           position: DecorationPosition.foreground,
           decoration: BoxDecoration(
@@ -1574,7 +1620,12 @@ class PortalListSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (header != null)
+        if (_skeletonHeader)
+          Padding(
+            padding: EdgeInsets.fromLTRB(sp.lg, sp.lg, sp.lg, sp.sm),
+            child: const PortalSectionHeader.skeleton(),
+          )
+        else if (header != null)
           _sectionHeader(tokens, cs, header!, captionHeader, headerAction,
               value: headerValue,
               actionLabel: actionLabel,

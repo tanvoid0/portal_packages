@@ -27,7 +27,10 @@ enum PortalDateStyle {
   monthDay('MMM d'),
 
   /// `Monday, Oct 5`.
-  weekdayMonthDay('EEEE, MMM d');
+  weekdayMonthDay('EEEE, MMM d'),
+
+  /// `Monday, 5 October`: the day first, month spelled out in full.
+  weekdayDayMonth('EEEE, d MMMM');
 
   const PortalDateStyle(this.pattern);
   final String pattern;
@@ -68,8 +71,8 @@ class PortalFormat {
   PortalFormat(this.locale, {DateTime Function()? now})
       : _now = now ?? DateTime.now;
 
-  factory PortalFormat.of(BuildContext context) =>
-      PortalFormat(Localizations.localeOf(context).toString());
+  factory PortalFormat.of(BuildContext context, {DateTime Function()? now}) =>
+      PortalFormat(Localizations.localeOf(context).toString(), now: now);
 
   final String locale;
   final DateTime Function() _now;
@@ -142,6 +145,10 @@ class PortalFormat {
             .currencySymbol;
     return '${value < 0 ? '-' : ''}$symbol${_trimZero(scaled)}$suffix';
   }
+
+  /// A plain grouped number: `1,200` from `1200`. No currency, no rounding
+  /// rule beyond the value's own decimals.
+  String count(num n) => NumberFormat.decimalPattern(locale).format(n);
 
   /// `6.4%` from `0.064`; `6%` from `0.06`.
   String percent(num fraction) {

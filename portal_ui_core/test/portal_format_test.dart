@@ -119,6 +119,26 @@ void main() {
     expect(us.dateAs(d, PortalDateStyle.monthDay), 'Oct 5');
     expect(us.dateAs(d, PortalDateStyle.weekdayMonthDay), 'Monday, Oct 5');
     expect(us.dateAs(d, PortalDateStyle.dayMonth), '05 Oct');
+    expect(
+        us.dateAs(d, PortalDateStyle.weekdayDayMonth), 'Monday, 5 October');
+  });
+
+  test('count: a plain grouped number, no currency', () {
+    expect(f.count(1200), '1,200');
+    expect(f.count(0), '0');
+  });
+
+  testWidgets('PortalFormat.of threads now through for relative dates',
+      (t) async {
+    late PortalFormat format;
+    await t.pumpWidget(MaterialApp(
+      home: Builder(builder: (context) {
+        format = PortalFormat.of(context, now: () => DateTime(2026, 9, 16));
+        return const SizedBox();
+      }),
+    ));
+    expect(format.date(DateTime(2026, 9, 16)), 'Today');
+    expect(format.date(DateTime(2026, 9, 15)), 'Yesterday');
   });
 
   test('duration: hoursMinutes, minutesSeconds, minutesSpelled', () {

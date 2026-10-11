@@ -35,7 +35,43 @@ class PortalScrollPage extends StatelessWidget {
     this.status,
     this.statusIcon,
     this.grouped = false,
-  })  : assert(
+  })  : body = null,
+        assert(
+          bottom == null || bottomNavigationBar == null,
+          'a page has one bottom bar: pass bottom or bottomNavigationBar',
+        ),
+        assert(
+          title == null || titleWidget == null,
+          'give a title or a titleWidget, not both',
+        );
+
+  /// For a page that owns its own scroll (chat, an active workout, a
+  /// timeline) — the same bar, dock and nav/fab clearance, over [body]
+  /// instead of a sliver list of [children].
+  const PortalScrollPage.custom({
+    super.key,
+    required Widget this.body,
+    this.title,
+    this.subtitle,
+    this.header,
+    this.appBar,
+    this.actions = const [],
+    this.trailing,
+    this.backgroundColor,
+    this.floatingActionButton,
+    this.bottomNavigationBar,
+    this.bottom,
+    this.titleWidget,
+    this.leading,
+    this.count,
+    this.status,
+    this.statusIcon,
+    this.grouped = false,
+  })  : children = const [],
+        onRefresh = null,
+        padding = null,
+        controller = null,
+        assert(
           bottom == null || bottomNavigationBar == null,
           'a page has one bottom bar: pass bottom or bottomNavigationBar',
         ),
@@ -88,8 +124,9 @@ class PortalScrollPage extends StatelessWidget {
   /// [subtitle], [actions] and [trailing] are ignored when it is given.
   final PortalHeader? header;
 
-  /// A custom sliver app bar. Supply this when the app dresses its own —
-  /// it must be a sliver. Wins over [header].
+  /// A custom app bar. Supply this when the app dresses its own — it must
+  /// be a sliver for the default constructor, or a [PreferredSizeWidget]
+  /// (a regular bar) for [PortalScrollPage.custom]. Wins over [header].
   final Widget? appBar;
 
   /// Actions for the default bar; overflow past two into the action sheet.
@@ -109,6 +146,9 @@ class PortalScrollPage extends StatelessWidget {
   final Widget? floatingActionButton;
   final Widget? bottomNavigationBar;
 
+  /// [PortalScrollPage.custom]'s own-scroll body, in place of [children].
+  final Widget? body;
+
   @override
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
@@ -123,6 +163,43 @@ class PortalScrollPage extends StatelessWidget {
     final statusLine = [count, status]
         .where((s) => s != null && s.isNotEmpty)
         .join(' · ');
+
+    if (body case final body?) {
+      // A regular (non-sliver) bar: [body] owns its own scroll, so there is
+      // no sliver list for a [PortalSliverAppBar] to sit above.
+      final customBar = appBar ??
+          (title == null && titleWidget == null
+              ? null
+              : PortalAppBar(
+                  title: title,
+                  titleWidget: titleWidget,
+                  subtitle: subtitle,
+                  status: statusLine.isEmpty ? null : statusLine,
+                  statusIcon: statusIcon,
+                  leading: leading,
+                  centerTitle: titleWidget == null ? null : true,
+                  backgroundColor: grouped ? pageColor : null,
+                  actions: actions,
+                  trailing: trailing,
+                ));
+      assert(
+        customBar == null || customBar is PreferredSizeWidget,
+        '.custom has a regular (non-sliver) bar: give a PreferredSizeWidget '
+        'appBar, not a sliver one',
+      );
+      Widget page(Widget Function(Widget) track) => Scaffold(
+            backgroundColor: pageColor ?? portal.surface,
+            appBar: customBar as PreferredSizeWidget?,
+            floatingActionButton: floatingActionButton,
+            // Scaffold reserves the body's height above it automatically —
+            // the same clearance [children]'s SliverPadding bakes in by hand.
+            bottomNavigationBar: bottom ?? bottomNavigationBar,
+            body: track(body),
+          );
+      return bottom == null
+          ? page((b) => b)
+          : _RuleHost(builder: page);
+    }
 
     final bar = appBar ??
         header ??

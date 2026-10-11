@@ -121,30 +121,57 @@ abstract final class PortalSheet {
 /// remaining height). Title, body and actions share the page gutter.
 /// [actions] sit in one row, each stretched equally, above a hairline.
 class PortalSheetScaffold extends StatelessWidget {
-  const PortalSheetScaffold({
+  PortalSheetScaffold({
     super.key,
     required this.body,
     this.title,
     this.actions = const [],
     this.scrollable = true,
-  });
+    this.onClose,
+    this.trailing = const [],
+    this.message,
+    this.dock,
+    this.gutter = true,
+  }) : assert(actions.isEmpty || dock == null,
+            'a sheet has one footer: pass actions or dock, not both');
 
   final Widget body;
   final String? title;
 
-  /// Pinned under the body; typically one or two `PortalButton`s.
+  /// Pinned under the body; typically one or two `PortalButton`s. Mutually
+  /// exclusive with [dock].
   final List<Widget> actions;
+
+  /// A footer bar (a `PortalButtonDock`) in place of [actions] — stacked,
+  /// not inset in the body's gutter.
+  final Widget? dock;
 
   /// Wrap [body] in a `SingleChildScrollView`. Off for a body that scrolls
   /// itself.
   final bool scrollable;
 
+  /// Shows a close button at the title row's end. Defaults to popping the
+  /// route; given explicitly it replaces that.
+  final VoidCallback? onClose;
+
+  /// Non-close widgets at the title row's end, before the close button.
+  final List<Widget> trailing;
+
+  /// Why the sheet asks, under the title: muted, read again when it changes.
+  final String? message;
+
+  /// False drops the page gutter around [body] — for a body that brings its
+  /// own (a full-bleed [PortalListSection]).
+  final bool gutter;
+
   @override
   Widget build(BuildContext context) {
     final tokens = PortalUiTheme.of(context).tokens;
-    final gutter = EdgeInsets.symmetric(horizontal: tokens.layout.pageHorizontal);
+    final pad = EdgeInsets.symmetric(horizontal: tokens.layout.pageHorizontal);
+    final gutterPad = gutter ? pad : EdgeInsets.zero;
+    final hasBar = title != null || trailing.isNotEmpty || onClose != null;
 
-    Widget content = Padding(padding: gutter, child: body);
+    Widget content = Padding(padding: gutterPad, child: body);
     if (scrollable) {
       content = SingleChildScrollView(
         controller: PrimaryScrollController.maybeOf(context),
@@ -156,27 +183,57 @@ class PortalSheetScaffold extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (title != null)
+        if (hasBar)
           Padding(
-            padding: gutter.copyWith(
+            padding: pad.copyWith(
               top: tokens.spacing.sm,
               bottom: tokens.spacing.md,
             ),
-            child: Text(title!, style: tokens.textStyles.title),
+            child: Row(
+              children: [
+                Expanded(
+                  child: title == null
+                      ? const SizedBox.shrink()
+                      : Semantics(
+                          header: true,
+                          child: Text(title!, style: tokens.textStyles.title),
+                        ),
+                ),
+                ...trailing,
+                if (onClose != null)
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    tooltip: 'Close',
+                    onPressed: onClose,
+                  ),
+              ],
+            ),
+          ),
+        if (message case final m?)
+          Padding(
+            padding: pad.copyWith(bottom: tokens.spacing.md),
+            child: Semantics(
+              liveRegion: true,
+              child: Text(m,
+                  style: tokens.textStyles.body.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            ),
           ),
         Flexible(child: content),
-        if (actions.isNotEmpty) ...[
+        if (dock != null)
+          dock!
+        else if (actions.isNotEmpty) ...[
           SizedBox(height: tokens.spacing.md),
           Divider(height: tokens.borderWidth),
           Padding(
-            padding: gutter.copyWith(top: tokens.spacing.md),
+            padding: pad.copyWith(top: tokens.spacing.md),
             child: Row(
               spacing: tokens.spacing.sm,
               children: [for (final a in actions) Expanded(child: a)],
             ),
           ),
         ],
-        SizedBox(height: tokens.spacing.lg),
+        if (dock == null) SizedBox(height: tokens.spacing.lg),
       ],
     );
   }

@@ -28,4 +28,19 @@ void main() {
     await t.tap(find.text('See all'));
     expect(taps, 1);
   });
+
+  testWidgets('headerValue reads with the title as one header, no title text',
+      (t) async {
+    await t.pumpWidget(host(
+      const PortalSectionHeader(title: 'Today', headerValue: '-£42.10'),
+    ));
+    expect(find.bySemanticsLabel('Today, -£42.10'), findsOneWidget);
+  });
+
+  testWidgets('skeleton draws no title text, as one excluded group',
+      (t) async {
+    await t.pumpWidget(host(const PortalSectionHeader.skeleton()));
+    expect(find.text('Today'), findsNothing);
+    expect(find.byType(PortalSkeleton), findsOneWidget);
+  });
 }

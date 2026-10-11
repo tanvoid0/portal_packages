@@ -132,6 +132,48 @@ void main() {
     expect(grown.height, closeTo(avail * 0.9, 1));
   });
 
+  testWidgets('onClose/trailing/message draw, and gutter:false drops padding',
+      (t) async {
+    var closed = false;
+    await t.pumpWidget(_host((context) {
+      PortalSheet.show<void>(
+        context,
+        builder: (_) => PortalSheetScaffold(
+          title: 'Actions',
+          message: 'Why this asks',
+          onClose: () => closed = true,
+          trailing: const [Icon(Icons.star)],
+          gutter: false,
+          scrollable: false,
+          body: const Text('body'),
+        ),
+      );
+    }));
+    await t.tap(find.text('open'));
+    await t.pumpAndSettle();
+    expect(find.text('Why this asks'), findsOneWidget);
+    expect(find.byIcon(Icons.star), findsOneWidget);
+    await t.tap(find.byTooltip('Close'));
+    expect(closed, isTrue);
+  });
+
+  testWidgets('dock renders as the footer instead of actions', (t) async {
+    await t.pumpWidget(_host((context) {
+      PortalSheet.show<void>(
+        context,
+        builder: (_) => PortalSheetScaffold(
+          body: const Text('body'),
+          dock: PortalButtonDock(
+            primary: PortalButton(label: 'Save', onPressed: () {}),
+          ),
+        ),
+      );
+    }));
+    await t.tap(find.text('open'));
+    await t.pumpAndSettle();
+    expect(find.text('Save'), findsOneWidget);
+  });
+
   testWidgets('the keyboard lifts a detents sheet instead of eating it',
       (t) async {
     t.view.viewInsets = const FakeViewPadding(bottom: 300);

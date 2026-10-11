@@ -45,4 +45,32 @@ void main() {
     expect(find.text('Row 0'), findsNothing);
     expect(find.byType(Divider), findsWidgets);
   });
+
+  testWidgets('selectedIndices outlines every selected row, not just one',
+      (t) async {
+    await t.pumpWidget(host(const PortalListSection.selectable(
+      selectedIndices: {0, 2},
+      children: [
+        PortalListItem(title: 'A'),
+        PortalListItem(title: 'B'),
+        PortalListItem(title: 'C'),
+      ],
+    )));
+    final boxes = t
+        .widgetList<DecoratedBox>(find.byType(DecoratedBox))
+        .where((d) => d.position == DecorationPosition.foreground);
+    expect(boxes.length, 2);
+  });
+
+  testWidgets('skeleton draws rows shaped like the data, inset', (t) async {
+    await t.pumpWidget(host(PortalListSection.skeleton(rows: 2)));
+    expect(find.byType(PortalListItem), findsNWidgets(2));
+    expect(find.byType(PortalSectionHeader), findsNothing);
+  });
+
+  testWidgets('skeleton hasHeader draws a PortalSectionHeader.skeleton',
+      (t) async {
+    await t.pumpWidget(host(PortalListSection.skeleton(hasHeader: true)));
+    expect(find.byType(PortalSectionHeader), findsOneWidget);
+  });
 }
