@@ -58,6 +58,7 @@ class PortalTextField extends StatefulWidget {
     this.maxLines = 1,
     this.minLines,
     this.enabled = true,
+    this.readOnly = false,
     this.autofocus = false,
     this.filled = false,
     this.prefix,
@@ -93,6 +94,7 @@ class PortalTextField extends StatefulWidget {
         maxLines = 1,
         minLines = null,
         enabled = false,
+        readOnly = false,
         autofocus = false,
         filled = false,
         prefix = null,
@@ -125,7 +127,8 @@ class PortalTextField extends StatefulWidget {
     String? currencySymbol,
     this.suffix,
     bool signed = false,
-  })  : initialValue = null,
+  })  : readOnly = false,
+        initialValue = null,
         warning = null,
         unit = null,
         readOnlyReason = null,
@@ -176,6 +179,12 @@ class PortalTextField extends StatefulWidget {
   final int? maxLines;
   final int? minLines;
   final bool enabled;
+
+  /// Visible, focusable (so it can still be tabbed to and selected/copied),
+  /// uneditable — and silent: no lock icon, no muted style, no line under the
+  /// field. For a value that is simply fixed right now (a prefilled email
+  /// mid-flow), not one that needs explaining; use [readOnlyReason] for that.
+  final bool readOnly;
   final bool autofocus;
 
   /// Borderless filled pill instead of the theme's bordered field.
@@ -292,7 +301,8 @@ class _PortalTextFieldState extends State<PortalTextField> {
       borderSide: BorderSide.none,
     );
 
-    final readOnly = widget.readOnlyReason != null;
+    final readOnlyWithReason = widget.readOnlyReason != null;
+    final readOnly = widget.readOnly || readOnlyWithReason;
     final muted =
         tokens.textStyles.body.copyWith(color: portal.mutedForeground);
     // One slot under the field: error > warning > helper > readOnlyReason.
@@ -318,7 +328,7 @@ class _PortalTextFieldState extends State<PortalTextField> {
       suffixText: widget.unit,
       suffixStyle: muted,
       suffixIcon: widget.suffix ??
-          (readOnly
+          (readOnlyWithReason
               ? const ExcludeSemantics(
                   child: Icon(Icons.lock_outline_rounded),
                 )
@@ -377,7 +387,7 @@ class _PortalTextFieldState extends State<PortalTextField> {
           autofocus: widget.autofocus,
           autofillHints: widget.autofillHints,
           textCapitalization: widget.textCapitalization,
-          style: readOnly ? muted : tokens.textStyles.body,
+          style: readOnlyWithReason ? muted : tokens.textStyles.body,
           cursorColor: portal.primary,
           decoration: decoration,
         ),

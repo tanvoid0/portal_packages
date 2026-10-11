@@ -33,6 +33,26 @@ void main() {
     expect(t.widget<TextField>(find.byType(TextField)).enabled, isFalse);
   });
 
+  testWidgets(
+      'readOnly: focusable and uneditable, no lock icon or reason line; '
+      'readOnlyReason also shows the lock and the reason', (t) async {
+    await t.pumpWidget(
+      host(const PortalTextField(label: 'Email', readOnly: true)),
+    );
+    final field = t.widget<TextField>(find.byType(TextField));
+    expect(field.enabled, isTrue);
+    expect(field.readOnly, isTrue);
+    expect(find.byIcon(Icons.lock_outline_rounded), findsNothing);
+
+    await t.pumpWidget(host(const PortalTextField(
+      label: 'Email',
+      readOnlyReason: 'Comes from Northwind Bank',
+    )));
+    expect(t.widget<TextField>(find.byType(TextField)).readOnly, isTrue);
+    expect(find.byIcon(Icons.lock_outline_rounded), findsOneWidget);
+    expect(find.text('Comes from Northwind Bank'), findsOneWidget);
+  });
+
   testWidgets('filled: borderless with a fill; field meets the tap target',
       (t) async {
     await t.pumpWidget(host(const PortalTextField(filled: true, hint: 'Note')));
