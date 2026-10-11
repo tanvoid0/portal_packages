@@ -252,7 +252,8 @@ class PortalFilterChip extends StatelessWidget {
         ),
       ),
     );
-    final shown = enabled ? chip : Opacity(opacity: 0.38, child: chip);
+    final shown =
+        enabled ? chip : Opacity(opacity: tokens.motion.disabledOpacity, child: chip);
     if (onDeleted == null) return shown;
 
     // The close glyph is painted by the chip; the target is laid over its end

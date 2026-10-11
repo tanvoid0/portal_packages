@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
+import '../../contrast_gate.dart';
 import '../theme/portal_sentiment.dart';
 import '../theme/portal_ui_theme.dart';
 import '../tokens/design_tokens.dart';
@@ -193,14 +194,8 @@ class _PromptBody extends StatelessWidget {
   final VoidCallback onDismiss;
 
   /// A foreground under its threshold on its fill steps 12% toward onSurface.
-  static Color _clear(Color fg, Color bg, Color ink, double min) {
-    double ratio(Color a, Color b) {
-      final x = a.computeLuminance(), y = b.computeLuminance();
-      return (x > y ? x + .05 : y + .05) / (x > y ? y + .05 : x + .05);
-    }
-
-    return ratio(fg, bg) >= min ? fg : Color.lerp(fg, ink, .12)!;
-  }
+  static Color _clear(Color fg, Color bg, Color ink, double min) =>
+      portalContrastRatio(fg, bg) >= min ? fg : Color.lerp(fg, ink, .12)!;
 
   @override
   Widget build(BuildContext context) {
@@ -362,7 +357,11 @@ class _PromptBody extends StatelessWidget {
               ),
               if (hasAction) ...[
                 const SizedBox(width: 8),
-                actionButton(height: 36, radius: 18, hPad: 14, size: 14),
+                actionButton(
+                    height: tokens.componentSizes.buttonHeightSm,
+                    radius: 18,
+                    hPad: 14,
+                    size: 14),
               ],
               if (hasDismiss) dismiss(),
             ],
@@ -405,7 +404,7 @@ class _PromptBody extends StatelessWidget {
                     runSpacing: 8,
                     children: [
                       actionButton(
-                          height: 36,
+                          height: tokens.componentSizes.buttonHeightSm,
                           radius: tokens.radii.md,
                           hPad: 16,
                           size: 14),

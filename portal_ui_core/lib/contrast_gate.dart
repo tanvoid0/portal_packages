@@ -27,6 +27,86 @@ const double kPortalTextContrast = 4.5;
 /// surface behind it (WCAG 1.4.11).
 const double kPortalNonTextContrast = 3.0;
 
+/// [fg] kept readable on [bg]: drawn as is when it already clears AA text
+/// ([kPortalTextContrast]), else stepped toward [toward] (the page ink)
+/// until it does. A brand primary that is fine on a button (3.9:1 on a grey
+/// page) is too light for a text-only action.
+Color portalReadable(Color fg, Color bg, Color toward) {
+  var c = fg;
+  for (var i = 1; i <= 10 && portalContrastRatio(c, bg) < kPortalTextContrast; i++) {
+    c = Color.lerp(fg, toward, i / 10)!;
+  }
+  return c;
+}
+
+/// How far a selection capsule must stand off the pill it sits on. The
+/// capsule is reinforcement, not a slab, so it only needs to clear this —
+/// not full text contrast.
+const double portalWellContrast = 1.5;
+
+/// A selection capsule that can actually be seen on [pill]: a wash of
+/// [mark], deepened until it clears [portalWellContrast].
+Color portalWellOn(Color pill, Color mark) {
+  var c = pill;
+  for (var a = 8; a <= 44 && portalContrastRatio(c, pill) < portalWellContrast; a += 4) {
+    c = Color.alphaBlend(mark.withValues(alpha: a / 100), pill);
+  }
+  return c;
+}
+
+/// True when two fills would be taken for each other at badge size: the
+/// same hue family, near enough in tone. Hue is what carries the meaning
+/// here, so it is the hue that is compared.
+bool portalTooAlike(Color a, Color b) {
+  final x = HSVColor.fromColor(a), y = HSVColor.fromColor(b);
+  final d = (x.hue - y.hue).abs();
+  return (d < 40 || d > 320) && (x.saturation > .05 || y.saturation > .05);
+}
+
+/// A fill for a state that is *not* done, guaranteed not to be read as
+/// done. [done] is the hue to steer away from; [accent] stands in when
+/// [pending] is too alike, and [plain] (a neutral fill) when [accent] is too.
+Color portalNotDone(Color pending, Color done, Color accent, Color plain) {
+  if (!portalTooAlike(pending, done)) return pending;
+  if (!portalTooAlike(accent, done)) return accent;
+  return plain;
+}
+
+/// A neutral fill (secondary button, neutral badge, neutral prompt): the
+/// high tone, or the card's where the surface under it is already high —
+/// a grouped light page draws neutral fills on `portal.card`.
+Color neutralFill(BuildContext context) {
+  final cs = Theme.of(context).colorScheme;
+  return Material.maybeOf(context)?.color == cs.surfaceContainerHigh
+      ? PortalUiTheme.of(context).card
+      : cs.surfaceContainerHigh;
+}
+
+/// Tint alphas for [categoryColors]: a category colour reads as a tint of
+/// the surface, not a solid fill.
+const double _tintLight = .18;
+const double _tintDark = .32;
+const double _glyphContrast = 3;
+
+/// (fill, glyph) for a category colour [c]: [c] tinted over the surface, and
+/// a glyph from [c] toward onSurface in tenths until it holds
+/// [_glyphContrast] (non-text contrast) on that tint.
+(Color, Color) categoryColors(BuildContext context, Color c) {
+  final cs = Theme.of(context).colorScheme;
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  final fill = Color.alphaBlend(
+    c.withValues(alpha: dark ? _tintDark : _tintLight),
+    cs.surface,
+  );
+  var ink = c;
+  for (var i = 1;
+      i <= 10 && portalContrastRatio(ink, fill) < _glyphContrast;
+      i++) {
+    ink = Color.lerp(c, cs.onSurface, i / 10)!;
+  }
+  return (fill, ink);
+}
+
 /// WCAG 2.x contrast ratio between two opaque colours.
 double portalContrastRatio(Color fg, Color bg) {
   final a = fg.computeLuminance(), b = bg.computeLuminance();

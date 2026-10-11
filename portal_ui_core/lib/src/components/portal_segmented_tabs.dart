@@ -113,7 +113,8 @@ class PortalSegmentedTabs extends StatelessWidget {
         ],
       ],
     );
-    final dimmed = enabled ? row : Opacity(opacity: 0.38, child: row);
+    final dimmed =
+        enabled ? row : Opacity(opacity: tokens.motion.disabledOpacity, child: row);
     final body = scrollable
         ? SingleChildScrollView(
             scrollDirection: Axis.horizontal,

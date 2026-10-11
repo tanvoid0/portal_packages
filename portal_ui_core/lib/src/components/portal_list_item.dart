@@ -62,6 +62,7 @@ class PortalListLeading {
     PortalListTone tone = PortalListTone.primary,
     Color? backgroundColor,
     Color? foregroundColor,
+    Color? autoContrastFrom,
     PortalIconTileShape shape = PortalIconTileShape.roundedSquare,
   }) =>
       PortalListLeading.tileBuilder(
@@ -70,6 +71,7 @@ class PortalListLeading {
         shape: shape,
         backgroundColor: backgroundColor,
         foregroundColor: foregroundColor,
+        autoContrastFrom: autoContrastFrom,
       );
 
   /// [PortalListLeading.tile] for any glyph: [iconBuilder] gets the ink to
@@ -79,6 +81,7 @@ class PortalListLeading {
     PortalListTone tone = PortalListTone.primary,
     Color? backgroundColor,
     Color? foregroundColor,
+    Color? autoContrastFrom,
     PortalIconTileShape shape = PortalIconTileShape.roundedSquare,
   }) =>
       PortalListLeading._(
@@ -89,6 +92,7 @@ class PortalListLeading {
           shape: shape,
           backgroundColor: backgroundColor,
           foregroundColor: foregroundColor,
+          autoContrastFrom: autoContrastFrom,
         ),
       );
 
@@ -903,7 +907,7 @@ class PortalListItem extends StatelessWidget {
       styles.body.copyWith(
         decoration: struck || done ? TextDecoration.lineThrough : null,
         color: disabled
-            ? cs.onSurface.withValues(alpha: 0.38)
+            ? cs.onSurface.withValues(alpha: tokens.motion.disabledOpacity)
             : destructive
                 ? cs.error
                 : done || detail || stepMuted

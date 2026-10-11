@@ -1,3 +1,5 @@
+import 'dart:ui' show lerpDouble;
+
 import 'package:flutter/material.dart';
 
 import '../tokens/design_tokens.dart';
@@ -36,6 +38,9 @@ class PortalUiTheme extends ThemeExtension<PortalUiTheme> {
     required this.input,
     this.surfaceTreatment = PortalSurfaceTreatment.solid,
     this.glassStyle,
+    this.dip = 1,
+    this.wash = true,
+    this.ruleVariant = false,
   });
 
   final DesignTokens tokens;
@@ -77,7 +82,25 @@ class PortalUiTheme extends ThemeExtension<PortalUiTheme> {
   final PortalSurfaceTreatment surfaceTreatment;
   final PortalGlassStyle? glassStyle;
 
+  /// Opacity [PortalPressable] applies while pressed, in addition to its
+  /// scale; 1 is no dip.
+  final double dip;
+
+  /// Whether [PortalPressable] shows the theme's overlay wash on press.
+  final bool wash;
+
+  /// `rule`'s hairline is outline-variant rather than ui_core's outline
+  /// at [_ruleAlpha].
+  final bool ruleVariant;
+
   bool get isGlass => surfaceTreatment == PortalSurfaceTreatment.glass;
+
+  /// kit: ui_core's `--rule`, `color-mix(outline 45%, transparent)`.
+  static const double _ruleAlpha = .45;
+
+  /// The fleet's hairline colour — dividers, rules, thin borders.
+  Color rule(ColorScheme cs) =>
+      ruleVariant ? cs.outlineVariant : cs.outline.withValues(alpha: _ruleAlpha);
 
   // ── shadcn aliases ──────────────────────────────────────────────────────
 
@@ -168,6 +191,9 @@ class PortalUiTheme extends ThemeExtension<PortalUiTheme> {
     PortalSurfaceTreatment? surfaceTreatment,
     PortalGlassStyle? glassStyle,
     bool clearGlassStyle = false,
+    double? dip,
+    bool? wash,
+    bool? ruleVariant,
   }) {
     return PortalUiTheme(
       tokens: tokens ?? this.tokens,
@@ -195,6 +221,9 @@ class PortalUiTheme extends ThemeExtension<PortalUiTheme> {
       input: input ?? this.input,
       surfaceTreatment: surfaceTreatment ?? this.surfaceTreatment,
       glassStyle: clearGlassStyle ? null : (glassStyle ?? this.glassStyle),
+      dip: dip ?? this.dip,
+      wash: wash ?? this.wash,
+      ruleVariant: ruleVariant ?? this.ruleVariant,
     );
   }
 
@@ -232,6 +261,9 @@ class PortalUiTheme extends ThemeExtension<PortalUiTheme> {
       surfaceTreatment:
           t < 0.5 ? surfaceTreatment : other.surfaceTreatment,
       glassStyle: t < 0.5 ? glassStyle : other.glassStyle,
+      dip: lerpDouble(dip, other.dip, t)!,
+      wash: t < 0.5 ? wash : other.wash,
+      ruleVariant: t < 0.5 ? ruleVariant : other.ruleVariant,
     );
   }
 }

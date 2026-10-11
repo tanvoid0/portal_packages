@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../contrast_gate.dart';
 import '../theme/portal_component_extensions.dart';
 import '../theme/portal_semantic_colors.dart';
 import '../theme/portal_ui_theme.dart';
@@ -34,14 +35,6 @@ enum PortalBadgeTone {
             ? warning
             : neutral;
   }
-}
-
-/// True when two fills would be taken for each other at badge size: the same
-/// hue family. Hue carries the meaning here, so it is the hue that is compared.
-bool _tooAlike(Color a, Color b) {
-  final x = HSVColor.fromColor(a), y = HSVColor.fromColor(b);
-  final d = (x.hue - y.hue).abs();
-  return (d < 40 || d > 320) && (x.saturation > .05 || y.saturation > .05);
 }
 
 /// Status label: Paid, Overdue, In progress.
@@ -133,21 +126,14 @@ class PortalBadge extends StatelessWidget {
   /// beside 'Paid') would draw both the same pale green, so they fall back to
   /// the primary container, then the neutral fill.
   (Color, Color) _container(BuildContext context) {
-    final portal = PortalUiTheme.of(context);
     final cs = Theme.of(context).colorScheme;
     final semantic = PortalSemanticColors.of(context);
-    final neutral = (
-      // On a surface that is already high the card is the neutral fill.
-      Material.maybeOf(context)?.color == cs.surfaceContainerHigh
-          ? portal.card
-          : cs.surfaceContainerHigh,
-      cs.onSurfaceVariant,
-    );
+    final neutral = (neutralFill(context), cs.onSurfaceVariant);
     (Color, Color) notDone((Color, Color) pending) {
       final done = semantic.successContainer;
-      if (!_tooAlike(pending.$1, done)) return pending;
       final accent = (cs.primaryContainer, cs.onPrimaryContainer);
-      return _tooAlike(accent.$1, done) ? neutral : accent;
+      final fill = portalNotDone(pending.$1, done, accent.$1, neutral.$1);
+      return fill == accent.$1 ? accent : fill == neutral.$1 ? neutral : pending;
     }
 
     return switch (tone) {

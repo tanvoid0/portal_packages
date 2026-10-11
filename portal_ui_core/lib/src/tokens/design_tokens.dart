@@ -250,6 +250,60 @@ class PortalTextStyles {
       height: 1.4,
       letterSpacing: 0.8,
     ),
+    this.barTitle = const TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w600,
+      height: 1.2,
+      letterSpacing: 0,
+    ),
+    this.field = const TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.normal,
+      height: 1.3,
+      letterSpacing: 0,
+    ),
+    this.pageTitle = const TextStyle(
+      fontSize: 18,
+      fontWeight: FontWeight.w600,
+      height: 1.2,
+      letterSpacing: -0.2,
+    ),
+    this.statusLine = const TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w500,
+      height: 1.3,
+      letterSpacing: 0,
+    ),
+    this.label = const TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+      height: 1.3,
+      letterSpacing: 0,
+    ),
+    this.help = const TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.normal,
+      height: 20 / 13,
+      letterSpacing: 0,
+    ),
+    this.buttonLabel = const TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w600,
+      height: 1.2,
+      letterSpacing: 0.1,
+    ),
+    this.value = const TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w500,
+      height: 1.35,
+      letterSpacing: 0,
+    ),
+    this.rowSubtitle = const TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.normal,
+      height: 1.35,
+      letterSpacing: 0,
+    ),
   });
 
   /// One figure that owns the screen — a balance, a stat page's headline
@@ -262,6 +316,34 @@ class PortalTextStyles {
   final TextStyle body;
   final TextStyle caption;
   final TextStyle overline;
+
+  /// A bar's mid title (a model switcher) — [body], 600, tight.
+  final TextStyle barTitle;
+
+  /// Text typed into a field — [body] at a tighter line height.
+  final TextStyle field;
+
+  /// A page's own title, below [title] — 18/1.2 at [subtitle]'s weight.
+  final TextStyle pageTitle;
+
+  /// A bar's small status line under [pageTitle] — [caption], 12/1.3.
+  final TextStyle statusLine;
+
+  /// A field's label above its input — [body], 600, 14/1.3.
+  final TextStyle label;
+
+  /// The helper line under a field or control — [body] at 13/20.
+  final TextStyle help;
+
+  /// A filled or text button's label — [body], 600, 16/1.2.
+  final TextStyle buttonLabel;
+
+  /// A row's value or title line — [body], 500, 16/1.35, tabular when
+  /// [numeric]. Pair with [rowSubtitle] for the line beneath it.
+  final TextStyle value;
+
+  /// The line under a [value] title — [caption] at [value]'s line height.
+  final TextStyle rowSubtitle;
 
   /// [style] one weight heavier and tracked 0.2 tighter — a selected tab, the
   /// current value in a list of values. Already `w900` stays `w900`.
@@ -303,6 +385,7 @@ class PortalMotion {
     this.staggerStep = const Duration(milliseconds: 60),
     this.listRevealDuration = const Duration(milliseconds: 280),
     this.pressScale = 0.97,
+    this.disabledOpacity = 0.38,
     Curve? standard,
     Curve? emphasized,
   })  : _standard = standard,
@@ -320,6 +403,9 @@ class PortalMotion {
 
   /// Scale a `PortalPressable` shrinks to while held. 1 disables the press.
   final double pressScale;
+
+  /// Opacity a disabled control dims to.
+  final double disabledOpacity;
 
   // Static because `SpringDescription.withDampingRatio` is not const and this
   // class has to stay const-constructible for `DesignTokens`.

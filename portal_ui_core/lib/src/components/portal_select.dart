@@ -106,7 +106,7 @@ class PortalSelect<T> extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final enabled = p.onTap != null;
     final readOnly = p.readOnlyReason != null;
-    final off = cs.onSurface.withValues(alpha: 0.38);
+    final off = cs.onSurface.withValues(alpha: tokens.motion.disabledOpacity);
     final ink = readOnly
         ? cs.onSurfaceVariant
         : enabled
@@ -190,7 +190,8 @@ class PortalSelect<T> extends StatelessWidget {
     final tokens = portal.tokens;
     final enabled = onChanged != null;
     final cs = Theme.of(context).colorScheme;
-    final ink = enabled ? cs.onSurface : cs.onSurface.withValues(alpha: 0.38);
+    final ink =
+        enabled ? cs.onSurface : cs.onSurface.withValues(alpha: tokens.motion.disabledOpacity);
 
     return PortalFormField(
       label: label,

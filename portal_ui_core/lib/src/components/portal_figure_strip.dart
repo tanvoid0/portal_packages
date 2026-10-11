@@ -22,10 +22,9 @@ class PortalFigure {
 enum PortalFigureSize { row, figure }
 
 // `.fit` caption-to-amount gap 2; the cell is 150 wide, so a long figure
-// shows the scaling. Its rule is the outline at 45%.
+// shows the scaling. Its rule is the theme's hairline colour.
 const double _fitGap = 2;
 const double _fitWidth = 150;
-const double _rule = .45;
 
 /// Supporting figures under a hero (`.fits`): 2-4 equal cells, each a
 /// caption over an amount that shrinks to its cell, a hairline on the leading
@@ -52,10 +51,11 @@ class PortalFigureStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = PortalUiTheme.of(context).tokens;
+    final portalUi = PortalUiTheme.of(context);
+    final t = portalUi.tokens;
     final cs = Theme.of(context).colorScheme;
     final rule = BorderSide(
-      color: cs.outline.withValues(alpha: _rule),
+      color: portalUi.rule(cs),
       width: t.borderWidth,
     );
     final cap = t.textStyles.caption.copyWith(color: cs.onSurfaceVariant);
@@ -189,68 +189,12 @@ final _valueTail = RegExp(
   r'^\s*(?:[%°]|[x×*/·]\s*\d[\d.,]*\s*[A-Za-z%]{0,4})$',
 );
 
-/// A strip cell's value, drawn as the viewer's `KitAmount` does: a row's value
-/// heavy-figure-plus-muted-unit, or the 34 `.fit` display figure.
-class _FigureValue extends StatelessWidget {
-  const _FigureValue(this.value, {required this.unit, required this.size});
-
-  final String value;
-  final String? unit;
-  final PortalFigureSize size;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = PortalUiTheme.of(context).tokens;
-    final cs = Theme.of(context).colorScheme;
-    final ink = cs.onSurface;
-    final muted = cs.onSurfaceVariant;
-    final row = size == PortalFigureSize.row;
-    final style = (row
-            ? _rowValue(t)
-            : t.textStyles
-                .numeric(t.textStyles.hero)
-                .copyWith(fontSize: 34, height: 1.15))
-        .copyWith(color: ink);
-    final TextSpan span;
-    if (row) {
-      span = _valueSpan(style, value, unit: unit, muted: muted);
-    } else {
-      // `.amt small`: .5em, 600.
-      final unitStyle = style.copyWith(
-        fontSize: style.fontSize! / 2,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0,
-        color: muted,
-      );
-      span = TextSpan(
-        text: value,
-        children: [
-          if (unit case final u?) ...[
-            const TextSpan(text: ' '),
-            TextSpan(text: u, style: unitStyle),
-          ],
-        ],
-      );
-    }
-    return PortalReviewTag(
-      id: row ? 'kit.G2.row' : 'kit.G2.fit',
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: AlignmentDirectional.centerStart,
-        child: Text.rich(span, style: style, maxLines: 1, softWrap: false),
-      ),
-    );
-  }
-}
-
 /// A row's value, built to be read at a glance: the figure heavy (700, 17),
 /// its unit small and muted, anything after it ('x 8' reps) at 600. Only a
 /// value that *is* a quantity is drawn that way; prose ('Paid', '10 min and
 /// 1 h before') is 600 throughout. [unit] is appended when the value does not
 /// carry one.
-// ponytail: duplicated from the viewer's Kit.valueSpan; fold the viewer onto
-// this when a second widget needs it.
-TextSpan _valueSpan(
+TextSpan portalValueSpan(
   TextStyle base,
   String value, {
   String? unit,
@@ -288,4 +232,58 @@ TextSpan _valueSpan(
       if (m[3]!.isNotEmpty) TextSpan(text: m[3]),
     ],
   );
+}
+
+/// A strip cell's value, drawn as the viewer's `KitAmount` does: a row's value
+/// heavy-figure-plus-muted-unit, or the 34 `.fit` display figure.
+class _FigureValue extends StatelessWidget {
+  const _FigureValue(this.value, {required this.unit, required this.size});
+
+  final String value;
+  final String? unit;
+  final PortalFigureSize size;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = PortalUiTheme.of(context).tokens;
+    final cs = Theme.of(context).colorScheme;
+    final ink = cs.onSurface;
+    final muted = cs.onSurfaceVariant;
+    final row = size == PortalFigureSize.row;
+    final style = (row
+            ? _rowValue(t)
+            : t.textStyles
+                .numeric(t.textStyles.hero)
+                .copyWith(fontSize: 34, height: 1.15))
+        .copyWith(color: ink);
+    final TextSpan span;
+    if (row) {
+      span = portalValueSpan(style, value, unit: unit, muted: muted);
+    } else {
+      // `.amt small`: .5em, 600.
+      final unitStyle = style.copyWith(
+        fontSize: style.fontSize! / 2,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0,
+        color: muted,
+      );
+      span = TextSpan(
+        text: value,
+        children: [
+          if (unit case final u?) ...[
+            const TextSpan(text: ' '),
+            TextSpan(text: u, style: unitStyle),
+          ],
+        ],
+      );
+    }
+    return PortalReviewTag(
+      id: row ? 'kit.G2.row' : 'kit.G2.fit',
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: AlignmentDirectional.centerStart,
+        child: Text.rich(span, style: style, maxLines: 1, softWrap: false),
+      ),
+    );
+  }
 }

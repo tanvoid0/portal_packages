@@ -96,9 +96,6 @@ class PortalChoiceGrid extends StatelessWidget {
 
   final bool enabled;
 
-  // Same dim as PortalSelect's disabled ink.
-  static const _disabledOpacity = 0.38;
-
   @override
   Widget build(BuildContext context) {
     final tokens = PortalUiTheme.of(context).tokens;
@@ -132,7 +129,7 @@ class PortalChoiceGrid extends StatelessWidget {
     final radius = BorderRadius.circular(tokens.radii.md);
     final glyph = TextStyle(fontSize: IconTheme.of(context).size, height: 1);
     return Opacity(
-      opacity: enabled ? 1 : _disabledOpacity,
+      opacity: enabled ? 1 : tokens.motion.disabledOpacity,
       child: Wrap(
         spacing: gap,
         runSpacing: gap,

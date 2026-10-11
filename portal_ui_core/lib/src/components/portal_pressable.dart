@@ -8,7 +8,10 @@ import '../theme/portal_ui_theme.dart';
 import '../tokens/design_tokens.dart';
 
 /// Press state for anything tappable: shrinks to `tokens.motion.pressScale`
-/// while held and springs back on release.
+/// while held and springs back on release. A skin can also dip the opacity
+/// on press (`PortalUiTheme.dip`) and suppress the overlay wash
+/// (`PortalUiTheme.wash`); both default to "off" (dip 1, wash on), so a skin
+/// that never sets them sees today's behavior unchanged.
 ///
 /// Hosts the [InkWell] itself so the scale tracks Material's own notion of
 /// "pressed" — a press that turns into a scroll releases; a hold stays pressed
@@ -119,7 +122,8 @@ class _PortalPressableState extends State<PortalPressable> {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = PortalUiTheme.of(context).tokens;
+    final portalUi = PortalUiTheme.of(context);
+    final tokens = portalUi.tokens;
     final hasHandler = widget.onTap != null || widget.onLongPress != null;
     final interactive = widget.enabled && hasHandler;
     final curve = _pressed ? _press : _release;
@@ -128,22 +132,28 @@ class _PortalPressableState extends State<PortalPressable> {
     return Semantics(
       button: isButton,
       enabled: isButton ? widget.enabled : null,
-      child: AnimatedScale(
-        scale: _pressed ? tokens.motion.pressScale : 1,
+      child: AnimatedOpacity(
+        opacity: _pressed ? portalUi.dip : 1,
         duration: curve.duration,
         curve: curve,
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
-            onTap: interactive && widget.onTap != null ? _tap : null,
-            onLongPress: interactive ? widget.onLongPress : null,
-            onHighlightChanged: _highlight,
-            borderRadius: widget.borderRadius,
-            splashFactory: widget.ripple ? null : NoSplash.splashFactory,
-            splashColor: widget.ripple ? widget.splashColor : null,
-            highlightColor:
-                widget.ripple ? widget.highlightColor : Colors.transparent,
-            child: widget.child,
+        child: AnimatedScale(
+          scale: _pressed ? tokens.motion.pressScale : 1,
+          duration: curve.duration,
+          curve: curve,
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              onTap: interactive && widget.onTap != null ? _tap : null,
+              onLongPress: interactive ? widget.onLongPress : null,
+              onHighlightChanged: _highlight,
+              borderRadius: widget.borderRadius,
+              splashFactory: widget.ripple ? null : NoSplash.splashFactory,
+              splashColor: widget.ripple ? widget.splashColor : null,
+              highlightColor: !portalUi.wash
+                  ? Colors.transparent
+                  : (widget.ripple ? widget.highlightColor : Colors.transparent),
+              child: widget.child,
+            ),
           ),
         ),
       ),
