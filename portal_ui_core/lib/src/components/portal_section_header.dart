@@ -19,9 +19,16 @@ class PortalSectionHeader extends StatelessWidget {
     this.caption,
     this.actionLabel,
     this.onAction,
+    this.overline = false,
   });
 
   final String title;
+
+  /// Renders the title as a small uppercase-style eyebrow
+  /// (`tokens.textStyles.overline`, muted by default) instead of the
+  /// `subtitle` role — for a filter-group label or a quiet section cue. The
+  /// caller still supplies the copy's casing.
+  final bool overline;
 
   /// Optional leading glyph. Sized to the title's line, not a fixed constant.
   final IconData? icon;
@@ -50,8 +57,10 @@ class PortalSectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
-    final ink = foregroundColor ?? portal.onSurface;
-    final style = tokens.textStyles.subtitle.copyWith(color: ink);
+    final ink = foregroundColor ??
+        (overline ? portal.onSurfaceVariant : portal.onSurface);
+    final style = (overline ? tokens.textStyles.overline : tokens.textStyles.subtitle)
+        .copyWith(color: ink);
 
     final heading = Text(title, style: style);
     final action = actionLabel;

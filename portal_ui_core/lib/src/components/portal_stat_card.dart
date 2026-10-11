@@ -281,7 +281,9 @@ class PortalStatRow extends StatelessWidget {
       : stats = const [],
         _cells = cells;
 
-  final List<PortalStatCard> stats;
+  /// Usually [PortalStatCard]s, but any widget works (an app's own stat-card
+  /// wrapper, or a card wrapped in an entrance animation).
+  final List<Widget> stats;
 
   /// Defaults to the page's card gutter: 16 either side, 8 above, none below.
   /// Pass `EdgeInsets.zero` inside a page that already has one.
