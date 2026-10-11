@@ -1,0 +1,24 @@
+name: portal_automation
+description: Trigger-to-action automation engine for Portal apps — the reusable core behind the Routines app and assistant-driven automations.
+version: 0.1.0
+repository: https://github.com/tanvoid0/portal_packages/tree/main/portal_automation
+publish_to: none
+
+environment:
+  sdk: ">=3.8.1 <4.0.0"
+  flutter: ">=3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  meta: ^1.11.0
+  uuid: ^4.5.1
+  # ApiClient (ServerCall handler), SyncableRepository + PortalApiPaths
+  # (offline-first definition sync). The only heavy dependency; everything
+  # device-facing is injected by the host app, not imported here.
+  portal_platform: ^0.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0

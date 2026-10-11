@@ -1,0 +1,10 @@
+# Published pubspec depends on portal_platform from pub.dev; inside this
+# monorepo resolve it — and the siblings its own published pubspec wants from
+# pub.dev — from packages/. `pub publish` ignores this file.
+dependency_overrides:
+  portal_platform:
+    path: ../portal_platform
+  portal_crypto:
+    path: ../portal_crypto
+  portal_ui_core:
+    path: ../portal_ui_core
