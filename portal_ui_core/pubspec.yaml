@@ -26,6 +26,8 @@ dependencies:
   intl: ^0.20.2
   # PortalArt (G8): the per-app spot illustrations are SVG strings.
   flutter_svg: ^2.3.0
+  # PortalNetworkImage: the disk+mem cache every app's own copy hand-rolled.
+  cached_network_image: ^3.3.1
 
 dev_dependencies:
   flutter_test:

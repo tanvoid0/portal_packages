@@ -38,6 +38,7 @@ export 'src/widgets/ai_settings_section.dart';
 export 'src/widgets/ai_settings_group.dart';
 export 'src/widgets/ai_routing_sheet.dart';
 export 'src/widgets/ai_model_manager_sheet.dart';
+export 'src/runtime/portal_ai_app_kit.dart';
 export 'src/runtime/portal_ai_runtime.dart';
 export 'src/tools/ai_agent.dart';
 export 'src/chat/ai_attachment.dart';

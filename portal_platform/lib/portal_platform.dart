@@ -118,6 +118,7 @@ export 'src/auth/device_security/portal_device_security_settings_tile.dart';
 export 'src/auth/device_security/portal_device_security_strings.dart';
 
 // ─── Bootstrap & Config ────────────────────────────────────────────
+export 'src/bootstrap/portal_app_root.dart';
 export 'src/bootstrap/portal_bootstrap.dart';
 export 'src/config/app_config.dart';
 export 'src/config/data_storage_mode.dart';
@@ -131,6 +132,7 @@ export 'src/observability/portal_error_handlers.dart';
 export 'src/extensions/uri_extensions.dart';
 export 'src/format/currency_format.dart';
 export 'src/widgets/portal_app_version.dart';
+export 'src/widgets/portal_deep_link_assistant_view.dart';
 
 // Sideload updates. Portal ships outside the Play Store while the apps are
 // finished, so nothing tells an installed build that a newer one exists.

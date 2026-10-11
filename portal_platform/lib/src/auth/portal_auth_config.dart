@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:portal_ui_core/portal_ui_core.dart';
+
+import 'portal_auth_binding.dart';
+import 'portal_auth_view.dart';
 
 /// Branding and feature configuration for the shared auth UI.
 ///
@@ -67,3 +71,27 @@ class PortalAuthConfig {
     allowRegistration: allowRegistration,
   );
 }
+
+/// The login [GetPage] every app wires up the same way: [PortalAuthView]
+/// built from [PortalAuthConfig.of], bound by [PortalAuthBinding]. Covers
+/// every app whose auth screen needs nothing beyond [identity] — one that
+/// builds its [PortalAuthConfig] some other way (a logo asset, a custom
+/// forgot-password route) still constructs its own `GetPage` instead.
+GetPage portalLoginPage({
+  required String name,
+  required PortalAppIdentity identity,
+  bool showTestServer = false,
+  VoidCallback? onForgotPassword,
+  bool allowRegistration = true,
+}) => GetPage(
+  name: name,
+  page: () => PortalAuthView(
+    config: PortalAuthConfig.of(
+      identity,
+      showTestServer: showTestServer,
+      onForgotPassword: onForgotPassword,
+      allowRegistration: allowRegistration,
+    ),
+  ),
+  binding: PortalAuthBinding(),
+);
