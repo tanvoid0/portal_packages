@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -279,8 +280,9 @@ Future<bool> showPortalUpdateDialog(
   return portalInstallAndReport(context, service, release);
 }
 
-/// Hands [release] to [service] and says where the download went, or why it
-/// did not. True when the browser hand-off started.
+/// Downloads [release] through [service] and hands it to the PackageInstaller,
+/// showing progress and the result. True when the install session was
+/// launched.
 ///
 /// The tail of [showPortalUpdateDialog], public because the Portal apps sheet
 /// in `PortalAppsSection.grouped` asks its own question first and then needs
@@ -290,25 +292,49 @@ Future<bool> portalInstallAndReport(
   PortalUpdateService service,
   PortalRelease release,
 ) async {
+  final progress = ValueNotifier<double>(-1);
+  // Not awaited: this dialog stays up until the download finishes and the
+  // `finally` below pops it. barrierDismissible is false, so it cannot close
+  // on its own and leave that pop to dismiss the wrong route.
+  unawaited(
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Downloading'),
+        content: ValueListenableBuilder<double>(
+          valueListenable: progress,
+          builder: (context, value, _) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              LinearProgressIndicator(value: value < 0 ? null : value),
+              const SizedBox(height: 12),
+              Text(value < 0 ? '' : '${(value * 100).round()}%'),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
   String? error;
+  File? apk;
   try {
-    await service.install(release);
+    apk = await service.download(release, onProgress: (p) => progress.value = p);
+    await service.install(apk);
   } on PortalUpdateException catch (e) {
     error = e.message;
   } catch (e) {
     error = 'Update failed: $e';
+  } finally {
+    progress.dispose();
+    if (context.mounted) Navigator.of(context).pop();
   }
 
-  if (!context.mounted) return error == null;
-  // The browser has the download now; the install sheet appears when the
-  // user opens it, so the one thing left to say is where to look.
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(
-        error ?? 'Downloading in your browser. Open it when it finishes to install.',
-      ),
-    ),
-  );
+  if (error != null && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+    return false;
+  }
   return error == null;
 }
 

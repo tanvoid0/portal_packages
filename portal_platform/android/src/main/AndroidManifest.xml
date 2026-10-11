@@ -16,5 +16,7 @@
         <package android:name="com.tanvoid0.portal_finance" />
         <package android:name="com.tanvoid0.portal_task" />
         <package android:name="com.tanvoid0.portallauncher" />
+        <package android:name="com.tanvoid0.portal_journey" />
+        <package android:name="com.tanvoid0.portal_assistant" />
     </queries>
 </manifest>
