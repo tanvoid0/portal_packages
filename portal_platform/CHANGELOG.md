@@ -1,5 +1,6 @@
 ## Unreleased
 
+- `PortalPasswordResetView` now builds on `portal_ui_core`'s `PortalAppBar`, `PortalTextField` and `PortalButton` instead of raw `AppBar`/`TextFormField`/`FilledButton` — presentation only, same fields, validation and API calls. The password fields use `PortalTextField.obscureToggle` for the show/hide eye.
 - `PortalAuthConfig.of(identity)`: builds a config from a `portal_ui_core` `PortalAppIdentity` so an app states its icon/name/tagline once. `identity.logo` isn't forwarded — `appIconImage` is an asset path, not an `ImageProvider` — pass it on the plain constructor if needed. Needs `portal_ui_core` 0.3.0 (`PortalAppIdentity`); the constraint is raised to match.
 - `PortalSettingsSection.slot` (new, defaults to `PortalSettingsGroup.custom`): a section can render right after a named group's own content instead of only in the `custom` slot.
 - `PortalSettingsPage.header` (new): given, the page is just its `ListView` with `header` first — no `Scaffold`/`PortalAppBar` — for a caller embedding it under its own chrome. Loses the app bar's cloud-outage line; the Status group's own Mode row still reports it.

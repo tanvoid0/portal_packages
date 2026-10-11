@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 import '../services/api_client.dart';
 
@@ -39,8 +40,6 @@ class _PortalPasswordResetViewState extends State<PortalPasswordResetView> {
 
   bool _codeSent = false;
   bool _isLoading = false;
-  bool _obscureNew = true;
-  bool _obscureConfirm = true;
   String _errorMessage = '';
 
   @override
@@ -124,7 +123,7 @@ class _PortalPasswordResetViewState extends State<PortalPasswordResetView> {
     final cs = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Reset password')),
+      appBar: const PortalAppBar(title: 'Reset password'),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -145,65 +144,38 @@ class _PortalPasswordResetViewState extends State<PortalPasswordResetView> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    TextFormField(
+                    PortalTextField(
                       controller: _emailController,
                       validator: _validateEmail,
                       keyboardType: TextInputType.emailAddress,
                       readOnly: _codeSent,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        prefixIcon: Icon(Icons.email_outlined),
-                      ),
+                      label: 'Email',
+                      prefix: const Icon(Icons.email_outlined),
                     ),
                     if (_codeSent) ...[
                       const SizedBox(height: 16),
-                      TextFormField(
+                      PortalTextField(
                         controller: _codeController,
                         validator: _validateCode,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Verification code',
-                          prefixIcon: Icon(Icons.pin_outlined),
-                        ),
+                        label: 'Verification code',
+                        prefix: const Icon(Icons.pin_outlined),
                       ),
                       const SizedBox(height: 16),
-                      TextFormField(
+                      PortalTextField(
                         controller: _newPasswordController,
                         validator: _validateNewPassword,
-                        obscureText: _obscureNew,
-                        decoration: InputDecoration(
-                          labelText: 'New password',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscureNew
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                            ),
-                            onPressed: () =>
-                                setState(() => _obscureNew = !_obscureNew),
-                          ),
-                        ),
+                        obscureToggle: true,
+                        label: 'New password',
+                        prefix: const Icon(Icons.lock_outline),
                       ),
                       const SizedBox(height: 16),
-                      TextFormField(
+                      PortalTextField(
                         controller: _confirmPasswordController,
                         validator: _validateConfirmPassword,
-                        obscureText: _obscureConfirm,
-                        decoration: InputDecoration(
-                          labelText: 'Confirm password',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscureConfirm
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                            ),
-                            onPressed: () => setState(
-                              () => _obscureConfirm = !_obscureConfirm,
-                            ),
-                          ),
-                        ),
+                        obscureToggle: true,
+                        label: 'Confirm password',
+                        prefix: const Icon(Icons.lock_outline),
                       ),
                     ],
                     if (_errorMessage.isNotEmpty) ...[
@@ -211,21 +183,12 @@ class _PortalPasswordResetViewState extends State<PortalPasswordResetView> {
                       Text(_errorMessage, style: TextStyle(color: cs.error)),
                     ],
                     const SizedBox(height: 24),
-                    FilledButton(
+                    PortalButton(
+                      label: _codeSent ? 'Update password' : 'Send code',
+                      size: PortalButtonSize.lg,
+                      expand: true,
+                      isLoading: _isLoading,
                       onPressed: _isLoading ? null : _submit,
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(_codeSent ? 'Update password' : 'Send code'),
                     ),
                     if (_codeSent) ...[
                       const SizedBox(height: 8),
