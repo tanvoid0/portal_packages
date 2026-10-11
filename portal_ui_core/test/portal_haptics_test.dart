@@ -73,10 +73,15 @@ void main() {
     await t.pump(const Duration(milliseconds: 300));
   });
 
-  test('PortalThemeConfig.haptics drives the switch', () {
+  test('PortalThemeConfig.haptics drives the switch when given', () {
     const PortalThemeConfig(haptics: false).light();
     expect(PortalHaptics.enabled, isFalse);
+    // Left null (the default), a rebuild must not stomp a user's own
+    // haptics setting back on.
     const PortalThemeConfig().light();
+    expect(PortalHaptics.enabled, isFalse);
+
+    const PortalThemeConfig(haptics: true).light();
     expect(PortalHaptics.enabled, isTrue);
   });
 

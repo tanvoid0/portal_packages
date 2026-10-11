@@ -40,6 +40,10 @@ class PortalSettingsLabels {
     this.appVersion = 'App version',
     this.theme = 'Theme',
     this.accentColour = 'Accent colour',
+    this.haptics = 'Haptics',
+    this.hapticsOff = 'Off',
+    this.hapticsLight = 'Light',
+    this.hapticsFull = 'Full',
     this.mode = 'Mode',
     this.modeCloud = 'Portal Cloud',
     this.modeOnDevice = 'On-device',
@@ -141,6 +145,10 @@ class PortalSettingsLabels {
   // Appearance, Status and updates.
   final String theme;
   final String accentColour;
+  final String haptics;
+  final String hapticsOff;
+  final String hapticsLight;
+  final String hapticsFull;
   final String mode;
   final String modeCloud;
   final String modeOnDevice;

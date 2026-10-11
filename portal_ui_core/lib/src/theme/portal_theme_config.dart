@@ -42,7 +42,7 @@ class PortalThemeConfig {
     this.portalUiThemeBuilder,
     this.customize,
     this.useComponentThemes = true,
-    this.haptics = true,
+    this.haptics,
     this.dynamicColor = false,
   });
 
@@ -65,8 +65,12 @@ class PortalThemeConfig {
   final PortalThemeCustomizer? customize;
   final bool useComponentThemes;
 
-  /// Sets [PortalHaptics.enabled] when a theme is built from this config.
-  final bool haptics;
+  /// When given, sets [PortalHaptics.enabled] every time a theme is built
+  /// from this config. Left null (the default) so a theme rebuild — e.g.
+  /// switching accent colour — does not overwrite the user's own haptics
+  /// setting; a caller that genuinely wants to force the switch (a demo, a
+  /// test) passes it explicitly.
+  final bool? haptics;
 
   /// Follow the device's dynamic colour (Android 12+ Material You).
   ///
@@ -96,7 +100,7 @@ class PortalThemeConfig {
     PortalUiThemeBuilder? portalUiThemeBuilder,
     PortalThemeCustomizer? customize,
     bool? useComponentThemes,
-    bool haptics = true,
+    bool? haptics,
     bool dynamicColor = false,
   }) {
     return PortalThemeConfig(
@@ -213,7 +217,7 @@ class PortalThemeConfig {
     required Brightness brightness,
     Color? accent,
   }) {
-    PortalHaptics.enabled = haptics;
+    if (haptics != null) PortalHaptics.enabled = haptics!;
     final resolvedAccent = accent ?? colorPalettes.seedColor;
     final colorScheme = _resolveColorScheme(
       brightness: brightness,

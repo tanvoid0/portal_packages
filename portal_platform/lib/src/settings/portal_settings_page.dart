@@ -358,9 +358,28 @@ class _PortalSettingsPageState extends State<PortalSettingsPage> {
                   ),
                 ),
               ),
+            PortalListItem(
+              title: _labels.haptics,
+              leading: PortalListLeading.tile(PortalIcons.vibration_rounded),
+              trailing: PortalListAccessory.navigate(
+                value: _hapticsValueLabel(theme),
+              ),
+              onTap: () => PortalSheet.show<void>(
+                context,
+                title: _labels.haptics,
+                builder: (_) => _HapticsSheet(controller: theme, labels: _labels),
+              ),
+            ),
           ],
         );
       });
+
+  String _hapticsValueLabel(PortalThemeController theme) {
+    if (!theme.hapticsEnabled.value) return _labels.hapticsOff;
+    return theme.hapticsIntensity.value == PortalHapticIntensity.light
+        ? _labels.hapticsLight
+        : _labels.hapticsFull;
+  }
 
   Widget _status(PortalUpdateService? updates) {
     // ponytail: Mode reflects reachability only; routing-aware text needs a modeLabel callback — add when an app asks.
@@ -772,6 +791,68 @@ class _ThemeSheet extends StatelessWidget {
           ],
         );
       });
+}
+
+/// The Haptics row's picker: Off plus every [PortalHapticIntensity], applied
+/// on tap like [_ThemeSheet] — no dock, no confirm, nothing to lose by
+/// trying a level and backing out.
+class _HapticsSheet extends StatelessWidget {
+  const _HapticsSheet({required this.controller, required this.labels});
+
+  final PortalThemeController controller;
+  final PortalSettingsLabels labels;
+
+  @override
+  Widget build(BuildContext context) => Obx(() {
+        final enabled = controller.hapticsEnabled.value;
+        final intensity = controller.hapticsIntensity.value;
+        final selected = !enabled
+            ? 0
+            : (intensity == PortalHapticIntensity.light ? 1 : 2);
+        return PortalListSection.selectable(
+          selected: selected,
+          children: [
+            PortalListItem(
+              title: labels.hapticsOff,
+              leading: PortalListLeading.icon(PortalIcons.vibration_rounded),
+              trailing: PortalListAccessory.radio(
+                checked: selected == 0,
+                onChanged: (_) {
+                  controller.setHapticsEnabled(false);
+                  Navigator.pop(context);
+                },
+              ),
+            ),
+            PortalListItem(
+              title: labels.hapticsLight,
+              leading: PortalListLeading.icon(PortalIcons.vibration_rounded),
+              trailing: PortalListAccessory.radio(
+                checked: selected == 1,
+                onChanged: (_) {
+                  _pick(PortalHapticIntensity.light);
+                  Navigator.pop(context);
+                },
+              ),
+            ),
+            PortalListItem(
+              title: labels.hapticsFull,
+              leading: PortalListLeading.icon(PortalIcons.vibration_rounded),
+              trailing: PortalListAccessory.radio(
+                checked: selected == 2,
+                onChanged: (_) {
+                  _pick(PortalHapticIntensity.full);
+                  Navigator.pop(context);
+                },
+              ),
+            ),
+          ],
+        );
+      });
+
+  void _pick(PortalHapticIntensity intensity) {
+    controller.setHapticsEnabled(true);
+    controller.setHapticsIntensity(intensity);
+  }
 }
 
 /// The Accent colour row's picker: a disc and its name per palette, applied on

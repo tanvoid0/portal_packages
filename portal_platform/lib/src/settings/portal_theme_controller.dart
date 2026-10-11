@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// The appearance choices every Portal app shares: light/dark/system, and an
@@ -19,6 +20,8 @@ class PortalThemeController extends GetxController {
 
   static const _modeKey = 'portal_theme_mode';
   static const _paletteKey = 'portal_theme_palette';
+  static const _hapticsEnabledKey = 'portal_haptics_enabled';
+  static const _hapticsIntensityKey = 'portal_haptics_intensity';
 
   /// What an app starts on before the user has chosen. `portal_gym` ships
   /// dark; everything else follows the system.
@@ -34,6 +37,12 @@ class PortalThemeController extends GetxController {
   late final themeMode = defaultMode.obs;
   final paletteId = RxnString();
 
+  /// Mirrors [PortalHaptics.enabled]/[PortalHaptics.intensity]. Owned here
+  /// (not read straight off the static) so the settings page has something
+  /// observable to build its radio rows from.
+  final hapticsEnabled = true.obs;
+  final hapticsIntensity = PortalHapticIntensity.full.obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -45,6 +54,13 @@ class PortalThemeController extends GetxController {
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     paletteId.value = prefs.getString(_paletteKey);
+
+    hapticsEnabled.value = prefs.getBool(_hapticsEnabledKey) ?? true;
+    hapticsIntensity.value = PortalHapticIntensity.values.firstWhere(
+      (i) => i.name == prefs.getString(_hapticsIntensityKey),
+      orElse: () => PortalHapticIntensity.full,
+    );
+    _applyHaptics();
 
     final stored = prefs.getString(_modeKey);
     if (stored != null) {
@@ -62,6 +78,25 @@ class PortalThemeController extends GetxController {
     }
 
     themeMode.value = defaultMode;
+  }
+
+  void _applyHaptics() {
+    PortalHaptics.enabled = hapticsEnabled.value;
+    PortalHaptics.intensity = hapticsIntensity.value;
+  }
+
+  Future<void> setHapticsEnabled(bool value) async {
+    hapticsEnabled.value = value;
+    _applyHaptics();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_hapticsEnabledKey, value);
+  }
+
+  Future<void> setHapticsIntensity(PortalHapticIntensity value) async {
+    hapticsIntensity.value = value;
+    _applyHaptics();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_hapticsIntensityKey, value.name);
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {

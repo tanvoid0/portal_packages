@@ -74,6 +74,7 @@ class AiAssistantPage extends StatefulWidget {
     this.onAttach,
     this.documents,
     this.maxPromptLength,
+    this.onNewIncognito,
   }) : assert(
          runtime != null || onSend != null,
          'give the page a runtime to drive the agent, or an onSend that '
@@ -121,6 +122,12 @@ class AiAssistantPage extends StatefulWidget {
   /// Opens the app's own AI settings, when it has any. The model and key live
   /// on the server, so there is nothing to configure here by default.
   final VoidCallback? onSettings;
+
+  /// Starts a fresh thread the host does not persist. Sits beside Settings in
+  /// the history panel's footer, next to the navigation it is a sibling of
+  /// rather than a third icon in the bar. No entry drawn when null -- a host
+  /// with nothing ephemeral to offer gets no dead row.
+  final VoidCallback? onNewIncognito;
 
   /// Overrides [PortalAiRuntime.tools] for this page, for tools that have to
   /// be built per call site (e.g. closed over a Riverpod ref).
@@ -826,6 +833,21 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                         // Configuration lives at the foot of the navigation,
                         // the way it does in every app that has a drawer --
                         // not as a third icon competing with "new chat".
+                        if (widget.onNewIncognito case final newIncognito?) ...[
+                          const Divider(height: 1),
+                          SafeArea(
+                            top: false,
+                            bottom: widget.onSettings == null,
+                            child: ListTile(
+                              leading: const Icon(Icons.visibility_off_rounded),
+                              title: const Text('New incognito chat'),
+                              onTap: () {
+                                Navigator.of(dialogContext).pop();
+                                newIncognito();
+                              },
+                            ),
+                          ),
+                        ],
                         if (widget.onSettings case final openSettings?) ...[
                           const Divider(height: 1),
                           SafeArea(

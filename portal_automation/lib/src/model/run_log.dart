@@ -44,6 +44,12 @@ class StepResult {
         'outcome': outcome.name,
         if (message.isNotEmpty) 'message': message,
       };
+
+  factory StepResult.fromJson(Map<String, dynamic> json) => StepResult(
+        actionType: json['actionType'] as String? ?? '',
+        outcome: StepOutcome.values.byName(json['outcome'] as String? ?? 'ok'),
+        message: json['message'] as String? ?? '',
+      );
 }
 
 /// The result of running a whole routine.
@@ -51,15 +57,26 @@ class StepResult {
 class RunResult {
   const RunResult({
     required this.automationId,
+    required this.automationName,
     required this.ranAt,
     required this.steps,
+    this.conditionsMet = true,
   });
 
   final String automationId;
+
+  /// The routine's name at the time it ran -- a snapshot, so history still
+  /// reads right after the routine is renamed or deleted.
+  final String automationName;
   final DateTime ranAt;
   final List<StepResult> steps;
 
-  /// True when no step failed. A skipped step (unavailable) is not a failure.
+  /// False when a condition blocked the run -- [steps] is then empty; this is
+  /// what distinguishes "didn't run, gate closed" from "ran zero actions".
+  final bool conditionsMet;
+
+  /// True when no step failed. A skipped step (unavailable), or a run a
+  /// condition blocked before any step started, is not a failure.
   bool get ok => steps.every((s) => s.outcome != StepOutcome.failed);
 
   int get failedCount =>
@@ -67,8 +84,22 @@ class RunResult {
 
   Map<String, dynamic> toJson() => {
         'automationId': automationId,
+        'automationName': automationName,
         'ranAt': ranAt.toIso8601String(),
         'ok': ok,
+        'conditionsMet': conditionsMet,
         'steps': [for (final s in steps) s.toJson()],
       };
+
+  factory RunResult.fromJson(Map<String, dynamic> json) => RunResult(
+        automationId: json['automationId'] as String? ?? '',
+        automationName: json['automationName'] as String? ?? '',
+        ranAt: DateTime.tryParse(json['ranAt'] as String? ?? '') ??
+            DateTime.now().toUtc(),
+        conditionsMet: json['conditionsMet'] as bool? ?? true,
+        steps: [
+          for (final s in (json['steps'] as List? ?? const []))
+            StepResult.fromJson(Map<String, dynamic>.from(s as Map)),
+        ],
+      );
 }

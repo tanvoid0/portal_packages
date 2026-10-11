@@ -2,6 +2,7 @@ import 'package:meta/meta.dart';
 import 'package:uuid/uuid.dart';
 
 import 'action.dart';
+import 'condition.dart';
 import 'trigger.dart';
 
 const _uuid = Uuid();
@@ -14,6 +15,7 @@ class Automation {
     required this.id,
     required this.name,
     required this.trigger,
+    this.conditions = const [],
     this.actions = const [],
     this.enabled = true,
     required this.createdAt,
@@ -24,6 +26,7 @@ class Automation {
   factory Automation.create({
     required String name,
     required Trigger trigger,
+    List<Condition> conditions = const [],
     List<AutomationAction> actions = const [],
     bool enabled = true,
   }) {
@@ -32,6 +35,7 @@ class Automation {
       id: _uuid.v4(),
       name: name,
       trigger: trigger,
+      conditions: conditions,
       actions: actions,
       enabled: enabled,
       createdAt: now,
@@ -43,6 +47,9 @@ class Automation {
   final String name;
   final bool enabled;
   final Trigger trigger;
+
+  /// Gates checked (AND) before [actions] run. Empty = trigger alone decides.
+  final List<Condition> conditions;
   final List<AutomationAction> actions;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -51,6 +58,7 @@ class Automation {
     String? name,
     bool? enabled,
     Trigger? trigger,
+    List<Condition>? conditions,
     List<AutomationAction>? actions,
   }) =>
       Automation(
@@ -58,6 +66,7 @@ class Automation {
         name: name ?? this.name,
         enabled: enabled ?? this.enabled,
         trigger: trigger ?? this.trigger,
+        conditions: conditions ?? this.conditions,
         actions: actions ?? this.actions,
         createdAt: createdAt,
         updatedAt: DateTime.now().toUtc(),
@@ -68,6 +77,8 @@ class Automation {
         'name': name,
         'enabled': enabled,
         'trigger': trigger.toJson(),
+        if (conditions.isNotEmpty)
+          'conditions': [for (final c in conditions) c.toJson()],
         'actions': [for (final a in actions) a.toJson()],
         'createdAt': createdAt.toIso8601String(),
         'updatedAt': updatedAt.toIso8601String(),
@@ -80,6 +91,10 @@ class Automation {
         trigger: Trigger.fromJson(
           Map<String, dynamic>.from(json['trigger'] as Map? ?? const {}),
         ),
+        conditions: [
+          for (final c in (json['conditions'] as List? ?? const []))
+            Condition.fromJson(Map<String, dynamic>.from(c as Map)),
+        ],
         actions: [
           for (final a in (json['actions'] as List? ?? const []))
             AutomationAction.fromJson(Map<String, dynamic>.from(a as Map)),

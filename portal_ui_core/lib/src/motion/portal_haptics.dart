@@ -4,18 +4,26 @@ import 'package:flutter/services.dart';
 /// can take it as a parameter (`PortalPressable(haptic: …)`).
 enum PortalHapticKind { selection, light, medium, heavy, success, warning, error }
 
+/// How strongly a fired haptic renders. [full] plays the kind's own pattern;
+/// [light] flattens every kind to one soft tap, for a user who wants the
+/// confirmation without the thump.
+enum PortalHapticIntensity { light, full }
+
 /// The fleet's haptic vocabulary over the stdlib [HapticFeedback] — one place
 /// to switch it off, one set of patterns so "success" feels the same in every
 /// app.
 ///
-/// [enabled] is global on purpose: haptics are a device preference, not a
-/// per-widget one. `PortalThemeConfig.haptics` sets it when the theme builds.
+/// [enabled] and [intensity] are global on purpose: haptics are a device
+/// preference, not a per-widget one. Set them from the user's own setting
+/// (`PortalSettingsPage`'s Haptics row persists it) rather than per screen.
 abstract final class PortalHaptics {
-  /// Owned by `PortalThemeConfig.haptics` when a config is in use: every
-  /// `light()`/`dark()` rewrites it, so a runtime toggle must rebuild the
-  /// theme via `copyWith(haptics:)` — a direct write here is overwritten by
-  /// the next theme build.
+  /// Settings-driven; defaults on. `PortalThemeConfig.haptics`, when given
+  /// explicitly, also writes this — leave that param unset so a theme rebuild
+  /// (e.g. switching accent colour) does not stomp the user's choice.
   static bool enabled = true;
+
+  /// Settings-driven; defaults to [PortalHapticIntensity.full].
+  static PortalHapticIntensity intensity = PortalHapticIntensity.full;
 
   /// Gap between the taps of a compound pattern. Short enough to read as one
   /// gesture, long enough that the motor renders two distinct pulses.
@@ -45,11 +53,24 @@ abstract final class PortalHaptics {
         PortalHapticKind.error => error(),
       };
 
-  static Future<void> _fire(Future<void> Function() haptic) =>
-      enabled ? haptic() : Future.value();
+  static Future<void> _fire(Future<void> Function() haptic) {
+    if (!enabled) return Future.value();
+    if (intensity == PortalHapticIntensity.light) {
+      return HapticFeedback.selectionClick();
+    }
+    return haptic();
+  }
 
+  /// A compound pattern (success/warning/error) collapses to its single
+  /// lightest tap at [PortalHapticIntensity.light] rather than playing every
+  /// step quietly — the point of "light" is less buzzing, not the same buzz
+  /// pattern turned down.
   static Future<void> _sequence(List<Future<void> Function()> steps) async {
     if (!enabled) return;
+    if (intensity == PortalHapticIntensity.light) {
+      await HapticFeedback.selectionClick();
+      return;
+    }
     for (var i = 0; i < steps.length; i++) {
       if (i > 0) await Future<void>.delayed(gap);
       await steps[i]();
