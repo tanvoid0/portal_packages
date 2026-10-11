@@ -12,14 +12,8 @@
     "portal_avatar": {
       "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_avatar"
     },
-    "portal_badge": {
-      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_badge"
-    },
     "portal_breadcrumb": {
       "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_breadcrumb"
-    },
-    "portal_calendar": {
-      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_calendar"
     },
     "portal_checkbox": {
       "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_checkbox"
@@ -57,23 +51,14 @@
     "portal_popover": {
       "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_popover"
     },
-    "portal_progress": {
-      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_progress"
-    },
     "portal_radio_group": {
       "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_radio_group"
     },
     "portal_scroll_area": {
       "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_scroll_area"
     },
-    "portal_select": {
-      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_select"
-    },
     "portal_separator": {
       "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_separator"
-    },
-    "portal_sheet": {
-      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_sheet"
     },
     "portal_sidebar": {
       "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_sidebar"
@@ -101,9 +86,6 @@
     },
     "portal_text_area": {
       "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_text_area"
-    },
-    "portal_text_field": {
-      "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_text_field"
     },
     "portal_toggle": {
       "path": "D:/production/portal/pocket_portal/packages/portal_ui_kit/bricks/portal_toggle"

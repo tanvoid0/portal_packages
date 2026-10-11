@@ -5,13 +5,11 @@
 # leaving copies in each app -- ui_core is where a component lives once more
 # than one app needs it.
 #
-# portal_button, portal_card and portal_skeleton were removed on 2026-09-09:
-# ui_core ships all three, and having both meant two classes with one name.
+# portal_button, portal_card and portal_skeleton were removed on 2026-09-09;
+# portal_badge, portal_calendar, portal_progress, portal_select, portal_sheet
+# and portal_text_field followed on 2026-10-11, for the same reason: ui_core
+# ships all of them, and having both meant two classes with one name.
 bricks:
-  portal_text_field:
-    path: bricks/portal_text_field
-  portal_badge:
-    path: bricks/portal_badge
   portal_divider:
     path: bricks/portal_divider
   portal_alert:
@@ -24,12 +22,8 @@ bricks:
     path: bricks/portal_dialog
   portal_label:
     path: bricks/portal_label
-  portal_progress:
-    path: bricks/portal_progress
   portal_radio_group:
     path: bricks/portal_radio_group
-  portal_select:
-    path: bricks/portal_select
   portal_spinner:
     path: bricks/portal_spinner
   portal_slidable:
@@ -46,8 +40,6 @@ bricks:
     path: bricks/portal_tooltip
   portal_accordion:
     path: bricks/portal_accordion
-  portal_sheet:
-    path: bricks/portal_sheet
   portal_breadcrumb:
     path: bricks/portal_breadcrumb
   portal_toggle:

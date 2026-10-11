@@ -347,7 +347,7 @@ class _PortalSettingsPageState extends State<PortalSettingsPage> {
                 leading: PortalListLeading.tile(PortalIcons.palette_rounded),
                 trailing: PortalListAccessory.navigate(
                   value: palette.label,
-                  swatch: palette.swatch,
+                  swatchColor: palette.swatch,
                 ),
                 onTap: () => PortalSheet.show<void>(
                   context,

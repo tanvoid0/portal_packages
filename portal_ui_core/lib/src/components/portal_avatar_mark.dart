@@ -145,7 +145,7 @@ class PortalCountBadge extends StatelessWidget {
 /// (the effects spring, so a full ring never overshoots and wraps) over
 /// `tokens.motion.medium`; under reduce-motion it jumps. The arc is
 /// Material's [CircularProgressIndicator] with a round cap, the track from
-/// `progressIndicatorTheme`, in [color] (theme `primary` when null). The
+/// `progressIndicatorTheme`, in [ringColor] (theme `primary` when null). The
 /// [label] defaults to the animated percentage in tabular figures so the
 /// digits do not jitter as they count up; pass your own for `3 / 5`. The
 /// centre text is excluded from semantics — the indicator announces the
@@ -157,7 +157,7 @@ class PortalProgressRing extends StatelessWidget {
     this.size,
     this.strokeWidth,
     this.label,
-    this.color,
+    this.ringColor,
   });
 
   final double value;
@@ -171,7 +171,7 @@ class PortalProgressRing extends StatelessWidget {
   /// Shown in the centre; the rounded percentage when null.
   final String? label;
 
-  final Color? color;
+  final Color? ringColor;
 
   @override
   Widget build(BuildContext context) {
@@ -201,9 +201,9 @@ class PortalProgressRing extends StatelessWidget {
                 value: v,
                 strokeWidth: stroke,
                 strokeCap: StrokeCap.round,
-                color: color,
+                color: ringColor,
                 // Same 15% recipe as the theme's track, in the arc's colour.
-                backgroundColor: color?.withValues(alpha: 0.15),
+                backgroundColor: ringColor?.withValues(alpha: 0.15),
                 semanticsValue: text,
               ),
               // scaleDown only shrinks: default-scale text is untouched, a

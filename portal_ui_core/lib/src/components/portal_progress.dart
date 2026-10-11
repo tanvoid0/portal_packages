@@ -452,12 +452,12 @@ class PortalProgressSegment {
   const PortalProgressSegment({
     required this.label,
     required this.value,
-    required this.color,
+    required this.segmentColor,
   });
 
   final String label;
   final double value;
-  final Color color;
+  final Color segmentColor;
 }
 
 /// Parts of a whole: one bar plus a legend in the same colours.
@@ -518,7 +518,7 @@ class PortalSegmentedProgress extends StatelessWidget {
                     Expanded(
                       flex: ((s.value / total).clamp(_minVisible, 1.0) * 10000)
                           .round(),
-                      child: ColoredBox(color: s.color),
+                      child: ColoredBox(color: s.segmentColor),
                     ),
                 ],
               ),
@@ -540,7 +540,7 @@ class PortalSegmentedProgress extends StatelessWidget {
                         width: tokens.spacing.sm,
                         height: tokens.spacing.sm,
                         decoration: BoxDecoration(
-                          color: s.color,
+                          color: s.segmentColor,
                           shape: BoxShape.circle,
                         ),
                       ),

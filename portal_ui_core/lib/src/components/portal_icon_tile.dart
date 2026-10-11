@@ -28,7 +28,7 @@ class PortalIconTile extends StatelessWidget {
     this.glyphSize,
     this.backgroundColor,
     this.foregroundColor,
-    this.autoContrastFrom,
+    this.autoContrastFromColor,
     this.semanticLabel,
   })  : _icon = icon,
         _builder = null;
@@ -42,7 +42,7 @@ class PortalIconTile extends StatelessWidget {
     this.glyphSize,
     this.backgroundColor,
     this.foregroundColor,
-    this.autoContrastFrom,
+    this.autoContrastFromColor,
     this.semanticLabel,
   })  : _icon = null,
         _builder = builder;
@@ -59,7 +59,7 @@ class PortalIconTile extends StatelessWidget {
     double? glyphSize,
     Color? backgroundColor,
     Color? foregroundColor,
-    Color? autoContrastFrom,
+    Color? autoContrastFromColor,
     String? semanticLabel,
   }) {
     final glyph = glyphSize ?? size * .6;
@@ -83,7 +83,7 @@ class PortalIconTile extends StatelessWidget {
       glyphSize: glyphSize,
       backgroundColor: backgroundColor,
       foregroundColor: foregroundColor,
-      autoContrastFrom: autoContrastFrom,
+      autoContrastFromColor: autoContrastFromColor,
       semanticLabel: semanticLabel,
     );
   }
@@ -96,7 +96,7 @@ class PortalIconTile extends StatelessWidget {
     PortalListTone tone = PortalListTone.primary,
     Color? backgroundColor,
     Color? foregroundColor,
-    Color? autoContrastFrom,
+    Color? autoContrastFromColor,
     String? semanticLabel,
   }) : this(
           icon,
@@ -107,7 +107,7 @@ class PortalIconTile extends StatelessWidget {
           glyphSize: 28,
           backgroundColor: backgroundColor,
           foregroundColor: foregroundColor,
-          autoContrastFrom: autoContrastFrom,
+          autoContrastFromColor: autoContrastFromColor,
           semanticLabel: semanticLabel,
         );
 
@@ -118,7 +118,7 @@ class PortalIconTile extends StatelessWidget {
     PortalListTone tone = PortalListTone.primary,
     Color? backgroundColor,
     Color? foregroundColor,
-    Color? autoContrastFrom,
+    Color? autoContrastFromColor,
     String? semanticLabel,
   }) =>
       PortalIconTile.emoji(
@@ -130,7 +130,7 @@ class PortalIconTile extends StatelessWidget {
         glyphSize: 28,
         backgroundColor: backgroundColor,
         foregroundColor: foregroundColor,
-        autoContrastFrom: autoContrastFrom,
+        autoContrastFromColor: autoContrastFromColor,
         semanticLabel: semanticLabel,
       );
 
@@ -155,7 +155,7 @@ class PortalIconTile extends StatelessWidget {
   /// of [tone] — a tint of the surface, with the glyph stepped until it
   /// clears non-text contrast on it. See [categoryColors]. [backgroundColor]
   /// / [foregroundColor] still win when set.
-  final Color? autoContrastFrom;
+  final Color? autoContrastFromColor;
 
   /// Names the tile for a screen reader; null leaves it decorative.
   final String? semanticLabel;
@@ -170,7 +170,7 @@ class PortalIconTile extends StatelessWidget {
       PortalListTone.error => (cs.errorContainer, cs.onErrorContainer),
     };
     final auto =
-        autoContrastFrom == null ? null : categoryColors(context, autoContrastFrom!);
+        autoContrastFromColor == null ? null : categoryColors(context, autoContrastFromColor!);
     final ink = foregroundColor ?? auto?.$2 ?? fg;
     final fill = backgroundColor ?? auto?.$1 ?? bg;
     final Decoration decoration = switch (shape) {

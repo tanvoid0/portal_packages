@@ -62,7 +62,7 @@ class PortalListLeading {
     PortalListTone tone = PortalListTone.primary,
     Color? backgroundColor,
     Color? foregroundColor,
-    Color? autoContrastFrom,
+    Color? autoContrastFromColor,
     PortalIconTileShape shape = PortalIconTileShape.roundedSquare,
   }) =>
       PortalListLeading.tileBuilder(
@@ -71,7 +71,7 @@ class PortalListLeading {
         shape: shape,
         backgroundColor: backgroundColor,
         foregroundColor: foregroundColor,
-        autoContrastFrom: autoContrastFrom,
+        autoContrastFromColor: autoContrastFromColor,
       );
 
   /// [PortalListLeading.tile] for any glyph: [iconBuilder] gets the ink to
@@ -81,7 +81,7 @@ class PortalListLeading {
     PortalListTone tone = PortalListTone.primary,
     Color? backgroundColor,
     Color? foregroundColor,
-    Color? autoContrastFrom,
+    Color? autoContrastFromColor,
     PortalIconTileShape shape = PortalIconTileShape.roundedSquare,
   }) =>
       PortalListLeading._(
@@ -92,7 +92,7 @@ class PortalListLeading {
           shape: shape,
           backgroundColor: backgroundColor,
           foregroundColor: foregroundColor,
-          autoContrastFrom: autoContrastFrom,
+          autoContrastFromColor: autoContrastFromColor,
         ),
       );
 
@@ -279,14 +279,14 @@ class PortalListAccessory {
     this.child,
     this.actions = const [],
     this.interactive = false,
-    this.swatch,
+    this.swatchColor,
     this.tonal = false,
     this.busy = false,
     this.busyLabel,
     this.fill = false,
     this.markLabel,
     this.spoken,
-    this.tint,
+    this.tintColor,
   }) : assert(
             !busy || busyLabel != null, 'a busy accessory announces busyLabel');
 
@@ -307,7 +307,7 @@ class PortalListAccessory {
   final bool interactive;
 
   /// The accent dot [PortalListAccessory.navigate] draws in place of its value.
-  final Color? swatch;
+  final Color? swatchColor;
 
   /// [PortalListAccessory.iconButton] paints a neutral fill behind the glyph.
   final bool tonal;
@@ -326,22 +326,22 @@ class PortalListAccessory {
 
   /// A checkbox's active fill / border, for a per-item accent (a task's own
   /// colour). Null (default) uses the theme.
-  final Color? tint;
+  final Color? tintColor;
 
   static const none = PortalListAccessory._(_Kind.none);
 
   /// A chevron; [value] is the muted current value ("Theme · System ›").
-  /// [swatch] draws a 20 dp colour dot in place of that text (an accent
+  /// [swatchColor] draws a 20 dp colour dot in place of that text (an accent
   /// picker); [value] still names it in the row's label.
-  const PortalListAccessory.navigate({String? value, Color? swatch})
-      : this._(_Kind.navigate, text: value, swatch: swatch);
+  const PortalListAccessory.navigate({String? value, Color? swatchColor})
+      : this._(_Kind.navigate, text: value, swatchColor: swatchColor);
 
   const PortalListAccessory.checkbox({
     required bool checked,
     required ValueChanged<bool>? onChanged,
     Color? color,
   }) : this._(_Kind.checkbox,
-            checked: checked, onChanged: onChanged, tint: color);
+            checked: checked, onChanged: onChanged, tintColor: color);
 
   const PortalListAccessory.radio({
     required bool checked,
@@ -1033,7 +1033,7 @@ class PortalListItem extends StatelessWidget {
         break;
       case _Kind.navigate:
         accessory = Row(mainAxisSize: MainAxisSize.min, children: [
-          if (acc.swatch != null)
+          if (acc.swatchColor != null)
             Padding(
               padding: EdgeInsets.only(right: sp.xs),
               child: ExcludeSemantics(
@@ -1041,7 +1041,7 @@ class PortalListItem extends StatelessWidget {
                   width: 20,
                   height: 20,
                   decoration: BoxDecoration(
-                      color: acc.swatch, shape: BoxShape.circle),
+                      color: acc.swatchColor, shape: BoxShape.circle),
                 ),
               ),
             )
@@ -1064,10 +1064,10 @@ class PortalListItem extends StatelessWidget {
         accessory = ExcludeSemantics(
           child: Checkbox(
             value: acc.checked,
-            activeColor: acc.tint,
-            side: acc.tint == null
+            activeColor: acc.tintColor,
+            side: acc.tintColor == null
                 ? null
-                : BorderSide(color: acc.tint!, width: 2),
+                : BorderSide(color: acc.tintColor!, width: 2),
             onChanged: disabled || acc.onChanged == null
                 ? null
                 : (v) => acc.onChanged!(v ?? false),

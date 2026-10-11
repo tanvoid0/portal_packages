@@ -66,7 +66,7 @@ class PortalChoiceOption {
 /// (square) to share the width, so the grid runs gutter to gutter.
 ///
 /// [selectedColor] is the outline and badge fill (the scheme primary by
-/// default). [ground] is what the grid sits on, for the badge's cut-out ring:
+/// default). [groundColor] is what the grid sits on, for the badge's cut-out ring:
 /// pass the sheet's colour on a sheet. [enabled] false (its form is saving)
 /// dims the grid, ignores taps and announces it disabled. State stays with the
 /// caller: it passes [selected] and takes [onSelected].
@@ -77,7 +77,7 @@ class PortalChoiceGrid extends StatelessWidget {
     required this.selected,
     required this.onSelected,
     this.selectedColor,
-    this.ground,
+    this.groundColor,
     this.enabled = true,
   });
 
@@ -92,7 +92,7 @@ class PortalChoiceGrid extends StatelessWidget {
 
   /// The colour behind the grid, for the check badge's cut-out ring. Null is
   /// the scaffold background.
-  final Color? ground;
+  final Color? groundColor;
 
   final bool enabled;
 
@@ -183,7 +183,7 @@ class PortalChoiceGrid extends StatelessWidget {
                                 color: accent,
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: ground ??
+                                  color: groundColor ??
                                       Theme.of(context).scaffoldBackgroundColor,
                                   width: tokens.borderWidth * 2,
                                 ),

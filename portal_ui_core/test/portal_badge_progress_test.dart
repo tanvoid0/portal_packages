@@ -63,9 +63,9 @@ void main() {
   testWidgets('segmented: drops empty segments, legend shows shares',
       (t) async {
     await t.pumpWidget(host(const PortalSegmentedProgress(segments: [
-      PortalProgressSegment(label: 'Tax', value: 1, color: Colors.red),
-      PortalProgressSegment(label: 'Net', value: 3, color: Colors.green),
-      PortalProgressSegment(label: 'Zero', value: 0, color: Colors.blue),
+      PortalProgressSegment(label: 'Tax', value: 1, segmentColor: Colors.red),
+      PortalProgressSegment(label: 'Net', value: 3, segmentColor: Colors.green),
+      PortalProgressSegment(label: 'Zero', value: 0, segmentColor: Colors.blue),
     ])));
     expect(find.text('25%'), findsOneWidget);
     expect(find.text('75%'), findsOneWidget);

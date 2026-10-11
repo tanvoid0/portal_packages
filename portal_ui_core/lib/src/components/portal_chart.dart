@@ -415,19 +415,19 @@ class PortalLineChart extends StatelessWidget {
 /// The line alone, 28 high, for a stat card's footer or a row: no axis, no
 /// frame, no end dot and no wash -- the figure beside it is the subject and
 /// the shape is the footnote. Fewer than two points reserves its height and
-/// draws nothing. [color] defaults to primary.
+/// draws nothing. [lineColor] defaults to primary.
 class PortalSparkline extends StatelessWidget {
   const PortalSparkline({
     super.key,
     required this.points,
     this.height = _ChartValues.sparkline,
-    this.color,
+    this.lineColor,
     this.semanticLabel,
   });
 
   final List<double> points;
   final double height;
-  final Color? color;
+  final Color? lineColor;
 
   /// The shape's one-line summary; with none it stays out of the tree, for
   /// a trend the figure beside it already states.
@@ -447,7 +447,7 @@ class PortalSparkline extends StatelessWidget {
           child: CustomPaint(
             painter: _LinePainter(
               points,
-              color ?? Theme.of(context).colorScheme.primary,
+              lineColor ?? Theme.of(context).colorScheme.primary,
               Directionality.of(context) == TextDirection.rtl,
               dot: 0,
               wash: false,

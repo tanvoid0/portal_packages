@@ -67,7 +67,7 @@ void main() {
     await t.pumpWidget(host(const PortalListSection(children: [
       PortalListItem(
         title: 'Accent',
-        trailing: PortalListAccessory.navigate(value: 'Teal', swatch: teal),
+        trailing: PortalListAccessory.navigate(value: 'Teal', swatchColor: teal),
       ),
     ])));
     final dot = find.byWidgetPredicate((w) =>
