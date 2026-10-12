@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:android_package_installer/android_package_installer.dart';
 import 'package:path_provider/path_provider.dart';
@@ -132,8 +133,8 @@ class PortalUpdateService {
     if (!isEnabled) {
       return const PortalUpdateCheck(PortalUpdateStatus.unsupported);
     }
-    if (!Platform.isAndroid) {
-      // iOS has no sideload path; there is nothing this could do with an APK.
+    if (kIsWeb || !Platform.isAndroid) {
+      // iOS/web have no sideload path; there is nothing this could do with an APK.
       return const PortalUpdateCheck(PortalUpdateStatus.unsupported);
     }
 

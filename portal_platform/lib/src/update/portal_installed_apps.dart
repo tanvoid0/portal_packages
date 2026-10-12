@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 
 /// What a sibling Portal app's installed build is, when it is installed.
@@ -44,7 +45,7 @@ class PortalInstalledApps {
   }
 
   static Future<PortalInstalledApp?> version(String slug) async {
-    if (!Platform.isAndroid) return null;
+    if (kIsWeb || !Platform.isAndroid) return null;
     try {
       final info = await _channel.invokeMapMethod<String, Object?>(
         'installedVersion',
@@ -64,7 +65,7 @@ class PortalInstalledApps {
   /// Starts an installed sibling app by its launch activity, bypassing the
   /// `portal-x://` scheme. False means there was nothing to start.
   static Future<bool> launch(String slug) async {
-    if (!Platform.isAndroid) return false;
+    if (kIsWeb || !Platform.isAndroid) return false;
     try {
       return await _channel.invokeMethod<bool>(
             'launch',
@@ -79,7 +80,7 @@ class PortalInstalledApps {
   /// Opens Android's uninstall confirmation. True means it opened, not that
   /// the app is gone — the caller re-probes on resume to find that out.
   static Future<bool> uninstall(String slug) async {
-    if (!Platform.isAndroid) return false;
+    if (kIsWeb || !Platform.isAndroid) return false;
     try {
       return await _channel.invokeMethod<bool>(
             'uninstall',
