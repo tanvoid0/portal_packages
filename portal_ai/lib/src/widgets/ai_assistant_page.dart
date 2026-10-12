@@ -39,8 +39,11 @@ import 'ai_turn_bubble.dart';
 /// before any tool that changes data.
 ///
 /// ```dart
-/// AiAssistantPage.show(context, runtime: Get.find<PortalAiRuntime>());
+/// AiAssistantPage(runtime: Get.find<PortalAiRuntime>())
 /// ```
+///
+/// Mount it at the app's own named `/ai` route (see `PortalAiSegment.ai`)
+/// rather than pushing it as an unnamed route.
 class AiAssistantPage extends StatefulWidget {
   const AiAssistantPage({
     super.key,
@@ -246,64 +249,6 @@ class AiAssistantPage extends StatefulWidget {
   /// this app composed itself. Only the first mount sends, so a rebuild does
   /// not ask twice.
   final bool autoSend;
-
-  /// Opens the assistant as its own route.
-  @Deprecated("push the app's named /ai route instead")
-  static Future<void> show(
-    BuildContext context, {
-    required PortalAiRuntime runtime,
-    String title = 'Assistant',
-    Widget? avatar,
-    List<AiSuggestion> suggestions = const [],
-    VoidCallback? onSettings,
-    List<AiTool>? tools,
-    Map<String, Widget Function(AiBlock block)> renderers = const {},
-    List<AiProposal> proposals = const [],
-    ValueChanged<AiProposal>? onAcceptProposal,
-    ValueChanged<AiProposal>? onEditProposal,
-    ValueChanged<AiProposal>? onDiscardProposal,
-    AiChatLabels labels = const AiChatLabels(),
-    AiChatStore? store,
-    void Function(String entity, AiItem item)? onItemTap,
-    Future<bool> Function(AiToolCall call)? onEditToolCall,
-    bool Function(AiToolCall call)? canEditToolCall,
-    AiConsent? consent,
-    VoidCallback? onAttach,
-    AiDocumentClient? documents,
-    int? maxPromptLength,
-  }) {
-    return Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
-          body: SafeArea(
-            child: AiAssistantPage(
-              runtime: runtime,
-              title: title,
-              avatar: avatar,
-              documents: documents,
-              suggestions: suggestions,
-              onSettings: onSettings,
-              tools: tools,
-              renderers: renderers,
-              proposals: proposals,
-              onAcceptProposal: onAcceptProposal,
-              onEditProposal: onEditProposal,
-              onDiscardProposal: onDiscardProposal,
-              labels: labels,
-              store: store,
-              onItemTap: onItemTap,
-              onEditToolCall: onEditToolCall,
-              canEditToolCall: canEditToolCall,
-              consent: consent,
-              onAttach: onAttach,
-              maxPromptLength: maxPromptLength,
-              fill: true,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   @override
   State<AiAssistantPage> createState() => _AiAssistantPageState();

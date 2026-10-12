@@ -598,7 +598,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.2.2"
+    version: "0.4.0"
   portal_ui_core:
     dependency: "direct main"
     description:

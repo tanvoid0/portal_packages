@@ -1,3 +1,11 @@
+## 0.4.0
+
+- **Breaking:** `AiAssistantPage.show` and `PortalAiAppKit.openAssistant`
+  (deprecated in 0.3.0) are removed. Push the app's own named `/ai` route
+  instead (see `PortalAiSegment.ai`) — every in-repo caller moved to this in
+  the same change. Not published to pub.dev yet, so this closes out the
+  deprecation rather than carrying it through a redesign.
+
 ## 0.3.0
 
 - `AiAssistantPage.show` and `PortalAiAppKit.openAssistant` are deprecated:

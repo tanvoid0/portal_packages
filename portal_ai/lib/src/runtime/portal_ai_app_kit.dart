@@ -39,9 +39,9 @@ abstract class PortalAiSegment {
 /// returns* the runtime rather than registering it — the caller still does
 /// `Get.put(runtime, permanent: true)` itself, exactly as before, because
 /// other call sites in the app (`Get.find<PortalAiRuntime>()` from a view or
-/// an import service) depend on that registration too. [settingsGroup],
-/// [assistantPage] and [openAssistant] likewise take the runtime as a
-/// parameter rather than looking it up. [init]'s `get`/`put`/`post`/
+/// an import service) depend on that registration too. [settingsGroup] and
+/// [assistantPage] likewise take the runtime as a parameter rather than
+/// looking it up. [init]'s `get`/`put`/`post`/
 /// `postStream` are `ApiClient`'s methods passed straight through (see
 /// [AiGetJson]/[AiPutJson]/[AiPostJson]/[AiPostStream]) for the same reason:
 /// so this package never needs to depend on `portal_platform`.
@@ -167,29 +167,4 @@ class PortalAiAppKit {
     autoSend: autoSend,
     fill: true,
   );
-
-  /// Pushes the assistant as a sheet/dialog over whatever is already
-  /// showing — the form every app's "ask the assistant" entry point opens
-  /// from.
-  @Deprecated("push the app's named /ai route instead")
-  void openAssistant(
-    BuildContext context, {
-    required PortalAiRuntime runtime,
-    required String title,
-    List<AiSuggestion> suggestions = const [],
-    void Function(String entity, AiItem item)? onItemTap,
-    Future<bool> Function(AiToolCall call)? onEditToolCall,
-    bool Function(AiToolCall call)? canEditToolCall,
-  }) =>
-      // ignore: deprecated_member_use_from_same_package
-      AiAssistantPage.show(
-        context,
-        runtime: runtime,
-        store: _chatStore,
-        onItemTap: onItemTap,
-        onEditToolCall: onEditToolCall,
-        canEditToolCall: canEditToolCall,
-        title: title,
-        suggestions: suggestions,
-      );
 }
