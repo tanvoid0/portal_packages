@@ -13,12 +13,11 @@ import 'portal_bootstrap.dart';
 /// built from that seed, [PortalBootstrap.startRoute] as the start route, and
 /// the fleet's shared [builder] unless the app needs its own.
 ///
-/// Seven apps (gym, journey, lifestyle, shopping, recipe, automation,
-/// finance) build this identically; this is that shape, once. What stays
-/// with the app: [getPages] (every route is app-specific), the theme
-/// functions themselves, and anything that does not fit this shape at all —
-/// task's GetX nav2 (section-outlet route tree) needs `GetMaterialApp.router`
-/// instead, so its root stays hand-rolled.
+/// Eight apps (gym, journey, lifestyle, shopping, recipe, automation,
+/// finance, task) build this identically; this is that shape, once. What
+/// stays with the app: [getPages] (every route is app-specific), the theme
+/// functions themselves, and — via [PortalAppRoot.router] — whether the app
+/// is on GetX nav2 instead of the named-route push model.
 class PortalAppRoot extends StatefulWidget {
   const PortalAppRoot({
     super.key,
@@ -26,6 +25,35 @@ class PortalAppRoot extends StatefulWidget {
     required this.lightTheme,
     required this.darkTheme,
     required this.getPages,
+    this.debugShowCheckedModeBanner = false,
+    this.builder,
+    this.shouldGuardRoute,
+  })  : routerDelegate = null,
+        routeInformationParser = null,
+        backButtonDispatcher = null,
+        scaffoldMessengerKey = null;
+
+  /// For an app on GetX nav2 (nested/section-outlet route trees) instead of
+  /// the named-route push model the plain constructor builds — task's
+  /// `AppPages.usesSectionOutlet`/`Get.routeTree.matchRoute` needs
+  /// `GetMaterialApp.router`, which the plain constructor can't express.
+  /// Everything else — theme, [shouldGuardRoute], [builder] — works exactly
+  /// the same; only the underlying `GetMaterialApp` constructor differs.
+  ///
+  /// [shouldGuardRoute] is driven by [routerDelegate]'s own `ChangeNotifier`
+  /// here, not `routingCallback` — `GetMaterialApp.router` never wires
+  /// `routingCallback` (`GetDelegate.build` passes a bare `GetObserver()`),
+  /// so the plain constructor's mechanism is silently dead in router mode.
+  const PortalAppRoot.router({
+    super.key,
+    required this.title,
+    required this.lightTheme,
+    required this.darkTheme,
+    required this.getPages,
+    required GetDelegate this.routerDelegate,
+    required GetInformationParser this.routeInformationParser,
+    this.backButtonDispatcher,
+    this.scaffoldMessengerKey,
     this.debugShowCheckedModeBanner = false,
     this.builder,
     this.shouldGuardRoute,
@@ -52,6 +80,15 @@ class PortalAppRoot extends StatefulWidget {
   /// the caller sets that up in its own startup step, same as it does today.
   final bool Function(String route)? shouldGuardRoute;
 
+  /// Non-null only via [PortalAppRoot.router].
+  final GetDelegate? routerDelegate;
+  final GetInformationParser? routeInformationParser;
+
+  /// Defaults to [RootBackButtonDispatcher] — without one, `Router` never
+  /// hears the system back button and Android just finishes the activity.
+  final BackButtonDispatcher? backButtonDispatcher;
+  final GlobalKey<ScaffoldMessengerState>? scaffoldMessengerKey;
+
   @override
   State<PortalAppRoot> createState() => _PortalAppRootState();
 }
@@ -65,9 +102,15 @@ class _PortalAppRootState extends State<PortalAppRoot> {
   void initState() {
     super.initState();
     final shouldGuardRoute = widget.shouldGuardRoute;
-    if (shouldGuardRoute != null) {
-      _guarding = RxBool(shouldGuardRoute(PortalBootstrap.startRoute));
-    }
+    if (shouldGuardRoute == null) return;
+    _guarding = RxBool(shouldGuardRoute(PortalBootstrap.startRoute));
+    widget.routerDelegate?.addListener(_onRouterDelegateChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.routerDelegate?.removeListener(_onRouterDelegateChanged);
+    super.dispose();
   }
 
   void _onRouting(Routing? routing) {
@@ -85,6 +128,18 @@ class _PortalAppRootState extends State<PortalAppRoot> {
     } else {
       _guarding!.value = guard;
     }
+  }
+
+  // The delegate's ChangeNotifier fires both from a tap (idle) and from
+  // setNewRoutePath during the Router's own build (deep link, web URL,
+  // back) — unlike routingCallback's one timing, so this always defers
+  // rather than picking a phase to trust.
+  void _onRouterDelegateChanged() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _guarding!.value =
+          widget.shouldGuardRoute!(_nav2CurrentPath(widget.routerDelegate!));
+    });
   }
 
   Widget _build(BuildContext context, Widget? child) {
@@ -106,6 +161,23 @@ class _PortalAppRootState extends State<PortalAppRoot> {
       // nothing stored, or an id from a build with palettes this one does
       // not have — leaves the app on its own default seed.
       final seed = portalSeedForPaletteId(themeController.paletteId.value);
+      final routerDelegate = widget.routerDelegate;
+      if (routerDelegate != null) {
+        return GetMaterialApp.router(
+          title: widget.title,
+          theme: widget.lightTheme(seed),
+          darkTheme: widget.darkTheme(seed),
+          themeMode: themeController.themeMode.value,
+          debugShowCheckedModeBanner: widget.debugShowCheckedModeBanner,
+          getPages: widget.getPages,
+          routerDelegate: routerDelegate,
+          routeInformationParser: widget.routeInformationParser!,
+          backButtonDispatcher:
+              widget.backButtonDispatcher ?? RootBackButtonDispatcher(),
+          scaffoldMessengerKey: widget.scaffoldMessengerKey,
+          builder: _build,
+        );
+      }
       return GetMaterialApp(
         title: widget.title,
         routingCallback: _guarding == null ? null : _onRouting,
@@ -119,6 +191,36 @@ class _PortalAppRootState extends State<PortalAppRoot> {
       );
     });
   }
+}
+
+/// The nav2 route path a [GetDelegate] currently sits on, resolved the same
+/// way for any app: the configuration's own URI, else its location string,
+/// else the active route tree branch's segment names. Null safe about all
+/// three being unavailable mid-transition.
+String _nav2CurrentPath(GetDelegate delegate) {
+  final config = delegate.currentConfiguration;
+  if (config == null) return '';
+
+  final uriPath = config.uri.path;
+  if (uriPath.isNotEmpty && uriPath != '/') return uriPath;
+
+  final location = config.locationString;
+  if (location.isNotEmpty) {
+    final fromLocation = Uri.tryParse(location)?.path;
+    if (fromLocation != null && fromLocation.isNotEmpty && fromLocation != '/') {
+      return fromLocation;
+    }
+  }
+
+  final segments = <String>[];
+  for (final page in config.currentTreeBranch) {
+    final name = page.name;
+    if (name.isEmpty || name == '/') continue;
+    final segment = name.startsWith('/') ? name.substring(1) : name;
+    if (segment.isEmpty) continue;
+    segments.add(segment);
+  }
+  return segments.isEmpty ? '' : '/${segments.join('/')}';
 }
 
 /// The fleet's shared app [builder]: clamps text scaling to a readable
