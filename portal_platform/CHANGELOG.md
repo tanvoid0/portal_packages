@@ -1,5 +1,9 @@
 ## Unreleased
 
+- `usePortalUrlStrategy()` (new, in `portal_platform.dart`): call once before
+  `runApp` so a nested GetX path (`/gym/settings`) shows in the browser bar
+  as-is instead of hash-routed (`/#/gym/settings`). No-ops off web. Replaces
+  the same conditional-import pattern three apps had each copied by hand.
 - `portalSettingsChildren()` (new): the settings sub-pages as `GetPage`
   children, for an app wiring a nested GetX route tree instead of a plain
   Navigator stack. Mount it under the same path given to the new

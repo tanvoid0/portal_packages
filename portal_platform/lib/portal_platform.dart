@@ -190,3 +190,6 @@ export 'src/sync/sync_operation.dart';
 export 'src/sync/sync_queue.dart';
 export 'src/sync/sync_status_banner.dart';
 export 'src/sync/syncable_repository.dart';
+
+// ─── Web ───────────────────────────────────────────────────────────
+export 'src/web/portal_url_strategy.dart';
