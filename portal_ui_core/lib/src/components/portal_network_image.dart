@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
@@ -81,7 +83,9 @@ class PortalNetworkImage extends StatelessWidget {
       boxShadow: boxShadow,
     );
 
-    final child = trimmed.isEmpty
+    final child = url == null
+        ? _noPhotoYet(context, w, h)
+        : trimmed.isEmpty
         ? _fallback(context, w, h)
         : CachedNetworkImage(
             key: ValueKey(cacheKey ?? trimmed),
@@ -103,6 +107,39 @@ class PortalNetworkImage extends StatelessWidget {
       decoration: decoration,
       clipBehavior: Clip.antiAlias,
       child: child,
+    );
+  }
+
+  /// "No photo yet" -- a null [url] (never fetched, as opposed to an empty
+  /// one or a failed fetch): the brand-neutral primary-to-tertiary gradient
+  /// and a faded glyph, rather than the flat [_fallback] box, so a page with
+  /// no photo at all reads differently from one still loading or broken.
+  Widget _noPhotoYet(BuildContext context, double? w, double? h) {
+    final cs = Theme.of(context).colorScheme;
+    return LayoutBuilder(
+      builder: (context, c) {
+        final side = w ??
+            h ??
+            (c.biggest.shortestSide.isFinite ? c.biggest.shortestSide : null);
+        final iconSize = fallbackIconSize ??
+            (side == null ? 28.0 : (side * 0.42).clamp(20, 36));
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: AlignmentDirectional.topStart,
+              end: AlignmentDirectional.bottomEnd,
+              colors: [cs.primaryContainer, cs.tertiaryContainer],
+            ),
+          ),
+          child: Center(
+            child: Icon(
+              fallbackIcon,
+              size: math.min(iconSize, c.biggest.shortestSide * 0.6),
+              color: cs.onPrimaryContainer.withValues(alpha: .6),
+            ),
+          ),
+        );
+      },
     );
   }
 

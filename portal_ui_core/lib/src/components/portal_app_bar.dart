@@ -253,12 +253,39 @@ Future<void> showPortalActionSheet(
   List<PortalAction> actions, {
   String? title,
 }) {
-  final portal = PortalUiTheme.of(context);
-  final tokens = portal.tokens;
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
-    builder: (sheet) => SafeArea(
+    builder: (sheet) => PortalActionSheetBody(
+      actions: actions,
+      title: title,
+      onClose: () => Navigator.of(sheet).pop(),
+    ),
+  );
+}
+
+/// [showPortalActionSheet]'s body, extracted so a design-review book can
+/// render the same rows without pushing a route. [onClose] is called before
+/// a tapped action's own `onPressed` -- the sheet's modal route pops itself
+/// by default; a caller showing this inline passes its own, or null to leave
+/// the row's action as the only effect.
+class PortalActionSheetBody extends StatelessWidget {
+  const PortalActionSheetBody({
+    super.key,
+    required this.actions,
+    this.title,
+    this.onClose,
+  });
+
+  final List<PortalAction> actions;
+  final String? title;
+  final VoidCallback? onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final portal = PortalUiTheme.of(context);
+    final tokens = portal.tokens;
+    return SafeArea(
       top: false,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -274,7 +301,7 @@ Future<void> showPortalActionSheet(
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  title,
+                  title!,
                   style: tokens.textStyles.overline
                       .copyWith(color: portal.onSurfaceVariant),
                 ),
@@ -299,15 +326,15 @@ Future<void> showPortalActionSheet(
               onTap: a.onPressed == null
                   ? null
                   : () {
-                      Navigator.of(sheet).pop();
+                      onClose?.call();
                       a.onPressed!();
                     },
             ),
           SizedBox(height: tokens.spacing.sm),
         ],
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _PortalAppBarTitle extends StatelessWidget {

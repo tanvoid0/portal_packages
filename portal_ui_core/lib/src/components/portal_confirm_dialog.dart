@@ -22,30 +22,64 @@ Future<bool> portalConfirm(
   final confirmed = await showDialog<bool>(
     context: context,
     barrierDismissible: barrierDismissible,
-    builder: (ctx) {
-      final scheme = Theme.of(ctx).colorScheme;
-      return AlertDialog(
-        title: Text(title),
-        content: message == null ? null : Text(message),
-        actions: [
-          if (cancelLabel != null)
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(cancelLabel),
-            ),
-          TextButton(
-            onPressed: () {
-              PortalHaptics.medium();
-              Navigator.pop(ctx, true);
-            },
-            style: isDestructive
-                ? TextButton.styleFrom(foregroundColor: scheme.error)
-                : null,
-            child: Text(confirmLabel),
-          ),
-        ],
-      );
-    },
+    builder: (ctx) => PortalConfirmDialog(
+      title: title,
+      message: message,
+      confirmLabel: confirmLabel,
+      cancelLabel: cancelLabel,
+      isDestructive: isDestructive,
+      onConfirm: () => Navigator.pop(ctx, true),
+      onCancel: () => Navigator.pop(ctx, false),
+    ),
   );
   return confirmed ?? false;
+}
+
+/// [portalConfirm]'s dialog body, extracted so a design-review book (or any
+/// other screen) can show the same chrome without pushing a route. Unlike
+/// [portalConfirm] there is no `Navigator` to pop by default, so [onConfirm]
+/// is required and [onCancel] is whatever the caller wants Cancel to do.
+class PortalConfirmDialog extends StatelessWidget {
+  const PortalConfirmDialog({
+    super.key,
+    required this.title,
+    this.message,
+    this.confirmLabel = 'Confirm',
+    this.cancelLabel = 'Cancel',
+    this.isDestructive = false,
+    required this.onConfirm,
+    this.onCancel,
+  });
+
+  final String title;
+  final String? message;
+  final String confirmLabel;
+  final String? cancelLabel;
+  final bool isDestructive;
+  final VoidCallback onConfirm;
+  final VoidCallback? onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final msg = message;
+    return AlertDialog(
+      title: Text(title),
+      content: msg == null ? null : Text(msg),
+      actions: [
+        if (cancelLabel != null)
+          TextButton(onPressed: onCancel, child: Text(cancelLabel!)),
+        TextButton(
+          onPressed: () {
+            PortalHaptics.medium();
+            onConfirm();
+          },
+          style: isDestructive
+              ? TextButton.styleFrom(foregroundColor: scheme.error)
+              : null,
+          child: Text(confirmLabel),
+        ),
+      ],
+    );
+  }
 }

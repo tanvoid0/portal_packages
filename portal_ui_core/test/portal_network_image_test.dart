@@ -59,6 +59,20 @@ void main() {
     expect(icon.color, Colors.teal);
   });
 
+  testWidgets('a null url draws the gradient "no photo yet" placeholder, '
+      'not the empty-string fallback box', (t) async {
+    await t.pumpWidget(host(const PortalNetworkImage(url: null, size: 40)));
+    await t.pump();
+    final decorated = t.widgetList<DecoratedBox>(find.descendant(
+      of: find.byType(PortalNetworkImage),
+      matching: find.byType(DecoratedBox),
+    ));
+    expect(
+      decorated.any((d) => (d.decoration as BoxDecoration).gradient != null),
+      isTrue,
+    );
+  });
+
   testWidgets('circle shape clips the tile', (t) async {
     await t.pumpWidget(host(const PortalNetworkImage(
       url: '',

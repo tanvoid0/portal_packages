@@ -1,5 +1,20 @@
 ## Unreleased
 
+- `PortalLoadState { loading, empty, error, data }`: the fleet's four states
+  as one enum, so a page switches on one value instead of several nullable
+  fields. `PortalFeatureCard`, `PortalDetailHero`, `PortalFormStack`,
+  `PortalOption`/`portalOptionSection`, `PortalChevronLink`: promoted from the
+  design kit's demo-only `FeatureCard`, `DetailHero`, `FormStack`,
+  `DemoOption`/`demoOptionSection` and `ChevronLink` to real ui_core types, so
+  an app's own screens (not just the kit) can use them. `PortalConfirmDialog`
+  and `PortalActionSheetBody` extracted from `portalConfirm` and
+  `showPortalActionSheet` respectively, so a design-review book can render
+  the same chrome inline without pushing a route; both functions are
+  unchanged and now call their extracted widget. `PortalNetworkImage` draws a
+  distinct "no photo yet" gradient-and-glyph placeholder when `url` is
+  strictly `null` (an empty string or a failed fetch keep the existing flat
+  fallback).
+
 - `PortalAppIdentity(icon, name, tagline, logo)`: an app's mark, name and line,
   with no colour field (the app's own `colorScheme.primary` already is the
   brand). `PortalStartupSplash` and `PortalStartupGate` take an optional
