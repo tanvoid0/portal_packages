@@ -1,5 +1,10 @@
 ## Unreleased
 
+- `PortalAppRoot.shouldGuardRoute` (new, nullable `bool Function(String route)`):
+  wires `PortalDeviceSecurityGate` and the route-change plumbing it needs for
+  an app with the shared app lock, so the lock no longer forces a hand-rolled
+  root. Null (the default) leaves every existing caller's widget tree exactly
+  as it was — no `Obx`, no gate.
 - `usePortalUrlStrategy()` (new, in `portal_platform.dart`): call once before
   `runApp` so a nested GetX path (`/gym/settings`) shows in the browser bar
   as-is instead of hash-routed (`/#/gym/settings`). No-ops off web. Replaces

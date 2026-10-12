@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:portal_ui_core/portal_ui_core.dart';
 
+import '../auth/device_security/portal_device_security_gate.dart';
 import '../settings/portal_theme_controller.dart';
 import 'portal_bootstrap.dart';
 
@@ -11,12 +13,13 @@ import 'portal_bootstrap.dart';
 /// built from that seed, [PortalBootstrap.startRoute] as the start route, and
 /// the fleet's shared [builder] unless the app needs its own.
 ///
-/// Six apps (gym, journey, lifestyle, shopping, recipe, automation)
-/// hand-built this identically; this is that shape, once. What stays with
-/// the app: [getPages] (every route is app-specific), the theme functions
-/// themselves, and anything that does not fit this shape at all — finance's
-/// `routingCallback`-driven app-lock gate means its root stays hand-rolled.
-class PortalAppRoot extends StatelessWidget {
+/// Seven apps (gym, journey, lifestyle, shopping, recipe, automation,
+/// finance) build this identically; this is that shape, once. What stays
+/// with the app: [getPages] (every route is app-specific), the theme
+/// functions themselves, and anything that does not fit this shape at all —
+/// task's GetX nav2 (section-outlet route tree) needs `GetMaterialApp.router`
+/// instead, so its root stays hand-rolled.
+class PortalAppRoot extends StatefulWidget {
   const PortalAppRoot({
     super.key,
     required this.title,
@@ -25,6 +28,7 @@ class PortalAppRoot extends StatelessWidget {
     required this.getPages,
     this.debugShowCheckedModeBanner = false,
     this.builder,
+    this.shouldGuardRoute,
   });
 
   final String title;
@@ -41,6 +45,57 @@ class PortalAppRoot extends StatelessWidget {
   /// [portalDefaultAppBuilder]'s result rather than reimplementing it.
   final Widget Function(BuildContext, Widget?)? builder;
 
+  /// Non-null turns on the shared app lock: [PortalDeviceSecurityGate] wraps
+  /// [builder]'s (or the default builder's) output and is guarded whenever
+  /// this returns true for the current route name. Requires a
+  /// `DeviceSecurityController` already registered when the root builds —
+  /// the caller sets that up in its own startup step, same as it does today.
+  final bool Function(String route)? shouldGuardRoute;
+
+  @override
+  State<PortalAppRoot> createState() => _PortalAppRootState();
+}
+
+class _PortalAppRootState extends State<PortalAppRoot> {
+  // Null when shouldGuardRoute is null, so the other callers get the exact
+  // widget tree they have today — no Obx, no gate.
+  RxBool? _guarding;
+
+  @override
+  void initState() {
+    super.initState();
+    final shouldGuardRoute = widget.shouldGuardRoute;
+    if (shouldGuardRoute != null) {
+      _guarding = RxBool(shouldGuardRoute(PortalBootstrap.startRoute));
+    }
+  }
+
+  void _onRouting(Routing? routing) {
+    final guard = widget.shouldGuardRoute!(routing?.current ?? '');
+    // The first route's didPush fires from inside the Navigator's own build
+    // (the persistentCallbacks phase), and this Rx sits above the Navigator,
+    // so a synchronous write there marks an ancestor dirty mid-build. A
+    // user-driven navigation arrives idle, and deferring that one leaks a
+    // frame of content before the lock, so only the mid-build case waits.
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _guarding!.value = guard;
+      });
+    } else {
+      _guarding!.value = guard;
+    }
+  }
+
+  Widget _build(BuildContext context, Widget? child) {
+    final built = (widget.builder ?? portalDefaultAppBuilder)(context, child);
+    final guarding = _guarding;
+    if (guarding == null) return built;
+    // `built` is constructed outside the Obx closure so flipping the guard
+    // rebuilds the gate only, never the navigator underneath it.
+    return Obx(() => PortalDeviceSecurityGate(shouldGuard: guarding.value, child: built));
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeController = Get.find<PortalThemeController>();
@@ -52,14 +107,15 @@ class PortalAppRoot extends StatelessWidget {
       // not have — leaves the app on its own default seed.
       final seed = portalSeedForPaletteId(themeController.paletteId.value);
       return GetMaterialApp(
-        title: title,
-        theme: lightTheme(seed),
-        darkTheme: darkTheme(seed),
+        title: widget.title,
+        routingCallback: _guarding == null ? null : _onRouting,
+        theme: widget.lightTheme(seed),
+        darkTheme: widget.darkTheme(seed),
         themeMode: themeController.themeMode.value,
-        debugShowCheckedModeBanner: debugShowCheckedModeBanner,
+        debugShowCheckedModeBanner: widget.debugShowCheckedModeBanner,
         initialRoute: PortalBootstrap.startRoute,
-        getPages: getPages,
-        builder: builder ?? portalDefaultAppBuilder,
+        getPages: widget.getPages,
+        builder: _build,
       );
     });
   }
