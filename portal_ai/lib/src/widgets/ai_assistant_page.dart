@@ -248,6 +248,7 @@ class AiAssistantPage extends StatefulWidget {
   final bool autoSend;
 
   /// Opens the assistant as its own route.
+  @Deprecated("push the app's named /ai route instead")
   static Future<void> show(
     BuildContext context, {
     required PortalAiRuntime runtime,

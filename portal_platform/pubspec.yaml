@@ -1,6 +1,6 @@
 name: portal_platform
 description: Shared auth, API client, session, config, deep-link routing, and offline-first sync for Portal apps.
-version: 0.3.0
+version: 0.4.0
 repository: https://github.com/tanvoid0/portal_packages/tree/main/portal_platform
 
 environment:

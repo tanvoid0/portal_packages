@@ -15,6 +15,13 @@ import '../widgets/ai_settings_group.dart';
 import '../widgets/ai_settings_section.dart';
 import 'portal_ai_runtime.dart';
 
+/// The route segment every app's own assistant route is named, so an app
+/// builds its full path by combining its own root with this rather than
+/// retyping `'ai'` -- e.g. `'${GymRoutes.root}/${PortalAiSegment.ai}'`.
+abstract class PortalAiSegment {
+  static const ai = 'ai';
+}
+
 /// The wiring every Portal app repeats to stand up its assistant: open the
 /// backend-choice store, start the account-wide prefs sync, build
 /// [PortalAiRuntime], open this app's own chat-thread store — then a
@@ -104,19 +111,21 @@ class PortalAiAppKit {
 
   /// The AI group for this app's settings page. `onChanged` re-points
   /// [runtime] and marks the account-wide prefs dirty — the two steps every
-  /// app's settings page took by hand. Blank until [runtime] exists: before
-  /// [init] resolves, or if it threw and the app never registered one.
+  /// app's settings page took by hand. Null until [runtime] exists: before
+  /// [init] resolves, or if it threw and the app never registered one — so
+  /// the caller's settings page can skip the row entirely rather than push
+  /// to an empty page.
   ///
   /// [localLlm]/[onModels] pass straight to [AiSettingsGroup], for the one
   /// app (the dedicated assistant) that bundles an on-device engine.
-  Widget settingsGroup({
+  Widget? settingsGroup({
     required PortalAiRuntime? runtime,
     required bool cloudEligible,
     LocalLlmEngine? localLlm,
     VoidCallback? onModels,
   }) {
     final store = _backendStore;
-    if (store == null || runtime == null) return const SizedBox.shrink();
+    if (store == null || runtime == null) return null;
     return AiSettingsGroup(
       store: store,
       // Every app wires PortalAiRuntime.create with `post:` in [init], so a
@@ -162,6 +171,7 @@ class PortalAiAppKit {
   /// Pushes the assistant as a sheet/dialog over whatever is already
   /// showing — the form every app's "ask the assistant" entry point opens
   /// from.
+  @Deprecated("push the app's named /ai route instead")
   void openAssistant(
     BuildContext context, {
     required PortalAiRuntime runtime,
@@ -170,14 +180,16 @@ class PortalAiAppKit {
     void Function(String entity, AiItem item)? onItemTap,
     Future<bool> Function(AiToolCall call)? onEditToolCall,
     bool Function(AiToolCall call)? canEditToolCall,
-  }) => AiAssistantPage.show(
-    context,
-    runtime: runtime,
-    store: _chatStore,
-    onItemTap: onItemTap,
-    onEditToolCall: onEditToolCall,
-    canEditToolCall: canEditToolCall,
-    title: title,
-    suggestions: suggestions,
-  );
+  }) =>
+      // ignore: deprecated_member_use_from_same_package
+      AiAssistantPage.show(
+        context,
+        runtime: runtime,
+        store: _chatStore,
+        onItemTap: onItemTap,
+        onEditToolCall: onEditToolCall,
+        canEditToolCall: canEditToolCall,
+        title: title,
+        suggestions: suggestions,
+      );
 }

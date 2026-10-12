@@ -18,8 +18,7 @@ class _FakeApi extends ApiClient {
   Future<BackendReadinessResult> checkBackendReadiness({
     Duration timeout = const Duration(seconds: 12),
     String? baseUrl,
-  }) =>
-      readiness.future;
+  }) => readiness.future;
 }
 
 /// A signed-in (or out) session that records what the page asked of it.
@@ -81,10 +80,12 @@ void main() {
     tester.view.physicalSize = const Size(800, 3000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(GetMaterialApp(
-      theme: buildPortalTheme(brightness: Brightness.light),
-      home: page,
-    ));
+    await tester.pumpWidget(
+      GetMaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
+        home: page,
+      ),
+    );
     await tester.pump();
   }
 
@@ -94,13 +95,15 @@ void main() {
   _FakeSession signedIn({String name = 'Ada Lovelace'}) {
     Get.put<ApiClient>(api);
     return Get.put<SessionController>(
-      _FakeSession({'name': name, 'email': 'ada@example.com'}),
-    ) as _FakeSession;
+          _FakeSession({'name': name, 'email': 'ada@example.com'}),
+        )
+        as _FakeSession;
   }
 
   group('what it builds', () {
-    testWidgets('only the groups it was given, headers as written',
-        (tester) async {
+    testWidgets('only the groups it was given, headers as written', (
+      tester,
+    ) async {
       await pump(
         tester,
         const PortalSettingsPage(
@@ -118,8 +121,9 @@ void main() {
       expect(find.text('Account'), findsNothing);
     });
 
-    testWidgets('Appearance, then the app, then Assistant, then Status',
-        (tester) async {
+    testWidgets('custom first, then one coalesced nav card for the rest', (
+      tester,
+    ) async {
       await pump(
         tester,
         PortalSettingsPage(
@@ -131,21 +135,54 @@ void main() {
         ),
       );
 
+      // The assistant's content is behind the Assistant row now, not inline.
+      expect(find.text('provider list'), findsNothing);
+
       final order = [
-        top(tester, 'Appearance'),
         top(tester, 'Mine'),
-        top(tester, 'provider list'),
-        top(tester, 'Status'),
+        top(tester, 'Appearance'),
+        top(tester, 'Assistant'),
+        top(tester, 'About'),
       ];
       expect(order, [...order]..sort());
     });
 
-    testWidgets('respects order, and skips what include leaves out',
-        (tester) async {
+    testWidgets(
+      'rows are nested: Theme and Mode live behind Appearance and About',
+      (tester) async {
+        final theme = Get.put(PortalThemeController());
+        await pump(
+          tester,
+          PortalSettingsPage(
+            themeController: theme,
+            include: const [
+              PortalSettingsGroup.appearance,
+              PortalSettingsGroup.status,
+            ],
+          ),
+        );
+
+        expect(find.text('Theme'), findsNothing);
+        expect(find.text('Mode'), findsNothing);
+
+        await tester.tap(find.text('Appearance'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Theme'), findsOneWidget);
+        expect(find.byType(BackButton), findsOneWidget);
+      },
+    );
+
+    testWidgets('respects order, and skips what include leaves out', (
+      tester,
+    ) async {
       await pump(
         tester,
         PortalSettingsPage(
-          include: const [PortalSettingsGroup.custom, PortalSettingsGroup.status],
+          include: const [
+            PortalSettingsGroup.custom,
+            PortalSettingsGroup.status,
+          ],
           order: const [PortalSettingsGroup.status, PortalSettingsGroup.custom],
           sections: const [
             PortalSettingsSection(title: 'Mine', children: [Text('row')]),
@@ -155,7 +192,7 @@ void main() {
         ),
       );
 
-      expect(top(tester, 'Status'), lessThan(top(tester, '<Mine>')));
+      expect(top(tester, 'About'), lessThan(top(tester, '<Mine>')));
     });
 
     testWidgets('sectionBuilder replaces the default chrome', (tester) async {
@@ -181,7 +218,7 @@ void main() {
         PortalSettingsPage(
           labels: const PortalSettingsLabels(
             title: 'Réglages',
-            status: 'Statut',
+            about: 'À propos',
             appearance: 'Apparence',
           ),
           themeController: Get.put(PortalThemeController()),
@@ -193,12 +230,13 @@ void main() {
       );
 
       expect(find.text('Réglages'), findsOneWidget);
-      expect(find.text('Statut'), findsOneWidget);
+      expect(find.text('À propos'), findsOneWidget);
       expect(find.text('Apparence'), findsOneWidget);
     });
 
-    testWidgets('appearance is absent without a theme controller',
-        (tester) async {
+    testWidgets('appearance is absent without a theme controller', (
+      tester,
+    ) async {
       await pump(
         tester,
         const PortalSettingsPage(include: [PortalSettingsGroup.appearance]),
@@ -207,8 +245,9 @@ void main() {
       expect(find.text('Appearance'), findsNothing);
     });
 
-    testWidgets('a slotted section renders right after its named group',
-        (tester) async {
+    testWidgets('a slotted section renders right after its named group', (
+      tester,
+    ) async {
       await pump(
         tester,
         PortalSettingsPage(
@@ -226,13 +265,14 @@ void main() {
       final order = [
         top(tester, 'Appearance'),
         top(tester, 'Mine'),
-        top(tester, 'Status'),
+        top(tester, 'About'),
       ];
       expect(order, [...order]..sort());
     });
 
-    testWidgets('header given: no Scaffold/app bar, header is first',
-        (tester) async {
+    testWidgets('header given: no Scaffold/app bar, header is first', (
+      tester,
+    ) async {
       await pump(
         tester,
         const PortalSettingsPage(
@@ -247,14 +287,12 @@ void main() {
       expect(find.byType(PortalAppBar), findsNothing);
       expect(find.byType(Scaffold), findsNothing);
       expect(find.text('My header'), findsOneWidget);
-      expect(
-        top(tester, 'My header'),
-        lessThan(top(tester, 'Only me')),
-      );
+      expect(top(tester, 'My header'), lessThan(top(tester, 'Only me')));
     });
 
-    testWidgets('include: [status] hides Appearance and Assistant',
-        (tester) async {
+    testWidgets('include: [status] hides Appearance and Assistant', (
+      tester,
+    ) async {
       await pump(
         tester,
         PortalSettingsPage(
@@ -264,15 +302,16 @@ void main() {
         ),
       );
 
-      expect(find.text('Status'), findsOneWidget);
+      expect(find.text('About'), findsOneWidget);
       expect(find.text('Appearance'), findsNothing);
-      expect(find.text('provider list'), findsNothing);
+      expect(find.text('Assistant'), findsNothing);
     });
   });
 
   group('assistant', () {
-    testWidgets('assistantSection is inline, not behind a push',
-        (tester) async {
+    testWidgets('assistantSection is behind an Assistant row, pushed on tap', (
+      tester,
+    ) async {
       await pump(
         tester,
         const PortalSettingsPage(
@@ -281,11 +320,19 @@ void main() {
         ),
       );
 
+      expect(find.text('provider list'), findsNothing);
+      expect(find.text('Assistant'), findsOneWidget);
+
+      await tester.tap(find.text('Assistant'));
+      await tester.pumpAndSettle();
+
       expect(find.text('provider list'), findsOneWidget);
+      expect(find.byType(BackButton), findsOneWidget);
     });
 
-    testWidgets('legacy aiSection is one row that opens its own page',
-        (tester) async {
+    testWidgets('legacy aiSection is one row that opens its own page', (
+      tester,
+    ) async {
       await pump(
         tester,
         const PortalSettingsPage(
@@ -313,20 +360,25 @@ void main() {
   group('status', () {
     const status = [PortalSettingsGroup.status];
 
-    testWidgets('Mode follows the probe, and the bar says when Cloud is down',
-        (tester) async {
+    testWidgets('Mode follows the probe, and the bar says when Cloud is down', (
+      tester,
+    ) async {
       Get.put<ApiClient>(api);
       await pump(tester, const PortalSettingsPage(include: status));
 
-      expect(find.text('Mode'), findsOneWidget);
-      expect(find.text('Checking…'), findsOneWidget);
       expect(find.text('Portal Cloud unreachable'), findsNothing);
 
       api.readiness.complete(const BackendReadinessResult(isReady: false));
       await tester.pumpAndSettle();
 
+      // The bar's own status line and the About row's subtitle both say so.
+      expect(find.text('Portal Cloud unreachable'), findsNWidgets(2));
+
+      await tester.tap(find.text('About'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mode'), findsOneWidget);
       expect(find.text('On-device'), findsOneWidget);
-      expect(find.text('Portal Cloud unreachable'), findsOneWidget);
     });
 
     testWidgets('Mode says Portal Cloud when it answers', (tester) async {
@@ -335,17 +387,27 @@ void main() {
 
       api.readiness.complete(const BackendReadinessResult(isReady: true));
       await tester.pumpAndSettle();
+      expect(find.text('Portal Cloud unreachable'), findsNothing);
+
+      await tester.tap(find.text('About'));
+      await tester.pumpAndSettle();
 
       expect(find.text('Portal Cloud'), findsOneWidget);
-      expect(find.text('Portal Cloud unreachable'), findsNothing);
     });
 
-    testWidgets('no client, no Mode row; the version still reads',
-        (tester) async {
+    testWidgets('no client, no Mode row; the version still reads', (
+      tester,
+    ) async {
       await pump(tester, const PortalSettingsPage(include: status));
       // The version future was resolved in the real zone (see setUp); let its
       // callback run there before settling.
       await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+
+      // The row's own trailing value already reads it before the push.
+      expect(find.text('1.3.0 (412)'), findsOneWidget);
+
+      await tester.tap(find.text('About'));
       await tester.pumpAndSettle();
 
       expect(find.text('Mode'), findsNothing);
@@ -353,27 +415,37 @@ void main() {
       expect(find.text('1.3.0 (412)'), findsOneWidget);
     });
 
-    testWidgets('a tap on App version opens the server page in debug',
-        (tester) async {
+    testWidgets('a tap on App version opens the server page in debug', (
+      tester,
+    ) async {
       Get.put<ApiClient>(api);
       await pump(tester, const PortalSettingsPage(include: status));
 
+      await tester.tap(find.text('About'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('App version'));
       await tester.pumpAndSettle();
 
       expect(find.byType(PortalServerPage), findsOneWidget);
     });
 
-    testWidgets('Check for updates only with an update service',
-        (tester) async {
+    testWidgets('Check for updates only with an update service', (
+      tester,
+    ) async {
       await pump(tester, const PortalSettingsPage(include: status));
+      await tester.tap(find.text('About'));
+      await tester.pumpAndSettle();
       expect(find.text('Check for updates'), findsNothing);
 
-      Get.put(PortalUpdateService(
-        manifestUrl: 'https://example.test/updates.json',
-        appName: 'Portal Gym',
-      ));
+      Get.put(
+        PortalUpdateService(
+          manifestUrl: 'https://example.test/updates.json',
+          appName: 'Portal Gym',
+        ),
+      );
       await pump(tester, const PortalSettingsPage(include: status));
+      await tester.tap(find.text('About'));
+      await tester.pumpAndSettle();
       expect(find.text('Check for updates'), findsOneWidget);
     });
   });
@@ -388,6 +460,9 @@ void main() {
           include: const [PortalSettingsGroup.appearance],
         ),
       );
+
+      await tester.tap(find.text('Appearance'));
+      await tester.pumpAndSettle();
 
       // No palettes, no accent row.
       expect(find.text('Accent colour'), findsNothing);
@@ -410,11 +485,22 @@ void main() {
           themeController: theme,
           include: const [PortalSettingsGroup.appearance],
           palettes: const [
-            PortalPaletteOption(id: 'ocean', label: 'Ocean', swatch: Colors.blue),
-            PortalPaletteOption(id: 'ember', label: 'Ember', swatch: Colors.red),
+            PortalPaletteOption(
+              id: 'ocean',
+              label: 'Ocean',
+              swatch: Colors.blue,
+            ),
+            PortalPaletteOption(
+              id: 'ember',
+              label: 'Ember',
+              swatch: Colors.red,
+            ),
           ],
         ),
       );
+
+      await tester.tap(find.text('Appearance'));
+      await tester.pumpAndSettle();
 
       // The row draws the swatch, not the name; the name is in the sheet.
       expect(find.text('Ocean'), findsNothing);
@@ -434,8 +520,9 @@ void main() {
   });
 
   group('profile', () {
-    testWidgets('shows the person, and renames through the sheet',
-        (tester) async {
+    testWidgets('shows the person, and renames through the sheet', (
+      tester,
+    ) async {
       final session = signedIn();
       await pump(
         tester,
@@ -458,8 +545,9 @@ void main() {
       expect(find.text('Edit name'), findsNothing);
     });
 
-    testWidgets('a failed rename stays open and offers a retry',
-        (tester) async {
+    testWidgets('a failed rename stays open and offers a retry', (
+      tester,
+    ) async {
       final session = signedIn()..failName = true;
       await pump(
         tester,
@@ -483,8 +571,9 @@ void main() {
       expect(find.text('Edit name'), findsNothing);
     });
 
-    testWidgets('signed out: a Sign in row only when the app gave one',
-        (tester) async {
+    testWidgets('signed out: a Sign in row only when the app gave one', (
+      tester,
+    ) async {
       Get.put<ApiClient>(api);
       Get.put<SessionController>(_FakeSession(null));
       await pump(
@@ -522,30 +611,41 @@ void main() {
       final session = signedIn();
       await pump(tester, const PortalSettingsPage(include: about));
 
+      await tester.tap(find.text('Account'));
+      await tester.pumpAndSettle();
+
       expect(find.text('Change password'), findsOneWidget);
       await tester.tap(find.text('Sign out'));
       await tester.pumpAndSettle();
       expect(session.calls, isEmpty);
 
-      await tester.tap(find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.text('Sign out'),
-      ));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Sign out'),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(session.calls, ['signOut']);
     });
 
-    testWidgets('a failed delete says so above the rows, and retries',
-        (tester) async {
+    testWidgets('a failed delete says so above the rows, and retries', (
+      tester,
+    ) async {
       final session = signedIn()..failDelete = true;
       await pump(tester, const PortalSettingsPage(include: about));
 
+      await tester.tap(find.text('Account'));
+      await tester.pumpAndSettle();
+
       await tester.tap(find.text('Delete account'));
       await tester.pumpAndSettle();
-      await tester.tap(find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.text('Delete account'),
-      ));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Delete account'),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(

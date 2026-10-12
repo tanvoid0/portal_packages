@@ -1,3 +1,12 @@
+## 0.3.0
+
+- `AiAssistantPage.show` and `PortalAiAppKit.openAssistant` are deprecated:
+  push the app's own named `/ai` route instead (see `PortalAiSegment.ai`).
+  Both still work exactly as before; nothing calling either breaks.
+- `PortalAiSegment.ai` (new): the route segment every app's assistant route
+  is named, shared so an app builds its full path from its own root plus
+  this rather than retyping `'ai'` itself.
+
 ## 0.2.2
 
 - `AiAssistantPage`: the chat reply, redone. The per-reply avatar gutter is

@@ -71,7 +71,7 @@ class _PortalDeepLinkAssistantViewState
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
+      canPop: Navigator.of(context).canPop(),
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) Get.offAllNamed(widget.fallbackRoute);
       },
