@@ -1,5 +1,10 @@
 ## Unreleased
 
+- `syncQueuedToast`, `syncPushedToast`, `syncRejectedToast` and
+  `syncEvictedToast` (new, exported): the four toasts `portalInstallSyncFeedback`
+  raises, as plain `PortalToastData` builders. Behaviour is unchanged — the
+  installer now calls `AppToast.present` with them — but the design kit can
+  preview the shipped copy instead of a hand-kept twin.
 - `PortalAppRoot.shouldGuardRoute` (new, nullable `bool Function(String route)`):
   wires `PortalDeviceSecurityGate` and the route-change plumbing it needs for
   an app with the shared app lock, so the lock no longer forces a hand-rolled
