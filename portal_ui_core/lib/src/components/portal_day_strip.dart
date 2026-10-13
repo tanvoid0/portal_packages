@@ -5,6 +5,7 @@ import '../motion/portal_haptics.dart';
 import '../theme/portal_component_extensions.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_pressable.dart';
+import 'portal_text.dart';
 
 /// A sideways strip of days: a weekday caption over a tabular date, one
 /// `minTapTarget` wide.
@@ -78,8 +79,7 @@ class PortalDayStrip extends StatelessWidget {
       controller: controller,
       reverse: reverse,
       scrollDirection: Axis.horizontal,
-      padding:
-          padding ?? EdgeInsets.symmetric(horizontal: t.spacing.lg),
+      padding: padding ?? EdgeInsets.symmetric(horizontal: t.spacing.lg),
       child: Row(children: cells),
     );
   }
@@ -104,8 +104,8 @@ class PortalDayStrip extends StatelessWidget {
       container: true,
       selected: picks ? on : null,
       inMutuallyExclusiveGroup: picks ? true : null,
-      label: [loc.formatFullDate(d), if (isToday) loc.currentDateLabel]
-          .join(', '),
+      label:
+          [loc.formatFullDate(d), if (isToday) loc.currentDateLabel].join(', '),
       child: PortalPressable(
         onTap: tap == null ? null : () => tap(d),
         haptic: PortalHapticKind.selection,
@@ -133,7 +133,7 @@ class PortalDayStrip extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
+                    PortalText(
                       weekday.format(d),
                       style: t.textStyles.caption.copyWith(
                         color: on ? onAccent : portal.onSurfaceVariant,

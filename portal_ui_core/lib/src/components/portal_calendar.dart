@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/portal_component_extensions.dart';
 import '../theme/portal_icons.dart';
 import '../theme/portal_ui_theme.dart';
+import 'portal_text.dart';
 
 /// Month grid with an optional selected day and day markers.
 ///
@@ -75,7 +76,8 @@ class _PortalCalendarState extends State<PortalCalendar> {
     final first = widget.firstWeekday;
 
     final days = DateTime(_month.year, _month.month + 1, 0).day;
-    final leading = (DateTime(_month.year, _month.month).weekday - first + 7) % 7;
+    final leading =
+        (DateTime(_month.year, _month.month).weekday - first + 7) % 7;
     final rows = (leading + days + 6) ~/ 7;
     final disc = t.minTapTarget * 0.72;
     final now = DateTime.now();
@@ -128,7 +130,7 @@ class _PortalCalendarState extends State<PortalCalendar> {
                   for (var i = 0; i < 7; i++)
                     Expanded(
                       child: Center(
-                        child: Text(
+                        child: PortalText(
                           // narrowWeekdays is Sunday-first; DateTime.sunday is 7.
                           loc.narrowWeekdays[(first - 1 + i + 1) % 7],
                           style: t.textStyles.caption

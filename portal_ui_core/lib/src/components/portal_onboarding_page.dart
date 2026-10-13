@@ -49,6 +49,10 @@ class PortalOnboardingPage extends StatelessWidget {
   static const _offlineMessage =
       'No connection. Signing in needs the internet.';
 
+  /// Past a phone's width the hero, copy and sign-in button stop stretching
+  /// and sit centred in a comfortable measure instead of spanning a tablet.
+  static const _maxWidth = 480.0;
+
   @override
   Widget build(BuildContext context) {
     final t = PortalUiTheme.of(context).tokens;
@@ -86,28 +90,31 @@ class PortalOnboardingPage extends StatelessWidget {
             child: ConstrainedBox(
               constraints: BoxConstraints(minHeight: c.maxHeight),
               child: Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: t.layout.pageHorizontal,
-                    vertical: t.spacing.xl,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      hero ?? _DefaultMark(identity: identity),
-                      SizedBox(height: t.spacing.lg),
-                      heading,
-                      if (footnote != null) ...[
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: _maxWidth),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: t.layout.pageHorizontal,
+                      vertical: t.spacing.xl,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        hero ?? _DefaultMark(identity: identity),
                         SizedBox(height: t.spacing.lg),
-                        Text(
-                          footnote!,
-                          textAlign: TextAlign.center,
-                          style: t.textStyles.caption.copyWith(
-                            color: cs.onSurfaceVariant,
+                        heading,
+                        if (footnote != null) ...[
+                          SizedBox(height: t.spacing.lg),
+                          Text(
+                            footnote!,
+                            textAlign: TextAlign.center,
+                            style: t.textStyles.caption.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
                           ),
-                        ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -116,30 +123,35 @@ class PortalOnboardingPage extends StatelessWidget {
         ),
       ),
       bottomNavigationBar: PortalButtonDock(
-        primary: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: t.spacing.md,
-          children: [
-            if (offline)
-              const PortalPrompt(
-                size: PortalPromptSize.compact,
-                sentiment: PortalSentiment.warning,
-                icon: Icons.cloud_off_rounded,
-                message: _offlineMessage,
-              ),
-            // Off while offline; the warning above is its reason, and the
-            // button carries it as its hint.
-            Semantics(
-              hint: offline ? _offlineMessage : null,
-              child: PortalButton(
-                label: signInLabel,
-                size: PortalButtonSize.lg,
-                expand: true,
-                onPressed: offline ? null : onSignIn,
-              ),
+        primary: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: _maxWidth),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              spacing: t.spacing.md,
+              children: [
+                if (offline)
+                  const PortalPrompt(
+                    size: PortalPromptSize.compact,
+                    sentiment: PortalSentiment.warning,
+                    icon: Icons.cloud_off_rounded,
+                    message: _offlineMessage,
+                  ),
+                // Off while offline; the warning above is its reason, and the
+                // button carries it as its hint.
+                Semantics(
+                  hint: offline ? _offlineMessage : null,
+                  child: PortalButton(
+                    label: signInLabel,
+                    size: PortalButtonSize.lg,
+                    expand: true,
+                    onPressed: offline ? null : onSignIn,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

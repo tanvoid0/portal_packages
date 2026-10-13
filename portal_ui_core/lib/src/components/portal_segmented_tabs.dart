@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../motion/portal_haptics.dart';
 import '../theme/portal_ui_theme.dart';
+import 'portal_text.dart';
 
 /// Full-width segmented control — two to four peer views of the same data.
 ///
@@ -47,7 +48,8 @@ class PortalSegmentedTabs extends StatelessWidget {
     final tint = accentColor ?? portal.primary;
     final radius = BorderRadius.circular(tokens.radii.md);
 
-    Widget share({required Widget child}) => scrollable ? child : Expanded(child: child);
+    Widget share({required Widget child}) =>
+        scrollable ? child : Expanded(child: child);
 
     void select(int i) {
       if (i != index) PortalHaptics.selection();
@@ -94,11 +96,10 @@ class PortalSegmentedTabs extends StatelessWidget {
                             horizontal: scrollable
                                 ? tokens.spacing.lg
                                 : tokens.spacing.sm),
-                        child: Text(
+                        child: PortalText(
                           labels[i],
                           textAlign: TextAlign.center,
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                           style: tokens.textStyles.caption.copyWith(
                             color: index == i ? tint : portal.onSurfaceVariant,
                           ),
@@ -113,8 +114,9 @@ class PortalSegmentedTabs extends StatelessWidget {
         ],
       ],
     );
-    final dimmed =
-        enabled ? row : Opacity(opacity: tokens.motion.disabledOpacity, child: row);
+    final dimmed = enabled
+        ? row
+        : Opacity(opacity: tokens.motion.disabledOpacity, child: row);
     final body = scrollable
         ? SingleChildScrollView(
             scrollDirection: Axis.horizontal,

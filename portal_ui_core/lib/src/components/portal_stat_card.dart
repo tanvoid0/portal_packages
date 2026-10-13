@@ -6,6 +6,7 @@ import '../theme/portal_ui_theme.dart';
 import 'portal_card.dart';
 import 'portal_icon_tile.dart';
 import 'portal_skeleton.dart';
+import 'portal_text.dart';
 
 /// One metric: glyph, value, label, optional footer.
 ///
@@ -143,11 +144,13 @@ class PortalStatCard extends StatelessWidget {
           Text(
             value,
             style: tokens.textStyles
-                .numeric(hero ? tokens.textStyles.hero : tokens.textStyles.title)
-                .copyWith(color: valueColor ?? skin.valueColor ?? portal.onSurface),
+                .numeric(
+                    hero ? tokens.textStyles.hero : tokens.textStyles.title)
+                .copyWith(
+                    color: valueColor ?? skin.valueColor ?? portal.onSurface),
           ),
           SizedBox(height: tokens.spacing.xs),
-          Text(
+          PortalText(
             label,
             style: tokens.textStyles.overline
                 .copyWith(color: skin.labelColor ?? portal.onSurfaceVariant),
@@ -253,15 +256,15 @@ class PortalStatCard extends StatelessWidget {
             ),
           ),
           SizedBox(height: t.spacing.xs),
-          Text(
+          PortalText(
             label,
             style: t.textStyles.subtitle.copyWith(color: portal.onSurface),
           ),
           if (note != null)
             Text(
               note!,
-              style: t.textStyles.caption
-                  .copyWith(color: portal.onSurfaceVariant),
+              style:
+                  t.textStyles.caption.copyWith(color: portal.onSurfaceVariant),
             ),
         ],
       ),
@@ -304,9 +307,8 @@ class PortalStatRow extends StatelessWidget {
             for (var i = 0; i < n; i++) ...[
               if (i > 0) SizedBox(width: sp.sm),
               Expanded(
-                child: _cells != null
-                    ? const PortalStatCard.skeleton()
-                    : stats[i],
+                child:
+                    _cells != null ? const PortalStatCard.skeleton() : stats[i],
               ),
             ],
           ],

@@ -58,6 +58,10 @@ class PortalResultScreen extends StatelessWidget {
   final Widget? dock;
   final VoidCallback? onClose;
 
+  /// Past a phone's width the art, copy and progress meter stop stretching and
+  /// sit centred in a comfortable measure instead of spanning a tablet.
+  static const _maxWidth = 480.0;
+
   @override
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
@@ -86,51 +90,56 @@ class PortalResultScreen extends StatelessWidget {
             child: ConstrainedBox(
               constraints: BoxConstraints(minHeight: c.maxHeight),
               child: Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: tokens.layout.pageHorizontal,
-                    vertical: tokens.spacing.xl,
-                  ),
-                  child: Semantics(
-                    container: true,
-                    // A failure is announced when it appears; success and
-                    // pending are read in order.
-                    liveRegion: state == PortalResultState.error,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (art != null) ...[
-                          ExcludeSemantics(child: art!),
-                          SizedBox(height: tokens.spacing.xl),
-                        ],
-                        Semantics(
-                          header: true,
-                          child: Text(
-                            title,
-                            textAlign: TextAlign.center,
-                            style: styles.headline.copyWith(color: cs.onSurface),
-                          ),
-                        ),
-                        SizedBox(height: tokens.spacing.sm),
-                        Text(
-                          body,
-                          textAlign: TextAlign.center,
-                          style: styles.body.copyWith(color: cs.onSurfaceVariant),
-                        ),
-                        if (progress != null) ...[
-                          SizedBox(height: tokens.spacing.lg),
-                          // Full width: the bar has no width of its own.
-                          SizedBox(
-                            width: double.infinity,
-                            child: PortalProgress(
-                              value: progress,
-                              startLabel: progressStartLabel,
-                              endLabel: progressEndLabel,
-                              semanticLabel: progressSemanticLabel,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: _maxWidth),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: tokens.layout.pageHorizontal,
+                      vertical: tokens.spacing.xl,
+                    ),
+                    child: Semantics(
+                      container: true,
+                      // A failure is announced when it appears; success and
+                      // pending are read in order.
+                      liveRegion: state == PortalResultState.error,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (art != null) ...[
+                            ExcludeSemantics(child: art!),
+                            SizedBox(height: tokens.spacing.xl),
+                          ],
+                          Semantics(
+                            header: true,
+                            child: Text(
+                              title,
+                              textAlign: TextAlign.center,
+                              style:
+                                  styles.headline.copyWith(color: cs.onSurface),
                             ),
                           ),
+                          SizedBox(height: tokens.spacing.sm),
+                          Text(
+                            body,
+                            textAlign: TextAlign.center,
+                            style: styles.body
+                                .copyWith(color: cs.onSurfaceVariant),
+                          ),
+                          if (progress != null) ...[
+                            SizedBox(height: tokens.spacing.lg),
+                            // Full width: the bar has no width of its own.
+                            SizedBox(
+                              width: double.infinity,
+                              child: PortalProgress(
+                                value: progress,
+                                startLabel: progressStartLabel,
+                                endLabel: progressEndLabel,
+                                semanticLabel: progressSemanticLabel,
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_icon_tile.dart';
 import 'portal_pressable.dart';
+import 'portal_text.dart';
 
 /// A dashboard shortcut: a glyph over a short label on a tonal tile
 /// ("Add expense", "Scan"). Lay several out in a `Row` of `Expanded`s or a
@@ -80,11 +81,10 @@ class PortalQuickAction extends StatelessWidget {
                   : Icon(_icon, size: 24, color: ink),
             ),
             SizedBox(height: tokens.spacing.xs),
-            Text(
+            PortalText(
               label,
               textAlign: TextAlign.center,
               maxLines: 2,
-              overflow: TextOverflow.ellipsis,
               style: tokens.textStyles.caption.copyWith(color: ink),
             ),
           ],

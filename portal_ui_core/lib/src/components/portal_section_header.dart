@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_pressable.dart';
 import 'portal_skeleton.dart';
+import 'portal_text.dart';
 
 /// A titled break inside a scroll page.
 ///
@@ -23,8 +24,7 @@ class PortalSectionHeader extends StatelessWidget {
     this.overline = false,
     this.headerValue,
   })  : assert(
-          headerValue == null ||
-              (trailing == null && actionLabel == null),
+          headerValue == null || (trailing == null && actionLabel == null),
           'a header value is not a control: never with trailing or an action',
         ),
         _skeleton = false;
@@ -88,14 +88,17 @@ class PortalSectionHeader extends StatelessWidget {
     final tokens = portal.tokens;
     final ink = foregroundColor ??
         (overline ? portal.onSurfaceVariant : portal.onSurface);
-    final style = (overline ? tokens.textStyles.overline : tokens.textStyles.subtitle)
-        .copyWith(color: ink);
+    final style =
+        (overline ? tokens.textStyles.overline : tokens.textStyles.subtitle)
+            .copyWith(color: ink);
 
     if (_skeleton) {
       return ExcludeSemantics(
         child: Row(
           children: [
-            Expanded(child: PortalSkeleton(height: style.fontSize ?? 16, width: 120)),
+            Expanded(
+                child:
+                    PortalSkeleton(height: style.fontSize ?? 16, width: 120)),
             if (headerValue != null) ...[
               SizedBox(width: tokens.spacing.sm),
               PortalSkeleton(height: style.fontSize ?? 16, width: 48),
@@ -177,7 +180,7 @@ class PortalSectionHeader extends StatelessWidget {
                 widthFactor: 1,
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: tokens.spacing.xs),
-                  child: Text(
+                  child: PortalText(
                     action,
                     style: tokens.textStyles.body.copyWith(
                       fontWeight: tokens.textStyles.subtitle.fontWeight,

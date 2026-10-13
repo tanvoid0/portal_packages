@@ -5,6 +5,7 @@ import '../theme/portal_semantic_colors.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_prompt.dart';
 import 'portal_skeleton.dart';
+import 'portal_text.dart';
 
 /// A budget meter's sentiment by how much of it is used: positive under 75%,
 /// warning to the limit, negative over it. [value] is spent over budget, 1.0
@@ -301,13 +302,12 @@ class PortalProgress extends StatelessWidget {
               if (i > 0) gap,
               Expanded(
                 flex: flex(i),
-                child: Text(
+                child: PortalText(
                   names[i],
                   style: tokens.textStyles.caption
                       .copyWith(color: portal.onSurfaceVariant),
                   textAlign: TextAlign.center,
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

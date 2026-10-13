@@ -4,6 +4,7 @@ import '../../contrast_gate.dart';
 import '../motion/portal_haptics.dart';
 import '../theme/portal_component_extensions.dart';
 import '../theme/portal_ui_theme.dart';
+import 'portal_text.dart';
 
 /// A destination in [PortalBottomNavBar].
 @immutable
@@ -87,8 +88,7 @@ class PortalBottomNavBar extends StatelessWidget {
   static const double barHeight = 68;
   static const double outerBottomPadding = 10;
   static const double outerHorizontalPadding = 20;
-  static const double overlayClearance =
-      barHeight + outerBottomPadding + 8;
+  static const double overlayClearance = barHeight + outerBottomPadding + 8;
 
   /// Bottom padding for a FAB so it clears the floating pill.
   static const double fabBottomPadding = overlayClearance + 12;
@@ -97,8 +97,7 @@ class PortalBottomNavBar extends StatelessWidget {
   static const double contentBottomInset = overlayClearance + 12;
 
   /// Bottom padding for a scrolling body that also has a FAB.
-  static const double contentBottomInsetWithFab =
-      fabBottomPadding + 56 + 12;
+  static const double contentBottomInsetWithFab = fabBottomPadding + 56 + 12;
 
   @override
   Widget build(BuildContext context) => switch (variant) {
@@ -136,8 +135,9 @@ class PortalBottomNavBar extends StatelessWidget {
           color: bg,
           borderRadius: BorderRadius.circular(tokens.radii.xl),
           border: Border.all(color: border),
-          boxShadow:
-              boxShadow ?? skin.boxShadow ?? tokens.elevation.medium(brightness),
+          boxShadow: boxShadow ??
+              skin.boxShadow ??
+              tokens.elevation.medium(brightness),
         ),
         child: Row(
           children: [
@@ -151,7 +151,8 @@ class PortalBottomNavBar extends StatelessWidget {
                     onDestinationSelected(i);
                   },
                   mark: mark,
-                  selectedMark: selectedMarkColor ?? skin.selectedMarkColor ?? mark,
+                  selectedMark:
+                      selectedMarkColor ?? skin.selectedMarkColor ?? mark,
                   well: well,
                   radius: tokens.radii.lg,
                   duration: duration,
@@ -183,8 +184,7 @@ class PortalBottomNavBar extends StatelessWidget {
     final mark = markColor ?? skin.markColor ?? portal.onCard;
     final selectedMark = selectedMarkColor ?? skin.selectedMarkColor ?? mark;
     final bg = backgroundColor ?? skin.backgroundColor ?? portal.card;
-    final well =
-        selectedWellColor ??
+    final well = selectedWellColor ??
         skin.selectedWellColor ??
         portalWellOn(bg, selectedMark);
     final n = destinations.length;
@@ -241,10 +241,9 @@ class PortalBottomNavBar extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 2),
-                  Text(
+                  PortalText(
                     d.label,
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: tokens.textStyles.caption.copyWith(
                       fontSize: 12,
                       height: 1.1,
@@ -393,9 +392,7 @@ class _NavItem extends StatelessWidget {
     return Semantics(
       button: true,
       selected: isSelected,
-      label: count > 0
-          ? '${destination.label}, $count'
-          : destination.label,
+      label: count > 0 ? '${destination.label}, $count' : destination.label,
       excludeSemantics: true,
       child: Material(
         color: Colors.transparent,
@@ -445,16 +442,14 @@ class _NavItem extends StatelessWidget {
               const SizedBox(height: 3),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Text(
+                child: PortalText(
                   destination.label,
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
                     height: 1.1,
-                    fontWeight:
-                        isSelected ? FontWeight.w700 : FontWeight.w500,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                     // The label sits outside the well, on the bar itself, so
                     // it always takes the bar's mark color — never the well's
                     // foreground, which would be invisible out here.

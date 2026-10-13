@@ -3,6 +3,7 @@ import '../theme/portal_ui_theme.dart';
 import '../theme/portal_typography.dart';
 import '../tokens/design_tokens.dart';
 import 'portal_pressable.dart';
+import 'portal_text.dart';
 
 enum PortalButtonVariant { primary, secondary, outline, destructive, ghost }
 
@@ -139,12 +140,13 @@ class PortalButton extends StatelessWidget {
         if (showLabel)
           Flexible(
             fit: expand ? FlexFit.tight : FlexFit.loose,
-            child: Text(
+            // Shrinks a long or translated label to fit before it ellipsizes,
+            // so the word stays readable on a narrow button.
+            child: PortalText(
               busyName ?? label,
               style: textStyle,
               textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
+              minFontSize: 11,
             ),
           ),
       ],

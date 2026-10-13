@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../responsive/portal_breakpoints.dart';
 import 'portal_bottom_nav_bar.dart';
+import 'portal_nav_rail.dart';
 
 /// The fleet's root tab shell: back on any tab but the first returns to the
 /// first instead of leaving the app, the tabs are `IndexedStack` siblings so
@@ -50,24 +52,51 @@ class PortalTabShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final body = IndexedStack(index: selectedIndex, children: children);
+    final fab = floatingActionButtonBuilder?.call(selectedIndex);
+
+    // Past the expanded breakpoint a bottom pill wastes a tablet's width and
+    // puts navigation under the thumb that isn't there; a side rail is the
+    // adaptive form. Compact and medium keep the floating pill unchanged.
+    final Widget scaffold = context.isExpandedOrWider
+        ? Scaffold(
+            appBar: appBar,
+            backgroundColor: backgroundColor,
+            resizeToAvoidBottomInset: resizeToAvoidBottomInset,
+            floatingActionButton: fab,
+            body: Row(
+              children: [
+                PortalNavRail(
+                  selectedIndex: selectedIndex,
+                  onDestinationSelected: onDestinationSelected,
+                  destinations: destinations,
+                  extended: context.portalSizeClass == PortalSizeClass.large,
+                ),
+                const VerticalDivider(width: 1, thickness: 1),
+                Expanded(child: body),
+              ],
+            ),
+          )
+        : Scaffold(
+            appBar: appBar,
+            backgroundColor: backgroundColor,
+            extendBody: extendBody,
+            resizeToAvoidBottomInset: resizeToAvoidBottomInset,
+            body: body,
+            bottomNavigationBar: PortalBottomNavBar(
+              selectedIndex: selectedIndex,
+              onDestinationSelected: onDestinationSelected,
+              destinations: destinations,
+            ),
+            floatingActionButton: fab,
+          );
+
     return PopScope(
       canPop: selectedIndex == 0,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) onDestinationSelected(0);
       },
-      child: Scaffold(
-        appBar: appBar,
-        backgroundColor: backgroundColor,
-        extendBody: extendBody,
-        resizeToAvoidBottomInset: resizeToAvoidBottomInset,
-        body: IndexedStack(index: selectedIndex, children: children),
-        bottomNavigationBar: PortalBottomNavBar(
-          selectedIndex: selectedIndex,
-          onDestinationSelected: onDestinationSelected,
-          destinations: destinations,
-        ),
-        floatingActionButton: floatingActionButtonBuilder?.call(selectedIndex),
-      ),
+      child: scaffold,
     );
   }
 }

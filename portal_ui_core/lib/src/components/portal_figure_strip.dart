@@ -4,6 +4,7 @@ import '../dev/portal_review_tag.dart';
 import '../theme/portal_ui_theme.dart';
 import '../tokens/design_tokens.dart';
 import 'portal_skeleton.dart';
+import 'portal_text.dart';
 
 /// One cell of a [PortalFigureStrip]. [spoken] is the caption a screen reader
 /// hears when the short one leans on its neighbour ('Done this year' for
@@ -125,7 +126,8 @@ class PortalFigureStrip extends StatelessWidget {
 
     Widget cell(PortalFigure f) => Semantics(
           container: true,
-          label: [f.spoken ?? f.caption, f.value, if (f.unit case final u?) u].join(', '),
+          label: [f.spoken ?? f.caption, f.value, if (f.unit case final u?) u]
+              .join(', '),
           child: ExcludeSemantics(
             child: ruled(
               Column(
@@ -133,7 +135,12 @@ class PortalFigureStrip extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 spacing: _fitGap,
                 children: [
-                  Text(f.caption, style: cap),
+                  // ponytail: the figure strip measures its cells with
+                  // IntrinsicHeight, which PortalText's LayoutBuilder cannot
+                  // answer; plain Text there, shrink-to-fit in the row size.
+                  size == PortalFigureSize.figure
+                      ? Text(f.caption, style: cap)
+                      : PortalText(f.caption, style: cap),
                   _FigureValue(f.value, unit: f.unit, size: size),
                 ],
               ),

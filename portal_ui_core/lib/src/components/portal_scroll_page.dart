@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../responsive/portal_breakpoints.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_app_bar.dart';
 import 'portal_button_dock.dart';
@@ -160,9 +161,8 @@ class PortalScrollPage extends StatelessWidget {
         (grouped && theme.brightness == Brightness.light
             ? theme.colorScheme.surfaceContainerHigh
             : null);
-    final statusLine = [count, status]
-        .where((s) => s != null && s.isNotEmpty)
-        .join(' · ');
+    final statusLine =
+        [count, status].where((s) => s != null && s.isNotEmpty).join(' · ');
 
     if (body case final body?) {
       // A regular (non-sliver) bar: [body] owns its own scroll, so there is
@@ -196,9 +196,7 @@ class PortalScrollPage extends StatelessWidget {
             bottomNavigationBar: bottom ?? bottomNavigationBar,
             body: track(body),
           );
-      return bottom == null
-          ? page((b) => b)
-          : _RuleHost(builder: page);
+      return bottom == null ? page((b) => b) : _RuleHost(builder: page);
     }
 
     final bar = appBar ??
@@ -229,11 +227,11 @@ class PortalScrollPage extends StatelessWidget {
         if (bar != null) bar,
         SliverPadding(
           padding: padding ??
-              EdgeInsets.fromLTRB(
-                layout.pageHorizontal,
-                tokens.spacing.sm,
-                layout.pageHorizontal,
-                layout.listBottomInset,
+              _contentPadding(
+                context,
+                baseGutter: layout.pageHorizontal,
+                top: tokens.spacing.sm,
+                bottom: layout.listBottomInset,
               ),
           sliver: SliverList.list(children: children),
         ),
@@ -241,27 +239,48 @@ class PortalScrollPage extends StatelessWidget {
     );
 
     Widget page(Widget Function(Widget) track) => Scaffold(
-      backgroundColor: pageColor ?? portal.surface,
-      floatingActionButton: floatingActionButton,
-      bottomNavigationBar: bottom ?? bottomNavigationBar,
-      body: onRefresh == null
-          ? track(scroll)
-          : PortalRefresh(
-              onRefresh: onRefresh!,
-              // Under the bar, not over it. A custom [appBar] is assumed
-              // compact — the same offset the default bar gets.
-              edgeOffset: bar == null
-                  ? 0
-                  : PortalRefresh.belowBar(context,
-                      large: appBar == null && header != null),
-              child: track(scroll),
-            ),
-    );
+          backgroundColor: pageColor ?? portal.surface,
+          floatingActionButton: floatingActionButton,
+          bottomNavigationBar: bottom ?? bottomNavigationBar,
+          body: onRefresh == null
+              ? track(scroll)
+              : PortalRefresh(
+                  onRefresh: onRefresh!,
+                  // Under the bar, not over it. A custom [appBar] is assumed
+                  // compact — the same offset the default bar gets.
+                  edgeOffset: bar == null
+                      ? 0
+                      : PortalRefresh.belowBar(context,
+                          large: appBar == null && header != null),
+                  child: track(scroll),
+                ),
+        );
 
-    return bottom == null
-        ? page((scroll) => scroll)
-        : _RuleHost(builder: page);
+    return bottom == null ? page((scroll) => scroll) : _RuleHost(builder: page);
   }
+}
+
+/// Page gutter that grows with the window and, past the readable column cap,
+/// turns the extra width into a centred margin so content never stretches.
+EdgeInsets _contentPadding(
+  BuildContext context, {
+  required double baseGutter,
+  required double top,
+  required double bottom,
+}) {
+  final sizeClass = context.portalSizeClass;
+  var side = context.portalResponsive<double>(
+    compact: baseGutter,
+    medium: 24,
+    expanded: 32,
+    large: 40,
+  );
+  final cap = portalMaxContentWidth(sizeClass);
+  if (cap.isFinite) {
+    final centred = (context.portalWidth - cap) / 2;
+    if (centred > side) side = centred;
+  }
+  return EdgeInsets.fromLTRB(side, top, side, bottom);
 }
 
 /// Watches the page's scroll and tells a [PortalButtonDock] below it whether

@@ -420,18 +420,33 @@ void main() {
 
   testWidgets('scroll page insets content to the layout gutter and clearance',
       (t) async {
+    // Phone width: the plain page gutter and bottom clearance.
+    t.view.devicePixelRatio = 1.0;
+    t.view.physicalSize = const Size(390, 800);
+    addTearDown(t.view.resetPhysicalSize);
+    addTearDown(t.view.resetDevicePixelRatio);
     await t.pumpWidget(_host(const PortalScrollPage(
       title: 'Library',
       children: [SizedBox(height: 40, child: Text('row'))],
     )));
 
-    final padding = t.widget<SliverPadding>(find.byType(SliverPadding)).padding
+    var padding = t.widget<SliverPadding>(find.byType(SliverPadding)).padding
         as EdgeInsets;
     expect(padding.left, _tokens.layout.pageHorizontal);
     expect(padding.right, _tokens.layout.pageHorizontal);
     expect(padding.bottom, _tokens.layout.listBottomInset);
     expect(find.text('Library'), findsOneWidget);
     expect(find.text('row'), findsOneWidget);
+
+    // Wide window: content stops at the readable cap and the spare width
+    // becomes a centred margin, so the side inset grows past the gutter and
+    // stays symmetric.
+    t.view.physicalSize = const Size(1000, 800);
+    await t.pump();
+    padding = t.widget<SliverPadding>(find.byType(SliverPadding)).padding
+        as EdgeInsets;
+    expect(padding.left, greaterThan(_tokens.layout.pageHorizontal));
+    expect(padding.left, padding.right);
   });
 
   testWidgets('app bar keeps two actions inline and overflows the third',
