@@ -31,6 +31,30 @@ double portalMaxContentWidth(PortalSizeClass sizeClass) => switch (sizeClass) {
       PortalSizeClass.large => 840,
     };
 
+/// Horizontal inset for page content at the current width: the responsive
+/// gutter, widened into a centred margin once the window passes the readable
+/// cap so content stops stretching.
+///
+/// [PortalScrollPage] applies this itself. Use it directly in a raw
+/// `CustomScrollView`/`ListView` page that can't be a [PortalScrollPage] —
+/// wrap the content sliver in `SliverPadding(padding: EdgeInsets.symmetric(
+/// horizontal: portalContentSideInset(context)), ...)`, leaving the app bar
+/// full-bleed.
+double portalContentSideInset(BuildContext context, {double baseGutter = 16}) {
+  var side = context.portalResponsive<double>(
+    compact: baseGutter,
+    medium: 24,
+    expanded: 32,
+    large: 40,
+  );
+  final cap = portalMaxContentWidth(context.portalSizeClass);
+  if (cap.isFinite) {
+    final centred = (context.portalWidth - cap) / 2;
+    if (centred > side) side = centred;
+  }
+  return side;
+}
+
 extension PortalResponsive on BuildContext {
   double get portalWidth => MediaQuery.sizeOf(this).width;
 

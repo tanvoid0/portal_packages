@@ -268,18 +268,7 @@ EdgeInsets _contentPadding(
   required double top,
   required double bottom,
 }) {
-  final sizeClass = context.portalSizeClass;
-  var side = context.portalResponsive<double>(
-    compact: baseGutter,
-    medium: 24,
-    expanded: 32,
-    large: 40,
-  );
-  final cap = portalMaxContentWidth(sizeClass);
-  if (cap.isFinite) {
-    final centred = (context.portalWidth - cap) / 2;
-    if (centred > side) side = centred;
-  }
+  final side = portalContentSideInset(context, baseGutter: baseGutter);
   return EdgeInsets.fromLTRB(side, top, side, bottom);
 }
 
