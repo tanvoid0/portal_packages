@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../theme/portal_icons.dart';
 import '../theme/portal_semantic_colors.dart';
@@ -227,6 +230,192 @@ class PortalListLeading {
           ),
         ),
       );
+}
+
+/// G1: "the value gives way first: it is capped at 45% of the row and
+/// ellipsizes before the title does." Applies to text values only.
+const _valueCapFraction = .45;
+
+enum _PairSlot { text, accessory }
+
+/// The row's text column and a text-valued accessory, laid out so the value
+/// gives way first: it is capped at [_valueCapFraction] of the pair's width and
+/// ellipsizes, and the text takes the rest. Known limit: for valueAndAction
+/// the cap includes the 48 dp IconButton, so it overflows below ~107 dp of
+/// pair width. A render object rather than a
+/// LayoutBuilder, which throws when asked for intrinsics (AlertDialog,
+/// IntrinsicWidth); this one answers every intrinsic and dry-layout query.
+class _TextAndAccessory
+    extends SlottedMultiChildRenderObjectWidget<_PairSlot, RenderBox> {
+  const _TextAndAccessory({
+    required this.text,
+    required this.accessory,
+    required this.gap,
+    required this.centered,
+  });
+
+  final Widget text;
+  final Widget accessory;
+  final double gap;
+
+  /// Centre both on the row's line; false top-aligns them (a reason, a step).
+  final bool centered;
+
+  @override
+  Iterable<_PairSlot> get slots => _PairSlot.values;
+
+  @override
+  Widget? childForSlot(_PairSlot slot) =>
+      slot == _PairSlot.text ? text : accessory;
+
+  @override
+  _RenderTextAndAccessory createRenderObject(BuildContext context) =>
+      _RenderTextAndAccessory(gap, centered, Directionality.of(context));
+
+  @override
+  void updateRenderObject(
+      BuildContext context, _RenderTextAndAccessory renderObject) {
+    renderObject
+      ..gap = gap
+      ..centered = centered
+      ..textDirection = Directionality.of(context);
+  }
+}
+
+class _RenderTextAndAccessory extends RenderBox
+    with SlottedContainerRenderObjectMixin<_PairSlot, RenderBox> {
+  _RenderTextAndAccessory(this._gap, this._centered, this._textDirection);
+
+  double _gap;
+  bool _centered;
+  TextDirection _textDirection;
+
+  set gap(double v) {
+    if (v == _gap) return;
+    _gap = v;
+    markNeedsLayout();
+  }
+
+  set textDirection(TextDirection v) {
+    if (v == _textDirection) return;
+    _textDirection = v;
+    markNeedsLayout();
+  }
+
+  set centered(bool v) {
+    if (v == _centered) return;
+    _centered = v;
+    markNeedsLayout();
+  }
+
+  RenderBox get _text => childForSlot(_PairSlot.text)!;
+  RenderBox get _acc => childForSlot(_PairSlot.accessory)!;
+
+  double _accCap(double width) => width * _valueCapFraction;
+
+  // The accessory at its natural width, up to the cap.
+  double _accIntrinsic(double width) {
+    final natural = _acc.getMaxIntrinsicWidth(double.infinity);
+    return width.isFinite ? math.min(natural, _accCap(width)) : natural;
+  }
+
+  @override
+  double computeMinIntrinsicWidth(double height) =>
+      _text.getMinIntrinsicWidth(height) +
+      _gap +
+      _acc.getMaxIntrinsicWidth(height);
+
+  @override
+  double computeMaxIntrinsicWidth(double height) =>
+      _text.getMaxIntrinsicWidth(height) +
+      _gap +
+      _acc.getMaxIntrinsicWidth(height);
+
+  double _heightFor(double width) {
+    final accW = _accIntrinsic(width);
+    final textW = math.max(0.0, width - accW - _gap);
+    return math.max(
+        _text.getMinIntrinsicHeight(textW), _acc.getMinIntrinsicHeight(accW));
+  }
+
+  @override
+  double computeMinIntrinsicHeight(double width) => _heightFor(width);
+
+  @override
+  double computeMaxIntrinsicHeight(double width) => _heightFor(width);
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) {
+    final w = constraints.maxWidth;
+    final accSize =
+        _acc.getDryLayout(BoxConstraints(maxWidth: _accCap(w)));
+    final textW = math.max(0.0, w - accSize.width - _gap);
+    final textSize = _text
+        .getDryLayout(BoxConstraints(minWidth: textW, maxWidth: textW));
+    return constraints
+        .constrain(Size(w, math.max(textSize.height, accSize.height)));
+  }
+
+  @override
+  void performLayout() {
+    final w = constraints.maxWidth;
+    _acc.layout(BoxConstraints(maxWidth: _accCap(w)), parentUsesSize: true);
+    final textW = math.max(0.0, w - _acc.size.width - _gap);
+    _text.layout(BoxConstraints(minWidth: textW, maxWidth: textW),
+        parentUsesSize: true);
+    final h = math.max(_text.size.height, _acc.size.height);
+    size = constraints.constrain(Size(w, h));
+    double y(RenderBox c) => _centered ? (size.height - c.size.height) / 2 : 0;
+    // The text sits on the start side, the accessory on the end side.
+    final rtl = _textDirection == TextDirection.rtl;
+    (_text.parentData! as BoxParentData).offset =
+        Offset(rtl ? w - _text.size.width : 0, y(_text));
+    (_acc.parentData! as BoxParentData).offset =
+        Offset(rtl ? 0 : w - _acc.size.width, y(_acc));
+  }
+
+  @override
+  double? computeDryBaseline(
+      BoxConstraints constraints, TextBaseline baseline) {
+    final w = constraints.maxWidth;
+    final accSize = _acc.getDryLayout(BoxConstraints(maxWidth: _accCap(w)));
+    final textW = math.max(0.0, w - accSize.width - _gap);
+    final textC = BoxConstraints(minWidth: textW, maxWidth: textW);
+    final b = _text.getDryBaseline(textC, baseline);
+    if (b == null) return null;
+    final textH = _text.getDryLayout(textC).height;
+    final h = math.max(textH, accSize.height);
+    return b + (_centered ? (h - textH) / 2 : 0);
+  }
+
+  @override
+  double? computeDistanceToActualBaseline(TextBaseline baseline) {
+    final b = _text.getDistanceToActualBaseline(baseline);
+    return b == null ? null : b + (_text.parentData! as BoxParentData).offset.dy;
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    for (final c in [_text, _acc]) {
+      context.paintChild(c, offset + (c.parentData! as BoxParentData).offset);
+    }
+  }
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
+    for (final c in [_acc, _text]) {
+      final offset = (c.parentData! as BoxParentData).offset;
+      if (result.addWithPaintOffset(
+        offset: offset,
+        position: position,
+        hitTest: (result, transformed) =>
+            c.hitTest(result, position: transformed),
+      )) {
+        return true;
+      }
+    }
+    return false;
+  }
 }
 
 enum _Kind {
@@ -1014,19 +1203,23 @@ class PortalListItem extends StatelessWidget {
           Icon(acc.icon, size: 18, fill: acc.fill ? 1 : null, color: color),
           SizedBox(width: sp.xs),
         ],
-        Text(
-          acc.unit == null ? acc.text! : '${acc.text} ${acc.unit}',
-          softWrap: false,
-          style: base.copyWith(
-            color: color,
-            fontWeight: acc.sentiment == PortalValueSentiment.dim
-                ? FontWeight.w400
-                : FontWeight.w500,
-            fontFeatures: const [FontFeature.tabularFigures()],
+        Flexible(
+          child: Text(
+            acc.unit == null ? acc.text! : '${acc.text} ${acc.unit}',
+            softWrap: false,
+            overflow: TextOverflow.ellipsis,
+            style: base.copyWith(
+              color: color,
+              fontWeight: acc.sentiment == PortalValueSentiment.dim
+                  ? FontWeight.w400
+                  : FontWeight.w500,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
           ),
         ),
       ]);
     }
+
 
     switch (acc._kind) {
       case _Kind.none:
@@ -1046,13 +1239,17 @@ class PortalListItem extends StatelessWidget {
               ),
             )
           else if (acc.text != null)
-            Padding(
-              padding: EdgeInsets.only(right: sp.xs),
-              child: Text(
-                acc.text!,
-                style: styles.body.copyWith(
-                  color: detail ? cs.onSurface : cs.onSurfaceVariant,
-                  fontWeight: detail ? FontWeight.w500 : null,
+            Flexible(
+              child: Padding(
+                padding: EdgeInsets.only(right: sp.xs),
+                child: Text(
+                  acc.text!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: styles.body.copyWith(
+                    color: detail ? cs.onSurface : cs.onSurfaceVariant,
+                    fontWeight: detail ? FontWeight.w500 : null,
+                  ),
                 ),
               ),
             ),
@@ -1146,7 +1343,9 @@ class PortalListItem extends StatelessWidget {
         accessory = valueRow();
       case _Kind.valueAndAction:
         accessory = Row(mainAxisSize: MainAxisSize.min, children: [
-          ExcludeSemantics(child: valueRow(withIcon: false)),
+          Flexible(
+            child: ExcludeSemantics(child: valueRow(withIcon: false)),
+          ),
           IconButton(
             icon: Icon(acc.icon),
             tooltip: acc.tooltip,
@@ -1217,6 +1416,28 @@ class PortalListItem extends StatelessWidget {
         edit != null ||
         remove != null;
 
+    // The row's label already says the text; a control beside it keeps its own
+    // node, so the text must not read twice.
+    final textSlot =
+        keepsSemantics ? ExcludeSemantics(child: textColumn) : textColumn;
+    final accessorySlot = accessory == null
+        ? null
+        : Opacity(
+            opacity: disabled ? .38 : 1,
+            // Only the leading is interactive: the row's label already
+            // reads this accessory's text, so it must not read twice.
+            child: keepsSemantics && !acc._keepsSemantics
+                ? ExcludeSemantics(child: accessory)
+                : accessory,
+          );
+    // G1: a text value gives way first, capped at 45% of the row and
+    // ellipsized. Controls (switch, buttons, steppers, custom widgets) never are.
+    final capsAccessory = acc._kind == _Kind.value ||
+        acc._kind == _Kind.valueAndAction ||
+        (acc._kind == _Kind.navigate &&
+            acc.text != null &&
+            acc.swatchColor == null);
+
     Widget row = ConstrainedBox(
       constraints: BoxConstraints(minHeight: tapTarget + sp.md),
       child: Padding(
@@ -1250,23 +1471,21 @@ class PortalListItem extends StatelessWidget {
                     ),
                   SizedBox(width: step == null ? sp.lg : sp.sm),
                 ],
-                Expanded(
-                  // The row's label already says it; a control beside it
-                  // keeps its own node, so the text must not read twice.
-                  child: keepsSemantics
-                      ? ExcludeSemantics(child: textColumn)
-                      : textColumn,
-                ),
-                if (accessory != null) ...[
-                  SizedBox(width: sp.md),
-                  Opacity(
-                    opacity: disabled ? .38 : 1,
-                    // Only the leading is interactive: the row's label already
-                    // reads this accessory's text, so it must not read twice.
-                    child: keepsSemantics && !acc._keepsSemantics
-                        ? ExcludeSemantics(child: accessory)
-                        : accessory,
-                  ),
+                if (accessory != null && capsAccessory)
+                  Expanded(
+                    child: _TextAndAccessory(
+                      text: textSlot,
+                      accessory: accessorySlot!,
+                      gap: sp.md,
+                                      centered: disabledReason == null && step == null,
+                    ),
+                  )
+                else ...[
+                  Expanded(child: textSlot),
+                  if (accessory != null) ...[
+                    SizedBox(width: sp.md),
+                    accessorySlot!,
+                  ],
                 ],
                 for (final a in [edit, remove])
                   if (a != null)

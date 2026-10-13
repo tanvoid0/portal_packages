@@ -20,8 +20,9 @@ import 'portal_button.dart';
 /// [grouped] seats both buttons and the value in one high pill, as the search
 /// field and the composer are. [enabled] false (while its form saves) dims the
 /// buttons and stops the value adjusting. State stays with the caller: it
-/// passes [value] and takes [onChanged]. Whole numbers only; not a typed-in
-/// number field, which is `PortalTextField`.
+/// passes [value] and takes [onChanged]. Whole numbers only (fractions:
+/// `PortalDecimalStepper`); not a typed-in number field, which is
+/// `PortalTextField`.
 class PortalStepper extends StatelessWidget {
   const PortalStepper({
     super.key,
@@ -32,6 +33,7 @@ class PortalStepper extends StatelessWidget {
     this.step = 1,
     this.label,
     this.unit,
+    this.format,
     this.valueStyle,
     this.decreaseTooltip = 'Decrease',
     this.increaseTooltip = 'Increase',
@@ -55,6 +57,11 @@ class PortalStepper extends StatelessWidget {
 
   /// Caption after the number (`pcs`, `kg`); ignored with [label].
   final String? unit;
+
+  /// How a value is written, shown and spoken; defaults to the plain integer.
+  /// [PortalDecimalStepper] uses it to count in whole steps and write them as
+  /// fractions.
+  final String Function(int value)? format;
 
   /// Defaults to the body style, tabular figures.
   final TextStyle? valueStyle;
@@ -89,14 +96,15 @@ class PortalStepper extends StatelessWidget {
     final style = (valueStyle ?? tokens.textStyles.body).copyWith(
       fontFeatures: const [FontFeature.tabularFigures()],
     );
-    final shown = label ?? '$value';
+    String figure(int v) => format?.call(v) ?? '$v';
+    final shown = label ?? figure(value);
     final down = enabled && value > min
         ? () => onChanged((value - step).clamp(min, max))
         : null;
     final up = enabled && value < max
         ? () => onChanged((value + step).clamp(min, max))
         : null;
-    String say(int v) => unit == null ? '$v' : '$v $unit';
+    String say(int v) => unit == null ? figure(v) : '${figure(v)} $unit';
 
     final text = Text.rich(
       TextSpan(children: [

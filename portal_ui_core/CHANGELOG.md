@@ -1,5 +1,19 @@
 ## Unreleased
 
+- `PortalListItem`: a text-valued accessory (`value`, `valueAndAction`,
+  `navigate` with text) is now capped at 45% of the row and ellipsizes, so the
+  title gives way last (the G1 spec; the old kit did this and ui_core did not,
+  so Settings rows read "AI provi… Portal Cloud" at 360). Done with a small
+  two-slot render object, not a `LayoutBuilder`, so rows inside
+  `IntrinsicWidth`/`AlertDialog` still lay out. Controls, `meta` and custom
+  widget accessories are unchanged. Honours text direction. Known limit: the
+  cap on `valueAndAction` includes its 48dp button, so it overflows below
+  ~107dp of pair width.
+- `PortalDecimalStepper` (new) and `PortalStepper.format` (optional): a stepper
+  in fractional steps (7.5 h of sleep) built on `PortalStepper`, counted in
+  integer steps so there is no float drift. `PortalStepper` stays int-only and
+  unchanged by default.
+
 - `PortalLoadState { loading, empty, error, data }`: the fleet's four states
   as one enum, so a page switches on one value instead of several nullable
   fields. `PortalFeatureCard`, `PortalDetailHero`, `PortalFormStack`,

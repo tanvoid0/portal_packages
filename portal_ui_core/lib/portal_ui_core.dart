@@ -96,6 +96,7 @@ export 'src/components/portal_sheet.dart';
 export 'src/components/portal_skeleton.dart';
 export 'src/components/portal_stat_card.dart';
 export 'src/components/portal_stepper.dart';
+export 'src/components/portal_decimal_stepper.dart';
 export 'src/components/portal_text.dart';
 export 'src/components/portal_text_field.dart';
 export 'src/components/portal_app_identity.dart';
