@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../responsive/portal_breakpoints.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_button.dart';
 import 'portal_prompt.dart';
@@ -10,7 +11,8 @@ import 'portal_prompt.dart';
 /// `PortalScrollPage(bottom:)` provides it; a dock outside one passes
 /// `showRule` itself.
 class PortalDockRule extends InheritedWidget {
-  const PortalDockRule({super.key, required this.showRule, required super.child});
+  const PortalDockRule(
+      {super.key, required this.showRule, required super.child});
 
   final bool showRule;
 
@@ -92,9 +94,8 @@ class PortalButtonDock extends StatelessWidget {
                 size: PortalPromptSize.inline,
                 sentiment: PortalSentiment.negative,
                 message: failed,
-                action: onSave == null
-                    ? null
-                    : (label: 'Retry', onPressed: onSave),
+                action:
+                    onSave == null ? null : (label: 'Retry', onPressed: onSave),
               )
             : null;
     return PortalButtonDock(
@@ -165,6 +166,9 @@ class PortalButtonDock extends StatelessWidget {
     // 32 clears the gesture bar's own inset plus breathing room.
     final bottom = keyboard ? 12.0 : math.max(32.0, mq.viewPadding.bottom + 16);
     final rule = showRule ?? PortalDockRule.of(context);
+    // On a wide window the surface spans full width but the actions centre at
+    // the readable measure, lining up with the page content capped above.
+    final side = portalContentSideInset(context, baseGutter: 16);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -177,7 +181,7 @@ class PortalButtonDock extends StatelessWidget {
         ),
       ),
       child: Padding(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, bottom),
+        padding: EdgeInsets.fromLTRB(side, 12, side, bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
