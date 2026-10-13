@@ -26,7 +26,9 @@ class ShoppingItem with _$ShoppingItem {
     required String name,
     @Default('') String category,
     @Default(1) int quantity,
-    @Default(1) int priority, // 1-5
+    // 1-5. The direction is per app and stored as-is, with no migration:
+    // portal_task reads 1 as urgent, portal_shopping reads 5 as urgent.
+    @Default(1) int priority,
     @Default(ShoppingStatus.pending) ShoppingStatus status,
     @JsonKey(name: 'linked_quest_id') String? linkedQuestId,
     @JsonKey(name: 'list_id') String? listId,
