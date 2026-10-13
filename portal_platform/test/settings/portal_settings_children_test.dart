@@ -84,7 +84,7 @@ void main() {
     expect(Get.currentRoute, '/x/settings/account/change-password');
   });
 
-  testWidgets('settingsRoute makes the Account row navigate by name', (
+  testWidgets('settingsRoute makes the change-password row navigate by name', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -101,11 +101,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Account'));
+    await tester.tap(find.text('Change password'));
     await tester.pumpAndSettle();
 
     // Lands on the named route -- an unnamed MaterialPageRoute push would
     // leave Get.currentRoute at '/x/settings'.
-    expect(Get.currentRoute, '/x/settings/account');
+    expect(Get.currentRoute, '/x/settings/account/change-password');
   });
 }

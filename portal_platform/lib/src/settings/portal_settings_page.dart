@@ -42,12 +42,11 @@ class PortalSettingsSection {
 /// [PortalSettingsPage.order] to move its own sections somewhere other than
 /// the default slot.
 ///
-/// Every group but [profile] and [custom] renders as one row in a single
-/// coalesced nav card and pushes the rest of its content on its own page:
+/// Each group is an inline section of the one flat page:
 /// [assistant] is the slot for [PortalSettingsPage.assistantSection];
-/// [status] is the About row/page (Mode, App version, Check for updates);
-/// [about] is the Account row/page (change password, sign out, delete
-/// account) — its own card, not coalesced with the others.
+/// [status] is the About section (Mode, App version, Check for updates);
+/// [about] is the Account section (change password, sign out, delete
+/// account).
 enum PortalSettingsGroup {
   profile,
   appearance,
@@ -93,10 +92,11 @@ abstract class PortalSettingsSegment {
 /// '/home/settings'), children: portalSettingsChildren(...))`), so each row's
 /// `Get.toNamed` call resolves against a route that actually exists.
 ///
-/// [include] mirrors [PortalSettingsPage.include] -- [profile] and [custom]
-/// build no page here since neither has a sub-page of its own, only inline
-/// rows on the hub itself. [assistant] builds nothing when
-/// [assistantSection] is null, same as the hub hiding that row.
+/// The page itself is flat and pushes none of these; they remain only as
+/// standalone deep-link targets (and [PortalSettingsSegment.changePassword],
+/// which the page's change-password row still opens). [include] mirrors
+/// [PortalSettingsPage.include] -- [profile] and [custom] build no page here.
+/// [assistant] builds nothing when [assistantSection] is null.
 List<GetPage> portalSettingsChildren({
   PortalSettingsLabels labels = const PortalSettingsLabels(),
   List<PortalSettingsGroup> include = PortalSettingsGroup.values,
@@ -173,8 +173,9 @@ List<GetPage> portalSettingsChildren({
 /// is genuinely its own — [sections] for its features, [assistantSection] for
 /// the backend picker (which lives in `portal_ai`, a package above this one).
 ///
-/// Built from `portal_ui_core`: a grouped page of inset sections, the account
-/// cell first, every row leading with a tonal tile, and Portal Cloud's outage
+/// Built from `portal_ui_core`: one flat grouped page of inset sections
+/// (profile, Appearance, the app's own, Assistant, Portal apps, About,
+/// Account), every row leading with a tonal tile, and Portal Cloud's outage
 /// in the bar's status line. Theme and accent open sheets; Mode reports
 /// whether Portal Cloud answered when the page opened. Seven taps on App
 /// version open the dev server page; nothing announces it. An app with its
@@ -220,11 +221,11 @@ class PortalSettingsPage extends StatefulWidget {
   final List<PortalPaletteOption> palettes;
 
   /// The app's AI settings, e.g. `AiSettingsSection` from `portal_ai`. Shown
-  /// as one "Assistant" row where [PortalSettingsGroup.assistant] falls,
-  /// which opens the widget on its own page. Null hides the row entirely.
+  /// as an inline "Assistant" section where [PortalSettingsGroup.assistant]
+  /// falls. Null hides it entirely.
   final Widget? assistantSection;
 
-  /// Legacy form of [assistantSection]: same one-row, pushed-page behavior.
+  /// Legacy form of [assistantSection]: same inline section.
   /// Ignored when [assistantSection] is given.
   final Widget? aiSection;
 
@@ -267,12 +268,10 @@ class PortalSettingsPage extends StatefulWidget {
   final Widget? header;
 
   /// Mount path for this page's own `GetPage` node, e.g. `/home/settings`.
-  /// Given, every row below opens its sub-page with
-  /// `Get.toNamed('$settingsRoute/<segment>')` against the app's own nested
-  /// route tree (see [portalSettingsChildren]) instead of pushing an unnamed
-  /// [MaterialPageRoute]. Null (the default) keeps today's push-based
-  /// navigation exactly as it was, so an existing caller or widget test that
-  /// builds [PortalSettingsPage] with no route tree is unaffected.
+  /// Given, the Account section's change-password row opens
+  /// `Get.toNamed('$settingsRoute/account/change-password')` against the app's
+  /// own route tree (see [portalSettingsChildren]) instead of pushing an
+  /// unnamed [MaterialPageRoute]. Null (the default) pushes.
   final String? settingsRoute;
 
   @override
@@ -393,104 +392,14 @@ class _PortalSettingsPageState extends State<PortalSettingsPage> {
     );
   });
 
-  /// The Appearance nav row; only the value text (the current theme label)
-  /// is reactive, not the row's existence — [PortalSettingsPage.appearance]'s
-  /// caller already decides that non-reactively before this is ever built.
-  PortalListItem _appearanceRow(PortalThemeController theme) => _AppearanceRow(
-    labels: _labels,
-    theme: theme,
-    onTap: () => _openSettingsPage(
-      context,
-      widget.settingsRoute,
-      PortalSettingsSegment.appearance,
-      (_) => _AppearancePage(
-        labels: _labels,
-        theme: theme,
-        palettes: widget.palettes,
-        backgroundColor: widget.backgroundColor,
-      ),
-    ),
-  );
-
-  Widget _assistantRow(Widget section) => PortalListItem(
-    title: _labels.assistant,
-    leading: PortalListLeading.tile(PortalIcons.auto_awesome_rounded),
-    trailing: const PortalListAccessory.navigate(),
-    onTap: () => _openSettingsPage(
-      context,
-      widget.settingsRoute,
-      PortalSettingsSegment.assistant,
-      (_) => PortalSettingsSubPage(
-        title: _labels.assistant,
-        backgroundColor: widget.backgroundColor,
-        children: [section],
-      ),
-    ),
-  );
-
-  Widget _appsRow(PortalUpdateService updates) => PortalListItem(
-    title: _labels.portalApps,
-    leading: PortalListLeading.tile(PortalIcons.apps_rounded),
-    trailing: const PortalListAccessory.navigate(),
-    onTap: () => _openSettingsPage(
-      context,
-      widget.settingsRoute,
-      PortalSettingsSegment.apps,
-      (_) => PortalSettingsSubPage(
-        title: _labels.portalApps,
-        backgroundColor: widget.backgroundColor,
-        children: [
-          PortalAppsSection.grouped(service: updates, labels: _labels),
-        ],
-      ),
-    ),
-  );
-
-  /// The About nav row: version plus the cloud-outage hint the embedded
-  /// app bar used to carry. Pushes [_AboutPage] with a snapshot of
-  /// [_reachable]/[_version] -- see the ponytail note on that constructor.
-  Widget _aboutRow() => PortalListItem(
-    title: _labels.about,
-    subtitle: _reachable == false ? _labels.cloudUnreachable : null,
-    leading: PortalListLeading.tile(PortalIcons.info_rounded),
-    trailing: PortalListAccessory.navigate(value: _version ?? '…'),
-    onTap: () => _openSettingsPage(
-      context,
-      widget.settingsRoute,
-      PortalSettingsSegment.about,
-      (_) => _AboutPage(
-        labels: _labels,
-        reachable: _reachable,
-        version: _version,
-        backgroundColor: widget.backgroundColor,
-      ),
-    ),
-  );
-
-  /// The Account nav card: its own section, gated on sign-in reactively since
-  /// it is never merged into the coalesced nav card above it.
+  /// The Account section, gated on sign-in reactively.
   Widget _account(SessionController session) => Obx(() {
     if (session.user.value == null) return const SizedBox.shrink();
-    return PortalListSection(
-      children: [
-        PortalListItem(
-          title: _labels.account,
-          leading: PortalListLeading.tile(PortalIcons.person_rounded),
-          trailing: const PortalListAccessory.navigate(),
-          onTap: () => _openSettingsPage(
-            context,
-            widget.settingsRoute,
-            PortalSettingsSegment.account,
-            (_) => _AccountPage(
-              labels: _labels,
-              session: session,
-              onChangePassword: widget.onChangePassword,
-              backgroundColor: widget.backgroundColor,
-              settingsRoute: widget.settingsRoute,
-            ),
-          ),
-        ),
-      ],
+    return _AccountRows(
+      labels: _labels,
+      session: session,
+      onChangePassword: widget.onChangePassword,
+      settingsRoute: widget.settingsRoute,
     );
   });
 
@@ -504,33 +413,26 @@ class _PortalSettingsPageState extends State<PortalSettingsPage> {
     final buildSection = widget.sectionBuilder ?? _defaultSection;
 
     final children = <Widget>[];
-    // Buffered nav rows (appearance/assistant/apps/status) wait here until a
-    // group that can't share their card is hit, then land in one
-    // PortalListSection -- so the hub never shows two cards back to back for
-    // what reads as one settings nav list.
-    final navRows = <Widget>[];
-    void flushNav() {
-      if (navRows.isEmpty) return;
-      children.add(PortalListSection(children: List.of(navRows)));
-      navRows.clear();
-    }
-
     for (final group in widget.order) {
       if (!widget.include.contains(group)) continue;
       switch (group) {
         case PortalSettingsGroup.profile:
-          flushNav();
           if (Get.isRegistered<SessionController>()) {
             children.add(_profile(Get.find<SessionController>()));
           }
 
         case PortalSettingsGroup.appearance:
           if (widget.themeController case final theme?) {
-            navRows.add(_appearanceRow(theme));
+            children.add(
+              _AppearanceRows(
+                labels: _labels,
+                theme: theme,
+                palettes: widget.palettes,
+              ),
+            );
           }
 
         case PortalSettingsGroup.custom:
-          flushNav();
           for (final section in widget.sections) {
             if (section.slot != PortalSettingsGroup.custom) continue;
             children.add(buildSection(section.title, section.children));
@@ -538,21 +440,28 @@ class _PortalSettingsPageState extends State<PortalSettingsPage> {
 
         case PortalSettingsGroup.assistant:
           if (widget.assistantSection ?? widget.aiSection case final section?) {
-            navRows.add(_assistantRow(section));
+            children.add(buildSection(_labels.assistant, [section]));
           }
 
         case PortalSettingsGroup.status:
-          navRows.add(_aboutRow());
+          children.add(
+            _AboutRows(
+              labels: _labels,
+              reachable: _reachable,
+              version: _version,
+            ),
+          );
 
         case PortalSettingsGroup.apps:
           // Gated on the same predicate the section itself uses, so iOS and a
-          // build with no manifest URL get no row at all.
+          // build with no manifest URL get no section at all.
           if (updates != null && portalCanInstallApps(updates)) {
-            navRows.add(_appsRow(updates));
+            children.add(
+              PortalAppsSection.grouped(service: updates, labels: _labels),
+            );
           }
 
         case PortalSettingsGroup.about:
-          flushNav();
           if (Get.isRegistered<SessionController>()) {
             children.add(_account(Get.find<SessionController>()));
           }
@@ -560,19 +469,13 @@ class _PortalSettingsPageState extends State<PortalSettingsPage> {
       // A section slotted to this group (not the default `custom`, which
       // rendered above in its own case) lands right after the group's own
       // content -- so e.g. an app can slide a section under Appearance
-      // without displacing it. It is a full section, never a nav row, so any
-      // buffer still open flushes first rather than straddling it.
+      // without displacing it.
       if (group != PortalSettingsGroup.custom) {
-        final slotted = widget.sections.where((s) => s.slot == group);
-        if (slotted.isNotEmpty) {
-          flushNav();
-          for (final section in slotted) {
-            children.add(buildSection(section.title, section.children));
-          }
+        for (final section in widget.sections.where((s) => s.slot == group)) {
+          children.add(buildSection(section.title, section.children));
         }
       }
     }
-    flushNav();
 
     if (widget.header case final header?) {
       return ListView(
@@ -632,39 +535,6 @@ class _HiddenTapRow extends PortalListItem {
   );
 }
 
-/// The Appearance nav row: a [PortalListItem] subclass (not a wrapper), so
-/// [PortalListSection] still insets its divider to the text column — a
-/// wrapper like `Obx(() => PortalListItem(...))` reads as a non-[PortalListItem]
-/// child and loses the inset. Only the value text is reactive.
-class _AppearanceRow extends PortalListItem {
-  _AppearanceRow({
-    required PortalSettingsLabels labels,
-    required this.theme,
-    required VoidCallback onTap,
-  }) : super(
-         title: labels.appearance,
-         leading: PortalListLeading.tile(PortalIcons.dark_mode_rounded),
-         trailing: PortalListAccessory.navigate(
-           value: PortalThemeController.labelFor(theme.themeMode.value),
-         ),
-         onTap: onTap,
-       );
-
-  final PortalThemeController theme;
-
-  @override
-  Widget build(BuildContext context) => Obx(
-    () => PortalListItem(
-      title: title,
-      leading: leading,
-      trailing: PortalListAccessory.navigate(
-        value: PortalThemeController.labelFor(theme.themeMode.value),
-      ),
-      onTap: onTap,
-    ).build(context),
-  );
-}
-
 /// The Haptics row's current value, from the labels given rather than the
 /// page's own -- [_AppearancePage] is pushed with its own copy of [labels].
 String _hapticsValueLabel(
@@ -677,105 +547,124 @@ String _hapticsValueLabel(
       : labels.hapticsFull;
 }
 
-/// The Appearance row's page: Theme and Accent colour rows open their sheets
-/// exactly as before; this is the old inline content, just pushed.
-class _AppearancePage extends StatelessWidget {
-  const _AppearancePage({
+/// The Appearance section: Theme, Accent colour and Haptics rows open their
+/// sheets. Inline on the page, and the body of [_AppearancePage].
+class _AppearanceRows extends StatelessWidget {
+  const _AppearanceRows({
     required this.labels,
     required this.theme,
     required this.palettes,
-    this.backgroundColor,
   });
 
   final PortalSettingsLabels labels;
   final PortalThemeController theme;
   final List<PortalPaletteOption> palettes;
-  final Color? backgroundColor;
+
+  @override
+  Widget build(BuildContext context) => Obx(() {
+    final palette = _currentPalette(theme, palettes);
+    return PortalListSection(
+      header: labels.appearance,
+      children: [
+        PortalListItem(
+          title: labels.theme,
+          leading: PortalListLeading.tile(PortalIcons.dark_mode_rounded),
+          trailing: PortalListAccessory.navigate(
+            value: PortalThemeController.labelFor(theme.themeMode.value),
+          ),
+          onTap: () => PortalSheet.show<void>(
+            context,
+            title: labels.theme,
+            builder: (_) => _ThemeSheet(controller: theme, labels: labels),
+          ),
+        ),
+        if (palette != null)
+          PortalListItem(
+            title: labels.accentColour,
+            leading: PortalListLeading.tile(PortalIcons.palette_rounded),
+            trailing: PortalListAccessory.navigate(
+              value: palette.label,
+              swatchColor: palette.swatch,
+            ),
+            onTap: () => PortalSheet.show<void>(
+              context,
+              title: labels.accentColour,
+              builder: (_) =>
+                  _AccentSheet(controller: theme, palettes: palettes),
+            ),
+          ),
+        if (!kIsWeb)
+          PortalListItem(
+            title: labels.haptics,
+            leading: PortalListLeading.tile(PortalIcons.vibration_rounded),
+            trailing: PortalListAccessory.navigate(
+              value: _hapticsValueLabel(theme, labels),
+            ),
+            onTap: () => PortalSheet.show<void>(
+              context,
+              title: labels.haptics,
+              builder: (_) => _HapticsSheet(controller: theme, labels: labels),
+            ),
+          ),
+      ],
+    );
+  });
+}
+
+/// [_AppearanceRows] on its own page, for the `appearance` route of
+/// [portalSettingsChildren].
+class _AppearancePage extends StatelessWidget {
+  const _AppearancePage({
+    required this.labels,
+    required this.theme,
+    required this.palettes,
+  });
+
+  final PortalSettingsLabels labels;
+  final PortalThemeController theme;
+  final List<PortalPaletteOption> palettes;
 
   @override
   Widget build(BuildContext context) => PortalSettingsSubPage(
     title: labels.appearance,
-    backgroundColor: backgroundColor,
     children: [
-      Obx(() {
-        final palette = _currentPalette(theme, palettes);
-        return PortalListSection(
-          header: labels.appearance,
-          children: [
-            PortalListItem(
-              title: labels.theme,
-              leading: PortalListLeading.tile(PortalIcons.dark_mode_rounded),
-              trailing: PortalListAccessory.navigate(
-                value: PortalThemeController.labelFor(theme.themeMode.value),
-              ),
-              onTap: () => PortalSheet.show<void>(
-                context,
-                title: labels.theme,
-                builder: (_) => _ThemeSheet(controller: theme, labels: labels),
-              ),
-            ),
-            if (palette != null)
-              PortalListItem(
-                title: labels.accentColour,
-                leading: PortalListLeading.tile(PortalIcons.palette_rounded),
-                trailing: PortalListAccessory.navigate(
-                  value: palette.label,
-                  swatchColor: palette.swatch,
-                ),
-                onTap: () => PortalSheet.show<void>(
-                  context,
-                  title: labels.accentColour,
-                  builder: (_) =>
-                      _AccentSheet(controller: theme, palettes: palettes),
-                ),
-              ),
-            if (!kIsWeb)
-              PortalListItem(
-                title: labels.haptics,
-                leading: PortalListLeading.tile(PortalIcons.vibration_rounded),
-                trailing: PortalListAccessory.navigate(
-                  value: _hapticsValueLabel(theme, labels),
-                ),
-                onTap: () => PortalSheet.show<void>(
-                  context,
-                  title: labels.haptics,
-                  builder: (_) =>
-                      _HapticsSheet(controller: theme, labels: labels),
-                ),
-              ),
-          ],
-        );
-      }),
+      _AppearanceRows(labels: labels, theme: theme, palettes: palettes),
     ],
   );
 }
 
-/// The About row's page: Mode, App version (still the 7-tap dev-unlock) and
-/// Check for updates -- what `_status` used to build inline.
-class _AboutPage extends StatefulWidget {
-  const _AboutPage({
+/// The About section: Mode, App version (still the 7-tap dev-unlock) and
+/// Check for updates. Inline on the page, and the body of [_AboutPage].
+class _AboutRows extends StatefulWidget {
+  const _AboutRows({
     required this.labels,
     this.reachable,
     this.version,
-    this.backgroundColor,
+    this.load = false,
   });
 
   final PortalSettingsLabels labels;
 
-  /// A snapshot the caller already had (e.g. the hub's own probe from push
-  /// time), or null to self-load on mount -- see [_AboutPageState.initState].
+  /// What the page already knows; null is still loading.
   final bool? reachable;
   final String? version;
-  final Color? backgroundColor;
+
+  /// Self-load reachability and version on mount -- for [_AboutPage], reached
+  /// by its own route with nothing to read from. The page itself passes its
+  /// own answers instead, so it probes once, not twice.
+  final bool load;
 
   @override
-  State<_AboutPage> createState() => _AboutPageState();
+  State<_AboutRows> createState() => _AboutRowsState();
 }
 
-class _AboutPageState extends State<_AboutPage> {
+class _AboutRowsState extends State<_AboutRows> {
   bool _checkingUpdate = false;
-  late bool? _reachable = widget.reachable;
-  late String? _version = widget.version;
+  bool? _loadedReachable;
+  String? _loadedVersion;
+
+  bool? get _reachable => widget.reachable ?? _loadedReachable;
+  String? get _version => widget.version ?? _loadedVersion;
 
   // Server-switch reveal: 7 taps on the App version row (Android's own
   // dev-options gesture), or a debug build. The gesture is only a
@@ -797,19 +686,20 @@ class _AboutPageState extends State<_AboutPage> {
     // Null means the caller had no answer yet, or none at all (reached
     // through its own named route rather than pushed with a snapshot) --
     // probe rather than stay stuck on "Checking..." forever.
-    if (_reachable == null) _probe();
-    if (_version == null) {
-      PortalAppVersion.load().then((info) {
-        if (mounted) setState(() => _version = PortalAppVersion.format(info));
-      }, onError: (_) {});
-    }
+    if (!widget.load) return;
+    _probe();
+    PortalAppVersion.load().then((info) {
+      if (mounted) {
+        setState(() => _loadedVersion = PortalAppVersion.format(info));
+      }
+    }, onError: (_) {});
   }
 
   Future<void> _probe() async {
     if (!Get.isRegistered<ApiClient>()) return;
     final ready = await _probeReachable();
     if (!mounted) return;
-    setState(() => _reachable = ready);
+    setState(() => _loadedReachable = ready);
   }
 
   void _onVersionTap() {
@@ -858,67 +748,75 @@ class _AboutPageState extends State<_AboutPage> {
       true => _labels.modeCloud,
       false => _labels.modeOnDevice,
     };
-    return PortalSettingsSubPage(
-      title: _labels.about,
-      backgroundColor: widget.backgroundColor,
+    return PortalListSection(
+      header: _labels.about,
       children: [
-        PortalListSection(
-          children: [
-            // Nothing to be in a mode of without a client.
-            if (Get.isRegistered<ApiClient>())
-              PortalListItem(
-                title: _labels.mode,
-                leading: PortalListLeading.tile(
-                  PortalIcons.swap_horiz_rounded,
-                  tone: PortalListTone.tertiary,
-                ),
-                trailing: PortalListAccessory.value(
-                  mode,
-                  sentiment: PortalValueSentiment.dim,
-                ),
-              ),
-            _HiddenTapRow(
-              title: _labels.appVersion,
-              leading: PortalListLeading.tile(
-                PortalIcons.info_rounded,
-                tone: PortalListTone.tertiary,
-              ),
-              trailing: PortalListAccessory.value(
-                _version ?? '…',
-                sentiment: PortalValueSentiment.dim,
-              ),
-              onHiddenTap: _onVersionTap,
+        // Nothing to be in a mode of without a client.
+        if (Get.isRegistered<ApiClient>())
+          PortalListItem(
+            title: _labels.mode,
+            leading: PortalListLeading.tile(
+              PortalIcons.swap_horiz_rounded,
+              tone: PortalListTone.tertiary,
             ),
-            if (updates != null && updates.isEnabled)
-              PortalListItem(
-                title: _labels.checkForUpdates,
-                leading: PortalListLeading.tile(
-                  PortalIcons.system_update_rounded,
-                  tone: PortalListTone.tertiary,
-                ),
-                trailing: _checkingUpdate
-                    ? PortalListAccessory.value(
-                        _labels.checking,
-                        sentiment: PortalValueSentiment.dim,
-                      )
-                    : PortalListAccessory.none,
-                onTap: _checkingUpdate ? null : () => _checkForUpdates(updates),
-              ),
-          ],
+            trailing: PortalListAccessory.value(
+              mode,
+              sentiment: PortalValueSentiment.dim,
+            ),
+          ),
+        _HiddenTapRow(
+          title: _labels.appVersion,
+          leading: PortalListLeading.tile(
+            PortalIcons.info_rounded,
+            tone: PortalListTone.tertiary,
+          ),
+          trailing: PortalListAccessory.value(
+            _version ?? '…',
+            sentiment: PortalValueSentiment.dim,
+          ),
+          onHiddenTap: _onVersionTap,
         ),
+        if (updates != null && updates.isEnabled)
+          PortalListItem(
+            title: _labels.checkForUpdates,
+            leading: PortalListLeading.tile(
+              PortalIcons.system_update_rounded,
+              tone: PortalListTone.tertiary,
+            ),
+            trailing: _checkingUpdate
+                ? PortalListAccessory.value(
+                    _labels.checking,
+                    sentiment: PortalValueSentiment.dim,
+                  )
+                : PortalListAccessory.none,
+            onTap: _checkingUpdate ? null : () => _checkForUpdates(updates),
+          ),
       ],
     );
   }
 }
 
-/// The Account row's page: change password, sign out, delete account --
-/// what `_account` used to build inline, under its own Account heading.
-class _AccountPage extends StatefulWidget {
-  const _AccountPage({
+/// [_AboutRows] on its own page, for the `about` route of
+/// [portalSettingsChildren].
+class _AboutPage extends StatelessWidget {
+  const _AboutPage({required this.labels});
+
+  final PortalSettingsLabels labels;
+
+  @override
+  Widget build(BuildContext context) => PortalSettingsSubPage(
+    title: labels.about,
+    children: [_AboutRows(labels: labels, load: true)],
+  );
+}
+
+/// The Account section: change password, sign out, delete account. Inline on
+/// the page, and the body of [_AccountPage] for a deep link to it.
+class _AccountRows extends StatefulWidget {
+  const _AccountRows({
     required this.labels,
     required this.session,
     required this.onChangePassword,
-    this.backgroundColor,
     this.settingsRoute,
   });
 
@@ -926,17 +824,16 @@ class _AccountPage extends StatefulWidget {
   final SessionController session;
   final Future<void> Function(String currentPassword, String newPassword)?
   onChangePassword;
-  final Color? backgroundColor;
 
   /// Same value as [PortalSettingsPage.settingsRoute] -- see
   /// [_openSettingsPage].
   final String? settingsRoute;
 
   @override
-  State<_AccountPage> createState() => _AccountPageState();
+  State<_AccountRows> createState() => _AccountRowsState();
 }
 
-class _AccountPageState extends State<_AccountPage> {
+class _AccountRowsState extends State<_AccountRows> {
   String? _deleteError;
 
   PortalSettingsLabels get _labels => widget.labels;
@@ -987,9 +884,8 @@ class _AccountPageState extends State<_AccountPage> {
     // — both rows would just 401/throw against an account that never
     // existed server-side.
     final localOnly = widget.session.user.value?['local_only'] == true;
-    return PortalSettingsSubPage(
-      title: _labels.account,
-      backgroundColor: widget.backgroundColor,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (_deleteError case final error?)
           Padding(
@@ -1002,6 +898,7 @@ class _AccountPageState extends State<_AccountPage> {
             ),
           ),
         PortalListSection(
+          header: _labels.account,
           children: [
             if (!localOnly)
               PortalListItem(
@@ -1039,6 +936,33 @@ class _AccountPageState extends State<_AccountPage> {
       ],
     );
   }
+}
+
+/// [_AccountRows] on its own page, for the `account` route of
+/// [portalSettingsChildren].
+class _AccountPage extends StatelessWidget {
+  const _AccountPage({
+    required this.labels,
+    required this.session,
+    required this.onChangePassword,
+  });
+
+  final PortalSettingsLabels labels;
+  final SessionController session;
+  final Future<void> Function(String currentPassword, String newPassword)?
+  onChangePassword;
+
+  @override
+  Widget build(BuildContext context) => PortalSettingsSubPage(
+    title: labels.account,
+    children: [
+      _AccountRows(
+        labels: labels,
+        session: session,
+        onChangePassword: onChangePassword,
+      ),
+    ],
+  );
 }
 
 /// Edit name: one field over a Save dock. Save is off while the field is

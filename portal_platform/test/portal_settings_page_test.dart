@@ -121,7 +121,7 @@ void main() {
       expect(find.text('Account'), findsNothing);
     });
 
-    testWidgets('custom first, then one coalesced nav card for the rest', (
+    testWidgets('custom first, then every group inline in one flat page', (
       tester,
     ) async {
       await pump(
@@ -135,8 +135,7 @@ void main() {
         ),
       );
 
-      // The assistant's content is behind the Assistant row now, not inline.
-      expect(find.text('provider list'), findsNothing);
+      expect(find.text('provider list'), findsOneWidget);
 
       final order = [
         top(tester, 'Mine'),
@@ -148,7 +147,7 @@ void main() {
     });
 
     testWidgets(
-      'rows are nested: Theme and Mode live behind Appearance and About',
+      'rows are inline: Theme and App version need no push',
       (tester) async {
         final theme = Get.put(PortalThemeController());
         await pump(
@@ -162,14 +161,9 @@ void main() {
           ),
         );
 
-        expect(find.text('Theme'), findsNothing);
-        expect(find.text('Mode'), findsNothing);
-
-        await tester.tap(find.text('Appearance'));
-        await tester.pumpAndSettle();
-
         expect(find.text('Theme'), findsOneWidget);
-        expect(find.byType(BackButton), findsOneWidget);
+        expect(find.text('App version'), findsOneWidget);
+        expect(find.byType(BackButton), findsNothing);
       },
     );
 
@@ -309,7 +303,7 @@ void main() {
   });
 
   group('assistant', () {
-    testWidgets('assistantSection is behind an Assistant row, pushed on tap', (
+    testWidgets('assistantSection is an inline Assistant section', (
       tester,
     ) async {
       await pump(
@@ -320,17 +314,12 @@ void main() {
         ),
       );
 
-      expect(find.text('provider list'), findsNothing);
-      expect(find.text('Assistant'), findsOneWidget);
-
-      await tester.tap(find.text('Assistant'));
-      await tester.pumpAndSettle();
-
       expect(find.text('provider list'), findsOneWidget);
-      expect(find.byType(BackButton), findsOneWidget);
+      expect(find.text('Assistant'), findsOneWidget);
+      expect(find.byType(BackButton), findsNothing);
     });
 
-    testWidgets('legacy aiSection is one row that opens its own page', (
+    testWidgets('legacy aiSection renders the same inline section', (
       tester,
     ) async {
       await pump(
@@ -342,18 +331,8 @@ void main() {
         ),
       );
 
-      expect(find.text('provider list'), findsNothing);
-      expect(find.text('Assistant'), findsOneWidget);
-
-      await tester.tap(find.text('Assistant'));
-      await tester.pumpAndSettle();
-
       expect(find.text('provider list'), findsOneWidget);
-      expect(find.byType(BackButton), findsOneWidget);
-
-      await tester.tap(find.byType(BackButton));
-      await tester.pumpAndSettle();
-      expect(find.text('provider list'), findsNothing);
+      expect(find.text('Assistant'), findsOneWidget);
     });
   });
 
@@ -371,11 +350,7 @@ void main() {
       api.readiness.complete(const BackendReadinessResult(isReady: false));
       await tester.pumpAndSettle();
 
-      // The bar's own status line and the About row's subtitle both say so.
-      expect(find.text('Portal Cloud unreachable'), findsNWidgets(2));
-
-      await tester.tap(find.text('About'));
-      await tester.pumpAndSettle();
+      expect(find.text('Portal Cloud unreachable'), findsOneWidget);
 
       expect(find.text('Mode'), findsOneWidget);
       expect(find.text('On-device'), findsOneWidget);
@@ -388,10 +363,6 @@ void main() {
       api.readiness.complete(const BackendReadinessResult(isReady: true));
       await tester.pumpAndSettle();
       expect(find.text('Portal Cloud unreachable'), findsNothing);
-
-      await tester.tap(find.text('About'));
-      await tester.pumpAndSettle();
-
       expect(find.text('Portal Cloud'), findsOneWidget);
     });
 
@@ -402,12 +373,6 @@ void main() {
       // The version future was resolved in the real zone (see setUp); let its
       // callback run there before settling.
       await tester.runAsync(() => Future<void>.delayed(Duration.zero));
-      await tester.pumpAndSettle();
-
-      // The row's own trailing value already reads it before the push.
-      expect(find.text('1.3.0 (412)'), findsOneWidget);
-
-      await tester.tap(find.text('About'));
       await tester.pumpAndSettle();
 
       expect(find.text('Mode'), findsNothing);
@@ -421,8 +386,6 @@ void main() {
       Get.put<ApiClient>(api);
       await pump(tester, const PortalSettingsPage(include: status));
 
-      await tester.tap(find.text('About'));
-      await tester.pumpAndSettle();
       await tester.tap(find.text('App version'));
       await tester.pumpAndSettle();
 
@@ -433,8 +396,6 @@ void main() {
       tester,
     ) async {
       await pump(tester, const PortalSettingsPage(include: status));
-      await tester.tap(find.text('About'));
-      await tester.pumpAndSettle();
       expect(find.text('Check for updates'), findsNothing);
 
       Get.put(
@@ -444,8 +405,6 @@ void main() {
         ),
       );
       await pump(tester, const PortalSettingsPage(include: status));
-      await tester.tap(find.text('About'));
-      await tester.pumpAndSettle();
       expect(find.text('Check for updates'), findsOneWidget);
     });
   });
@@ -460,9 +419,6 @@ void main() {
           include: const [PortalSettingsGroup.appearance],
         ),
       );
-
-      await tester.tap(find.text('Appearance'));
-      await tester.pumpAndSettle();
 
       // No palettes, no accent row.
       expect(find.text('Accent colour'), findsNothing);
@@ -498,9 +454,6 @@ void main() {
           ],
         ),
       );
-
-      await tester.tap(find.text('Appearance'));
-      await tester.pumpAndSettle();
 
       // The row draws the swatch, not the name; the name is in the sheet.
       expect(find.text('Ocean'), findsNothing);
@@ -611,9 +564,6 @@ void main() {
       final session = signedIn();
       await pump(tester, const PortalSettingsPage(include: about));
 
-      await tester.tap(find.text('Account'));
-      await tester.pumpAndSettle();
-
       expect(find.text('Change password'), findsOneWidget);
       await tester.tap(find.text('Sign out'));
       await tester.pumpAndSettle();
@@ -634,9 +584,6 @@ void main() {
     ) async {
       final session = signedIn()..failDelete = true;
       await pump(tester, const PortalSettingsPage(include: about));
-
-      await tester.tap(find.text('Account'));
-      await tester.pumpAndSettle();
 
       await tester.tap(find.text('Delete account'));
       await tester.pumpAndSettle();

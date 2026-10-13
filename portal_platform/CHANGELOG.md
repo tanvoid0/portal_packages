@@ -1,10 +1,31 @@
 ## Unreleased
 
+- `PortalSettingsPage` is one flat grouped page: Appearance, Assistant, About
+  (Status) and Account render inline as sections instead of nav rows that push
+  sub-pages, and Portal apps is an inline section. Sheets (name, theme, accent,
+  haptics) are unchanged, as are the sign-out and delete-account flows. API is
+  unchanged: `order`, `include`, `slot`, `sections`, `settingsRoute` and
+  `portalSettingsChildren` all still work (the child routes remain as
+  deep-link targets; `settingsRoute` now only names the change-password push).
 - `syncQueuedToast`, `syncPushedToast`, `syncRejectedToast` and
   `syncEvictedToast` (new, exported): the four toasts `portalInstallSyncFeedback`
   raises, as plain `PortalToastData` builders. Behaviour is unchanged — the
   installer now calls `AppToast.present` with them — but the design kit can
   preview the shipped copy instead of a hand-kept twin.
+- Fix: a local-only session (`ApiClient.startLocalOnlySession`) writes no
+  token, so every request it made afterward still went out unauthenticated,
+  401'd, and `_failSessionExpired` signed the device-local user back out on
+  their first authenticated read — the "Continue without an account" flow
+  was unusable the moment it touched the network. `ApiClient` now tracks
+  `_localOnly` (set on `startLocalOnlySession`, seeded from the cached user on
+  `init`, cleared by a real sign-in/logout/server switch) and short-circuits
+  `_authorizeWithRetry`/`postStream` with an `ApiException` (code
+  `LOCAL_ONLY_SESSION`) before ever sending — callers already treat a thrown
+  `ApiException` as offline (serve cache, queue the write).
+- `PortalAuthController.continueWithoutAccount` no longer asks "Encrypt your
+  data on this device?" when the caller passed no `onLocalOnlySessionStarted`
+  — only an app with its own entity-persistence seam reads that choice, so
+  asking elsewhere offered a prompt nothing honoured.
 - `PortalAppRoot.shouldGuardRoute` (new, nullable `bool Function(String route)`):
   wires `PortalDeviceSecurityGate` and the route-change plumbing it needs for
   an app with the shared app lock, so the lock no longer forces a hand-rolled
