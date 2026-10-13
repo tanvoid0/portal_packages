@@ -1,9 +1,25 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 import '../chat/ai_chat_session.dart';
 import 'ai_chat_labels.dart';
+
+/// One icon button in the panel's quick-access row.
+class AiChatQuickAccess {
+  const AiChatQuickAccess({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+
+  /// The button's tooltip and screen-reader name.
+  final String label;
+  final VoidCallback onTap;
+}
 
 /// Past threads, newest first, with a button to start a fresh one.
 ///
@@ -29,6 +45,8 @@ class AiChatHistoryList extends StatefulWidget {
     this.onDelete,
     this.onRename,
     this.onSetPinned,
+    this.quickAccess = const [],
+    this.footer,
     this.labels = const AiChatLabels(),
     this.width = 280,
     this.previous7DaysLabel = 'Previous 7 days',
@@ -59,6 +77,12 @@ class AiChatHistoryList extends StatefulWidget {
 
   /// Pins or unpins a thread. No menu entry is drawn when this is null.
   final Future<void> Function(String id, bool pinned)? onSetPinned;
+
+  /// Icon buttons under the search row: new incognito chat and the like.
+  final List<AiChatQuickAccess> quickAccess;
+
+  /// Pinned under the list over a rule: who is signed in, Settings.
+  final Widget? footer;
 
   final AiChatLabels labels;
   final double width;
@@ -151,10 +175,12 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
   Future<void> _rename(AiChatSessionSummary item) async {
     final onRename = widget.onRename;
     if (onRename == null) return;
-    final title = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) =>
-          _RenameDialog(initial: item.title, labels: widget.labels),
+    final title = await portalInputDialog(
+      context,
+      title: widget.labels.renameTitle,
+      initialValue: item.title,
+      confirmLabel: widget.labels.save,
+      cancelLabel: widget.labels.cancel,
     );
     if (title == null || title.isEmpty || title == item.title) return;
     await onRename(item.id, title);
@@ -168,154 +194,163 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final t = PortalUiTheme.of(context).tokens;
+    final cs = Theme.of(context).colorScheme;
     final labels = widget.labels;
     final matches = _matches;
-    return SizedBox(
-      width: widget.width,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              16,
-              widget.onClose == null ? 16 : 4,
-              8,
-            ),
-            child: Row(
+    return PortalReviewTag(
+      id: 'shared.sidebar',
+      child: SizedBox(
+        width: widget.width,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
               children: [
                 Expanded(
-                  child: Text(
-                    labels.historyTitle,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
+                  child: Padding(
+                    padding: EdgeInsetsDirectional.only(
+                      start: t.spacing.lg,
+                      top: t.spacing.sm,
+                      bottom: t.spacing.sm,
+                    ),
+                    child: PortalSearchField(
+                      hintText: labels.searchHint,
+                      onChanged: (value) => setState(() => _query = value),
                     ),
                   ),
                 ),
+                PortalButton.icon(
+                  icon: PortalIcons.edit_square_rounded,
+                  tooltip: labels.newChat,
+                  onPressed: widget.onNewChat,
+                ),
                 if (widget.onClose != null)
-                  IconButton(
-                    icon: const Icon(Icons.close),
+                  PortalButton.icon(
+                    icon: PortalIcons.close_rounded,
                     tooltip: labels.close,
                     onPressed: widget.onClose,
                   ),
+                SizedBox(width: t.spacing.xs),
               ],
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: FilledButton.icon(
-              onPressed: widget.onNewChat,
-              icon: const Icon(Icons.add, size: 18),
-              label: Text(labels.newChat),
-            ),
-          ),
-          if (widget.sessions.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-              child: TextField(
-                onChanged: (value) => setState(() => _query = value),
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  isDense: true,
-                  hintText: labels.searchHint,
-                  prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                  border: const OutlineInputBorder(),
+            if (widget.quickAccess.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: t.spacing.sm),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    for (final q in widget.quickAccess)
+                      PortalButton.icon(
+                        icon: q.icon,
+                        tooltip: q.label,
+                        onPressed: q.onTap,
+                      ),
+                  ],
                 ),
               ),
+            Expanded(
+              child: matches.isEmpty
+                  ? ListView(children: [_empty()])
+                  : ListView(children: _sections(matches)),
             ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: matches.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      // No PortalEmptyState: this package doesn't depend on
-                      // portal_ui_core. Only the truly-empty case (no
-                      // sessions at all) gets the icon -- a search with no
-                      // hits is a filter result, not a nothing-here state.
-                      child: widget.sessions.isEmpty
-                          ? Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.forum_rounded,
-                                  size: 32,
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  labels.historyEmpty,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.bodySmall,
-                                ),
-                              ],
-                            )
-                          : Text(
-                              labels.noMatches,
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodySmall,
-                            ),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 16),
-                    itemCount: matches.length,
-                    itemBuilder: (context, index) {
-                      final item = matches[index];
-                      final bucket = _bucketOf(item);
-                      final newGroup =
-                          index == 0 || _bucketOf(matches[index - 1]) != bucket;
-                      final row = _Row(
-                        item: item,
-                        selected: item.id == widget.selectedId,
-                        subtitle: _subtitleFor(item),
-                        onTap: () => widget.onSelect(item.id),
-                        onDelete: widget.onDelete == null
-                            ? null
-                            : () => _delete(item),
-                        onRename: widget.onRename == null
-                            ? null
-                            : () => _rename(item),
-                        onTogglePin: widget.onSetPinned == null
-                            ? null
-                            : () => _togglePin(item),
-                        labels: labels,
-                      );
-                      if (!newGroup) return row;
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(8, 12, 8, 4),
-                            // No PortalSectionHeader here: this package
-                            // doesn't depend on portal_ui_core. This is an
-                            // overline, not a section header (it labels a
-                            // group of rows, doesn't title content), so it's
-                            // upper-cased and tracked rather than styled like
-                            // `subtitle`.
-                            child: Text(
-                              // Not upper-cased. The eyebrow treatment is the letter-spacing
-                              // and the muted weight, not CAPS -- which a
-                              // screen reader may spell out letter by letter
-                              // and which no translation of these labels asked
-                              // for.
-                              _labelFor(bucket),
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.6,
-                              ),
-                            ),
-                          ),
-                          row,
-                        ],
-                      );
-                    },
+            if (widget.footer != null)
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: PortalUiTheme.of(context).rule(cs)),
                   ),
-          ),
-        ],
+                ),
+                child: widget.footer,
+              ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _empty() {
+    final labels = widget.labels;
+    if (widget.sessions.isEmpty) {
+      return PortalEmptyState(
+        icon: PortalIcons.forum_rounded,
+        title: labels.historyEmpty,
+        actionLabel: labels.newChat,
+        onAction: widget.onNewChat,
+        inCard: false,
+      );
+    }
+    return PortalEmptyState(
+      icon: PortalIcons.search_rounded,
+      title: labels.noMatches,
+      inCard: false,
+    );
+  }
+
+  /// One caption-headed, full-bleed section per bucket; [_matches] already
+  /// has the pinned rows first, so a bucket is a run.
+  List<Widget> _sections(List<AiChatSessionSummary> matches) {
+    final runs = <_Group, List<AiChatSessionSummary>>{};
+    for (final s in matches) {
+      (runs[_bucketOf(s)] ??= []).add(s);
+    }
+    return [
+      for (final MapEntry(key: group, value: rows) in runs.entries)
+        PortalListSection(
+          header: _labelFor(group),
+          captionHeader: true,
+          style: PortalListStyle.fullBleed,
+          children: [for (final s in rows) _row(s)],
+        ),
+    ];
+  }
+
+  Widget _row(AiChatSessionSummary item) {
+    final labels = widget.labels;
+    final f = PortalFormat.of(context);
+    final current = item.id == widget.selectedId;
+    final actions = [
+      if (widget.onRename != null)
+        PortalAction(
+          icon: PortalIcons.edit_rounded,
+          label: labels.rename,
+          onPressed: () => _rename(item),
+        ),
+      if (widget.onSetPinned != null)
+        PortalAction(
+          icon: PortalIcons.push_pin_rounded,
+          label: item.pinned ? labels.unpin : labels.pin,
+          onPressed: () => _togglePin(item),
+        ),
+      if (widget.onDelete != null)
+        PortalAction(
+          icon: PortalIcons.delete_rounded,
+          label: labels.delete,
+          destructive: true,
+          onPressed: () => _delete(item),
+        ),
+    ];
+    return PortalListItem(
+      title: item.title,
+      subtitle: _subtitleFor(item),
+      trailing: PortalListAccessory.meta(
+        f.date(item.updatedAt, short: true),
+        spoken: f.date(item.updatedAt),
+        icon: current
+            ? PortalIcons.check_circle_rounded
+            : item.pinned
+            ? PortalIcons.push_pin_rounded
+            : null,
+        markLabel: current
+            ? 'current chat'
+            : item.pinned
+            ? 'pinned'
+            : null,
+      ),
+      onTap: () => widget.onSelect(item.id),
+      onLongPress: actions.isEmpty
+          ? null
+          : () => showPortalActionSheet(context, actions, title: item.title),
     );
   }
 
@@ -356,192 +391,3 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
 }
 
 enum _Group { pinned, today, yesterday, previous7, previous30, older }
-
-/// Owns its own controller so it is disposed with the route rather than the
-/// moment `showDialog` returns -- the field is still on screen while the
-/// dialog animates out.
-class _RenameDialog extends StatefulWidget {
-  const _RenameDialog({required this.initial, required this.labels});
-
-  final String initial;
-  final AiChatLabels labels;
-
-  @override
-  State<_RenameDialog> createState() => _RenameDialogState();
-}
-
-class _RenameDialogState extends State<_RenameDialog> {
-  late final _controller = TextEditingController(text: widget.initial);
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _submit() => Navigator.of(context).pop(_controller.text.trim());
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.labels.renameTitle),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        textInputAction: TextInputAction.done,
-        onSubmitted: (_) => _submit(),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(widget.labels.cancel),
-        ),
-        FilledButton(onPressed: _submit, child: Text(widget.labels.save)),
-      ],
-    );
-  }
-}
-
-class _Row extends StatelessWidget {
-  const _Row({
-    required this.item,
-    required this.selected,
-    required this.subtitle,
-    required this.onTap,
-    required this.labels,
-    this.onDelete,
-    this.onRename,
-    this.onTogglePin,
-  });
-
-  final AiChatSessionSummary item;
-  final bool selected;
-  final String subtitle;
-  final VoidCallback onTap;
-  final VoidCallback? onDelete;
-  final VoidCallback? onRename;
-  final VoidCallback? onTogglePin;
-  final AiChatLabels labels;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final hasMenu = onDelete != null || onRename != null || onTogglePin != null;
-    return ListTile(
-      selected: selected,
-      dense: true,
-      title: Row(
-        children: [
-          if (item.pinned)
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: Icon(
-                Icons.push_pin,
-                size: 14,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          Expanded(
-            child: Text(
-              item.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            _ago(item.updatedAt),
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-      subtitle: Text(
-        subtitle,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.labelSmall,
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (item.itemCount > 0)
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: Text(
-                '${item.itemCount}',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-            ),
-          if (selected) const Icon(Icons.check_circle_rounded, size: 18),
-          if (hasMenu)
-            PopupMenuButton<VoidCallback>(
-              icon: const Icon(Icons.more_vert, size: 18),
-              tooltip: '',
-              onSelected: (action) => action(),
-              itemBuilder: (context) => [
-                if (onRename case final rename?)
-                  PopupMenuItem(
-                    value: rename,
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.edit_outlined, size: 18),
-                      title: Text(labels.rename),
-                    ),
-                  ),
-                if (onTogglePin case final pin?)
-                  PopupMenuItem(
-                    value: pin,
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        item.pinned ? Icons.push_pin_outlined : Icons.push_pin,
-                        size: 18,
-                      ),
-                      title: Text(item.pinned ? labels.unpin : labels.pin),
-                    ),
-                  ),
-                if (onDelete case final delete?)
-                  PopupMenuItem(
-                    value: delete,
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        Icons.delete_outline,
-                        size: 18,
-                        color: theme.colorScheme.error,
-                      ),
-                      title: Text(
-                        labels.delete,
-                        style: TextStyle(color: theme.colorScheme.error),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-        ],
-      ),
-      onTap: onTap,
-    );
-  }
-
-  /// Coarse on purpose: the row is for recognising a thread, not for auditing
-  /// it, so anything past a week is just a date.
-  static String _ago(DateTime at) {
-    final gap = DateTime.now().difference(at);
-    if (gap.inMinutes < 1) return 'now';
-    if (gap.inMinutes < 60) return '${gap.inMinutes}m';
-    if (gap.inHours < 24) return '${gap.inHours}h';
-    if (gap.inDays < 7) return '${gap.inDays}d';
-    return '${at.day}/${at.month}';
-  }
-}

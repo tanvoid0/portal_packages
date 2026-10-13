@@ -28,6 +28,7 @@ import 'ai_voice_page.dart';
 import 'ai_item_list.dart';
 import 'ai_markdown.dart';
 import 'ai_presence_orb.dart';
+import '../runtime/ai_persona.dart';
 import 'ai_prompt_composer.dart';
 import 'ai_reply_foot.dart';
 import 'ai_settings_section.dart';
@@ -51,6 +52,7 @@ class AiAssistantPage extends StatefulWidget {
     this.title = 'Assistant',
     this.avatar,
     this.suggestions = const [],
+    this.personas = const [],
     this.onSettings,
     this.tools,
     this.renderers = const {},
@@ -128,6 +130,12 @@ class AiAssistantPage extends StatefulWidget {
   /// wraps them -- but a suggestion that carries a subtitle, an icon and a
   /// time-of-day bias gets a fuller card and a better slot in the rotation.
   final List<AiSuggestion> suggestions;
+
+  /// The roles the user can pick between, shown as a chip row over the
+  /// composer. Empty (every embedded app) draws no chips and routes nothing --
+  /// the page runs the one agent exactly as before. Falls back to the
+  /// runtime's own [PortalAiRuntime.personas] when the host passes none.
+  final List<AiPersona> personas;
 
   /// Opens the app's own AI settings, when it has any. The model and key live
   /// on the server, so there is nothing to configure here by default.
@@ -290,6 +298,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   bool _searching = false;
   String _chatQuery = '';
 
+  /// Which of the shown matches prev/next last scrolled to.
+  int _matchIndex = 0;
+
   /// True when the newest turn is off screen, which is the only time a
   /// jump-to-latest button is worth the space.
   bool _scrolledUp = false;
@@ -320,6 +331,15 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   /// The tool waiting on the user, drawn as a card at the end of the thread.
   _PendingConfirm? _pendingConfirm;
 
+  /// The role the user pinned from the chip row. Null means Auto -- the
+  /// router picks per message. Pinning skips the router (and its extra call).
+  AiPersona? _activePersona;
+
+  /// The personas to offer: the host's list, or the runtime's own.
+  List<AiPersona> get _personas => widget.personas.isNotEmpty
+      ? widget.personas
+      : (widget.runtime?.personas ?? const []);
+
   /// Accepting or discarding removes a card here and now; the host is told, but
   /// the page does not wait for it to hand back a new list.
   late List<AiProposal> _proposals = List.of(widget.proposals);
@@ -342,10 +362,18 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   /// Four on a full page, three in the sheet. Wrapped two-up, four
   /// suggestions plus the shuffle and more-ideas cards make three even rows;
   /// three would leave a single card stranded on the last one.
-  late final _rotator = AiSuggestionRotator(
-    pool: widget.suggestions,
-    visibleCount: widget.fill ? 4 : 3,
-  )..refresh();
+  late AiSuggestionRotator _rotator = _buildRotator(widget.suggestions);
+
+  AiSuggestionRotator _buildRotator(List<AiSuggestion> pool) =>
+      AiSuggestionRotator(pool: pool, visibleCount: widget.fill ? 4 : 3)
+        ..refresh();
+
+  /// The deck a persona shows: its own starter prompts when it has them, the
+  /// app's default list otherwise (Auto, or a persona that ships none).
+  List<AiSuggestion> get _deckPool =>
+      (_activePersona?.suggestions.isNotEmpty ?? false)
+      ? _activePersona!.suggestions
+      : widget.suggestions;
 
   /// Swaps one card every so often while the deck is the only thing on screen.
   /// Cancelled the moment a conversation starts -- nothing should move under a
@@ -429,6 +457,24 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       _searching = false;
       _chatQuery = '';
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = GlobalObjectKey(turn).currentContext;
+      if (context == null) return;
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 250),
+        alignment: 0.2,
+      );
+    });
+  }
+
+  /// Steps the search to the next (+1) or previous (-1) match, wrapping, and
+  /// scrolls it into view without leaving the search.
+  void _stepMatch(int delta) {
+    final matches = _shownTurns;
+    if (matches.isEmpty) return;
+    setState(() => _matchIndex = (_matchIndex + delta) % matches.length);
+    final turn = matches[_matchIndex];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final context = GlobalObjectKey(turn).currentContext;
       if (context == null) return;
@@ -791,9 +837,11 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                           SafeArea(
                             top: false,
                             bottom: widget.onSettings == null,
-                            child: ListTile(
-                              leading: const Icon(Icons.visibility_off_rounded),
-                              title: const Text('New incognito chat'),
+                            child: PortalListItem(
+                              leading: PortalListLeading.icon(
+                                Icons.visibility_off_rounded,
+                              ),
+                              title: 'New incognito chat',
                               onTap: () {
                                 Navigator.of(dialogContext).pop();
                                 newIncognito();
@@ -805,9 +853,11 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                           const Divider(height: 1),
                           SafeArea(
                             top: false,
-                            child: ListTile(
-                              leading: const Icon(Icons.tune_rounded),
-                              title: Text(widget.labels.aiSettings),
+                            child: PortalListItem(
+                              leading: PortalListLeading.icon(
+                                Icons.tune_rounded,
+                              ),
+                              title: widget.labels.aiSettings,
                               onTap: () {
                                 // Close the panel first: settings pushes a
                                 // route, and leaving the panel open behind it
@@ -961,7 +1011,23 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       ask: _voiceAsk,
       interrupt: _stop,
     );
-    if (!await session.start() || !mounted) return;
+    final started = await session.start();
+    if (!mounted) return;
+    if (!started) {
+      // Denied is a decision: say so on the kit's mic-off page; the field
+      // stays a text field behind it.
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          fullscreenDialog: true,
+          builder: (_) => AiVoicePage(
+            session: session,
+            labels: widget.labels,
+            micDenied: true,
+          ),
+        ),
+      );
+      return;
+    }
     setState(() {});
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -1043,23 +1109,12 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
 
   Future<bool> _confirmRewind(int dropped) async {
     final labels = widget.labels;
-    final approved = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        content: Text(labels.rewindWarning.replaceAll('@count', '$dropped')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(labels.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(labels.rewind),
-          ),
-        ],
-      ),
+    return portalConfirm(
+      context,
+      title: labels.rewindWarning.replaceAll('@count', '$dropped'),
+      confirmLabel: labels.rewind,
+      cancelLabel: labels.cancel,
     );
-    return approved ?? false;
   }
 
   /// Host-driven mode owns its own transcript; without an [onRewind] to tell
@@ -1131,10 +1186,24 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         );
       }
     });
+    final runtime = widget.runtime!;
     try {
-      final result = await widget.runtime!.ask(
+      // Auto (no pin) routes per message when there are personas to route
+      // between; a pinned persona skips the router and its extra call.
+      final persona =
+          _activePersona ??
+          (_personas.isEmpty
+              ? null
+              : await runtime.route(prompt, history: history));
+      if (!mounted || _cancelled) return;
+      final result = await runtime.ask(
         _withAttachment(prompt),
-        tools: widget.tools,
+        // A persona with its own tools restricts the run to them; one with
+        // none inherits the default set (which carries web search).
+        tools: (persona != null && persona.tools.isNotEmpty)
+            ? persona.tools
+            : widget.tools,
+        appDescription: persona?.description,
         history: history,
         confirm: _confirm,
         onStep: (step) {
@@ -1168,6 +1237,10 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
             at: DateTime.now(),
             took: clock.elapsed,
             payload: {
+              if (persona != null) ...{
+                'agent': persona.label,
+                'agent_id': persona.id,
+              },
               'blocks': [
                 for (final step in _steps)
                   for (final block in step.blocks) block.toJson(),
@@ -1371,9 +1444,11 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
           spacing: 8,
           children: [
             for (final action in block.actions)
-              OutlinedButton(
+              PortalButton(
+                label: action.label,
+                variant: PortalButtonVariant.outline,
+                size: PortalButtonSize.sm,
                 onPressed: _busy ? null : () => _runAction(action),
-                child: Text(action.label),
               ),
           ],
         ),
@@ -1459,6 +1534,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     setState(() {
       _searching = !_searching;
       if (!_searching) _chatQuery = '';
+      _matchIndex = 0;
     });
     if (!_searching) return;
     WidgetsBinding.instance.addPostFrameCallback(
@@ -1516,6 +1592,8 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   /// Threads saved before turns carried a time show nothing at all.
   String? _meta(AiChatTurn turn) {
     final parts = [
+      if (turn.payload?['agent'] case final String agent when agent.isNotEmpty)
+        agent,
       if (turn.at case final at?)
         MaterialLocalizations.of(
           context,
@@ -1668,6 +1746,41 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     retry: widget.labels.retry,
   );
 
+  /// The match counter with prev/next, shown once there is a query.
+  Widget? _searchTrailing() {
+    final query = _chatQuery.trim();
+    if (query.isEmpty) return null;
+    final labels = widget.labels;
+    final total = _shownTurns.length;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          total == 0
+              ? labels.searchNoMatches
+              : labels.searchMatches
+                    .replaceAll('@current', '${_matchIndex + 1}')
+                    .replaceAll('@total', '$total'),
+          style: PortalUiTheme.of(context).tokens.textStyles.caption,
+        ),
+        PortalButton.icon(
+          tooltip: labels.searchPrevious,
+          icon: PortalIcons.keyboard_arrow_up_rounded,
+          variant: PortalButtonVariant.ghost,
+          size: PortalButtonSize.sm,
+          onPressed: total == 0 ? null : () => _stepMatch(-1),
+        ),
+        PortalButton.icon(
+          tooltip: labels.searchNext,
+          icon: PortalIcons.keyboard_arrow_down_rounded,
+          variant: PortalButtonVariant.ghost,
+          size: PortalButtonSize.sm,
+          onPressed: total == 0 ? null : () => _stepMatch(1),
+        ),
+      ],
+    );
+  }
+
   /// A finished reply's foot: copy, and regenerate where redoing it makes
   /// sense. [meta] is the caption (time, how long, steps, model).
   AiReplyFoot _doneFoot({
@@ -1727,11 +1840,12 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                       style: Theme.of(sheetContext).textTheme.titleMedium,
                     ),
                   ),
-                  IconButton(
+                  PortalButton.icon(
                     tooltip: MaterialLocalizations.of(
                       sheetContext,
                     ).closeButtonTooltip,
-                    icon: const Icon(Icons.close_rounded),
+                    icon: Icons.close_rounded,
+                    variant: PortalButtonVariant.ghost,
                     onPressed: () => Navigator.of(sheetContext).pop(),
                   ),
                 ],
@@ -1968,16 +2082,14 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
             if (_searching)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: TextField(
+                child: PortalSearchField(
                   focusNode: _searchFocus,
-                  onChanged: (value) => setState(() => _chatQuery = value),
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    isDense: true,
-                    hintText: widget.labels.searchInChatHint,
-                    prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                    border: const OutlineInputBorder(),
-                  ),
+                  hintText: widget.labels.searchInChatHint,
+                  onChanged: (value) => setState(() {
+                    _chatQuery = value;
+                    _matchIndex = 0;
+                  }),
+                  trailing: _searchTrailing(),
                 ),
               ),
             const SizedBox(height: 8),
@@ -2124,15 +2236,12 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               child: _replyBubble(
-                                _replyBody(
-                                  AiMarkdown(text: reply),
-                                  [
-                                    for (final step in _steps)
-                                      if (!step.failed &&
-                                          _mutates(step.call.name))
-                                        step.call.name,
-                                  ],
-                                ),
+                                _replyBody(AiMarkdown(text: reply), [
+                                  for (final step in _steps)
+                                    if (!step.failed &&
+                                        _mutates(step.call.name))
+                                      step.call.name,
+                                ]),
                                 footer: _busy
                                     ? null
                                     : _doneFoot(onCopy: () => _copyText(reply)),
@@ -2179,7 +2288,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                                 args: pending.preview == null
                                     ? pending.call.args
                                     : const {},
-                                coverImageUrl: aiPreviewImage(pending.call.args),
+                                coverImageUrl: aiPreviewImage(
+                                  pending.call.args,
+                                ),
                                 previewTitle: pending.preview?.title,
                                 onAccept: () => _answerConfirm(true),
                                 onDecline: () => _answerConfirm(false),
@@ -2233,10 +2344,10 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
           if (_proposals.isNotEmpty && widget.onAcceptProposal != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: FilledButton.icon(
+              child: PortalButton(
                 onPressed: _acceptAll,
-                icon: const Icon(Icons.playlist_add),
-                label: Text('${widget.labels.addAll} (${_proposals.length})'),
+                leading: const Icon(Icons.playlist_add),
+                label: '${widget.labels.addAll} (${_proposals.length})',
               ),
             ),
           const SizedBox(height: 8),
@@ -2276,6 +2387,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                       ),
               ),
             ),
+          if (_personas.isNotEmpty) _personaBar(),
           AiPromptComposer(
             controller: _input,
             focusNode: _inputFocus,
@@ -2304,6 +2416,42 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         ],
       ),
     );
+  }
+
+  /// The role picker: Auto (the router decides per message) plus one chip per
+  /// persona. Selecting a persona pins it for the thread; Auto clears the pin.
+  /// One mutually-exclusive group, so a screen reader hears it as a choice.
+  Widget _personaBar() {
+    final selectedId = _activePersona?.id;
+    return PortalFilterChipRow(
+      semanticLabel: widget.labels.assistantRole,
+      children: [
+        PortalFilterChip(
+          label: widget.labels.autoRole,
+          selected: selectedId == null,
+          exclusive: true,
+          onTap: () => _pickPersona(null),
+        ),
+        for (final persona in _personas)
+          PortalFilterChip(
+            label: persona.label,
+            selected: selectedId == persona.id,
+            exclusive: true,
+            onTap: () => _pickPersona(persona),
+          ),
+      ],
+    );
+  }
+
+  /// Pins [persona] (null = Auto) and swaps the opening deck to its starter
+  /// prompts. The deck only shows before the first message, but rebuilding it
+  /// off-screen is cheap and keeps the two in step.
+  void _pickPersona(AiPersona? persona) {
+    setState(() {
+      _activePersona = persona;
+      _rotator = _buildRotator(_deckPool);
+    });
+    _syncRotation();
   }
 }
 
@@ -2377,22 +2525,28 @@ class _ProposalCard extends StatelessWidget {
                 Row(
                   children: [
                     if (onAccept != null)
-                      TextButton.icon(
+                      PortalButton(
                         onPressed: onAccept,
-                        icon: const Icon(Icons.add, size: 18),
-                        label: Text(labels.add),
+                        variant: PortalButtonVariant.ghost,
+                        size: PortalButtonSize.sm,
+                        leading: const Icon(Icons.add, size: 18),
+                        label: labels.add,
                       ),
                     if (onEdit != null)
-                      TextButton.icon(
+                      PortalButton(
                         onPressed: onEdit,
-                        icon: const Icon(Icons.edit_outlined, size: 18),
-                        label: Text(labels.edit),
+                        variant: PortalButtonVariant.ghost,
+                        size: PortalButtonSize.sm,
+                        leading: const Icon(Icons.edit_outlined, size: 18),
+                        label: labels.edit,
                       ),
                     if (onDiscard != null)
-                      TextButton.icon(
+                      PortalButton(
                         onPressed: onDiscard,
-                        icon: const Icon(Icons.close, size: 18),
-                        label: Text(labels.discard),
+                        variant: PortalButtonVariant.ghost,
+                        size: PortalButtonSize.sm,
+                        leading: const Icon(Icons.close, size: 18),
+                        label: labels.discard,
                       ),
                   ],
                 ),

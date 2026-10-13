@@ -121,6 +121,7 @@ class AiDayStamp extends StatelessWidget {
           label,
           style: tokens.textStyles.caption.copyWith(
             color: portal.onSurfaceVariant,
+            fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
       ),

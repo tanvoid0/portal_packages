@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Selection moved from a per-tile `onChanged` to a single [RadioGroup] that
@@ -44,6 +45,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
         home: Scaffold(
           body: AiBackendSelector(
             store: AiBackendStore(prefs: prefs, keyPrefix: 'test'),
@@ -55,7 +57,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text(label));
+    await tester.tap(find.text(label).first);
     await tester.pumpAndSettle();
     return selected;
   }

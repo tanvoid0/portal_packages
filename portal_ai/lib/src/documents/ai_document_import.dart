@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 import '../chat/ai_proposal.dart';
 import '../clients/ai_completion_client.dart';
@@ -118,23 +119,33 @@ class AiDocumentImportSheet extends StatefulWidget {
   State<AiDocumentImportSheet> createState() => _AiDocumentImportSheetState();
 }
 
-enum _Stage { idle, reading, review, applying }
+extension on String {
+  String? get nullIfEmpty => isEmpty ? null : this;
+}
+
+enum _Stage { idle, reading, review, applying, failed, empty }
 
 class _AiDocumentImportSheetState extends State<AiDocumentImportSheet> {
   _Stage _stage = _Stage.idle;
   String? _error;
-  String? _filename;
+  AiPickedFile? _file;
   List<AiProposal> _found = const [];
   final Set<String> _selected = <String>{};
 
-  Future<void> _read() async {
+  /// Picks a file, then reads it.
+  Future<void> _choose() async {
     final file = await widget.pick();
     if (file == null || !mounted) return;
+    _file = file;
+    await _read();
+  }
 
+  /// Reads [_file] again: the retry after a failure, without another pick.
+  Future<void> _read() async {
+    final file = _file!;
     setState(() {
       _stage = _Stage.reading;
       _error = null;
-      _filename = file.name;
     });
 
     try {
@@ -151,13 +162,12 @@ class _AiDocumentImportSheetState extends State<AiDocumentImportSheet> {
         _selected
           ..clear()
           ..addAll(found.map((p) => p.id));
-        _stage = found.isEmpty ? _Stage.idle : _Stage.review;
-        _error = found.isEmpty ? 'Nothing to import from that file.' : null;
+        _stage = found.isEmpty ? _Stage.empty : _Stage.review;
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _stage = _Stage.idle;
+        _stage = _Stage.failed;
         _error = error is AiCompletionException ? error.message : '$error';
       });
     }
@@ -185,122 +195,121 @@ class _AiDocumentImportSheetState extends State<AiDocumentImportSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final busy = _stage == _Stage.reading || _stage == _Stage.applying;
+    final t = PortalUiTheme.of(context).tokens;
+    final cs = Theme.of(context).colorScheme;
+    final reading = _stage == _Stage.reading;
+    final applying = _stage == _Stage.applying;
+    final reviewing = _stage == _Stage.review || applying;
+    final name = _file?.name;
 
     return Padding(
       padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        left: t.spacing.lg,
+        right: t.spacing.lg,
+        top: t.spacing.lg,
+        bottom: MediaQuery.of(context).viewInsets.bottom + t.spacing.lg,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text(widget.title, style: theme.textTheme.titleMedium),
-              ),
-              IconButton(
-                onPressed: busy ? null : () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close),
+              Expanded(child: Text(widget.title, style: t.textStyles.title)),
+              PortalButton.icon(
+                icon: PortalIcons.close_rounded,
                 tooltip: 'Close',
+                onPressed: reading || applying
+                    ? null
+                    : () => Navigator.of(context).pop(),
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: t.spacing.xs),
           Text(
-            _filename ?? widget.hint,
-            style: theme.textTheme.bodySmall,
+            name ?? widget.hint,
+            style: t.textStyles.body.copyWith(color: cs.onSurfaceVariant),
             overflow: TextOverflow.ellipsis,
           ),
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              _error!,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.error,
+          SizedBox(height: t.spacing.lg),
+          if (reading)
+            Semantics(
+              liveRegion: true,
+              label: 'Reading the document',
+              child: PortalListSection.skeleton(
+                rows: 3,
+                leading: PortalSkeletonLeading.none,
+                trailing: PortalSkeletonTrailing.checkbox,
+              ),
+            )
+          else if (_stage == _Stage.failed)
+            PortalEmptyState.error(
+              title: "Couldn't read ${name ?? 'that file'}",
+              message: _error,
+              onRetry: _read,
+              inCard: false,
+            )
+          else if (_stage == _Stage.empty)
+            PortalEmptyState(
+              icon: PortalIcons.search_off_rounded,
+              title: 'Nothing to import from that file.',
+              actionLabel: 'Choose another file',
+              onAction: _choose,
+              inCard: false,
+            )
+          else if (reviewing) ...[
+            if (_error case final e?) ...[
+              PortalPrompt(
+                size: PortalPromptSize.compact,
+                sentiment: PortalSentiment.negative,
+                message: e,
+              ),
+              SizedBox(height: t.spacing.sm),
+            ],
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final proposal in _found)
+                    PortalListItem.checklist(
+                      title: proposal.title,
+                      subtitle: [
+                        proposal.badge,
+                        proposal.subtitle,
+                      ].where((x) => x.isNotEmpty).join(' · ').nullIfEmpty,
+                      done: _selected.contains(proposal.id),
+                      checkbox: true,
+                      onChanged: applying
+                          ? null
+                          : (on) => setState(() {
+                              if (on) {
+                                _selected.add(proposal.id);
+                              } else {
+                                _selected.remove(proposal.id);
+                              }
+                            }),
+                    ),
+                ],
               ),
             ),
           ],
-          const SizedBox(height: 16),
-          if (_stage == _Stage.reading)
-            const _Busy(label: 'Reading the document...')
-          else if (_stage == _Stage.applying)
-            const _Busy(label: 'Saving...')
-          else if (_stage == _Stage.review)
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _found.length,
-                itemBuilder: (context, index) {
-                  final proposal = _found[index];
-                  return CheckboxListTile(
-                    value: _selected.contains(proposal.id),
-                    onChanged: (on) => setState(() {
-                      if (on ?? false) {
-                        _selected.add(proposal.id);
-                      } else {
-                        _selected.remove(proposal.id);
-                      }
-                    }),
-                    title: Text(proposal.title),
-                    subtitle: proposal.subtitle.isEmpty
-                        ? null
-                        : Text(proposal.subtitle),
-                    secondary: proposal.badge.isEmpty
-                        ? null
-                        : Chip(
-                            label: Text(proposal.badge),
-                            labelStyle: theme.textTheme.labelSmall,
-                            visualDensity: VisualDensity.compact,
-                          ),
-                    dense: true,
-                  );
-                },
-              ),
+          SizedBox(height: t.spacing.lg),
+          if (reviewing)
+            PortalButton(
+              label: '${widget.applyLabel} (${_selected.length})',
+              leading: const Icon(Icons.check),
+              isLoading: applying,
+              busyLabel: 'Saving...',
+              onPressed: _selected.isEmpty ? null : _apply,
+            )
+          else if (_stage == _Stage.idle)
+            PortalButton(
+              label: 'Choose a file',
+              leading: const Icon(Icons.upload_file),
+              onPressed: _choose,
             ),
-          const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerRight,
-            child: _stage == _Stage.review
-                ? FilledButton.icon(
-                    onPressed: _selected.isEmpty ? null : _apply,
-                    icon: const Icon(Icons.check),
-                    label: Text('${widget.applyLabel} (${_selected.length})'),
-                  )
-                : FilledButton.icon(
-                    onPressed: busy ? null : _read,
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text('Choose a file'),
-                  ),
-          ),
         ],
       ),
-    );
-  }
-}
-
-class _Busy extends StatelessWidget {
-  const _Busy({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const SizedBox(
-          height: 18,
-          width: 18,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-        const SizedBox(width: 12),
-        Text(label, style: Theme.of(context).textTheme.bodyMedium),
-      ],
     );
   }
 }

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 import '../chat/ai_voice_session.dart';
 
@@ -186,7 +187,13 @@ class _AiVoiceOrbState extends State<AiVoiceOrb>
           // Fixed height so the line does not jump as the label types in.
           SizedBox(
             height: 28,
-            child: Text(typed, style: theme.textTheme.titleMedium),
+            // The phase is status, quieter than the caption it heads.
+            child: Text(
+              typed,
+              style: PortalUiTheme.of(context).tokens.textStyles.body.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
           ),
         ],
       ),
@@ -280,7 +287,9 @@ class _OrbPainter extends CustomPainter {
     );
 
     // -- Second shell: fainter, fatter, offset, out of step --------------------
-    final c2 = c + Offset(math.sin(t * 0.17 + 1.1), math.cos(t * 0.21 + 0.4)) * 0.10 * r;
+    final c2 =
+        c +
+        Offset(math.sin(t * 0.17 + 1.1), math.cos(t * 0.21 + 0.4)) * 0.10 * r;
     canvas.drawPath(
       _shell(c2, r * 1.03, amp * 1.3, 11),
       Paint()
@@ -307,7 +316,10 @@ class _OrbPainter extends CustomPainter {
       );
     }
 
-    final mass = Offset(math.sin(t * 0.11) * 0.45, math.cos(t * 0.09 + 3.7) * 0.45);
+    final mass = Offset(
+      math.sin(t * 0.11) * 0.45,
+      math.cos(t * 0.09 + 3.7) * 0.45,
+    );
     canvas.drawPath(
       edge,
       Paint()

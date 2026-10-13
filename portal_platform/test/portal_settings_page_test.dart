@@ -506,16 +506,16 @@ void main() {
       expect(find.text('Ocean'), findsNothing);
       await tester.tap(find.text('Accent colour'));
       await tester.pumpAndSettle();
-      expect(find.text('Ocean'), findsOneWidget);
+      expect(find.bySemanticsLabel('Ocean'), findsOneWidget);
       // Nothing chosen yet: the first palette is the app's own accent, and
       // it is the one carrying the check.
       expect(find.byIcon(PortalIcons.check_rounded), findsOneWidget);
 
-      await tester.tap(find.text('Ember'));
+      await tester.tap(find.bySemanticsLabel('Ember'));
       await tester.pumpAndSettle();
 
       expect(theme.paletteId.value, 'ember');
-      expect(find.text('Ember'), findsNothing);
+      expect(find.bySemanticsLabel('Ember'), findsNothing);
     });
   });
 

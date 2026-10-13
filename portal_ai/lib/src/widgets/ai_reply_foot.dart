@@ -56,66 +56,64 @@ class AiReplyFoot extends StatelessWidget {
     final gap = SizedBox(width: tokens.spacing.sm);
 
     Widget iconButton(String tip, IconData icon, VoidCallback? onPressed) =>
-        IconButton(
+        PortalButton.icon(
           tooltip: tip,
           onPressed: onPressed,
-          icon: Icon(icon, size: tokens.iconSizes.sm),
-          color: cs.onSurfaceVariant,
-          style: IconButton.styleFrom(
-            minimumSize: Size.square(tokens.minTapTarget),
-          ),
+          icon: icon,
+          variant: PortalButtonVariant.ghost,
+          foregroundColor: cs.onSurfaceVariant,
         );
 
     final children = switch (status) {
       AiReplyStatus.writing => [
-          if (mark != null) ...[mark!, gap],
-          // The only live region on a streaming reply; PortalPrompt carries
-          // its own, so failed does not nest one.
-          Semantics(
-            liveRegion: true,
-            // ponytail: PortalShimmer sweeps the whole word, and drops to the
-            // plain muted caption under reduce-motion. A per-letter wave
-            // would be a custom painter; add if the sweep reads too flat.
-            child: PortalShimmer(
-              baseColor: cs.onSurfaceVariant,
-              highlightColor: cs.onSurface,
-              child: Text(writing, style: caption),
-            ),
+        if (mark != null) ...[mark!, gap],
+        // The only live region on a streaming reply; PortalPrompt carries
+        // its own, so failed does not nest one.
+        Semantics(
+          liveRegion: true,
+          // ponytail: PortalShimmer sweeps the whole word, and drops to the
+          // plain muted caption under reduce-motion. A per-letter wave
+          // would be a custom painter; add if the sweep reads too flat.
+          child: PortalShimmer(
+            baseColor: cs.onSurfaceVariant,
+            highlightColor: cs.onSurface,
+            child: Text(writing, style: caption),
           ),
-        ],
+        ),
+      ],
       AiReplyStatus.waiting => [
-          if (mark != null) ...[mark!, gap],
-          Text(waitingForYou, style: caption),
-        ],
+        if (mark != null) ...[mark!, gap],
+        Text(waitingForYou, style: caption),
+      ],
       AiReplyStatus.done => [
-          if (mark != null) ...[mark!, gap],
-          iconButton(copyReply, PortalIcons.content_copy_rounded, onCopy),
-          if (onRegenerate != null)
-            iconButton(regenerate, PortalIcons.refresh_rounded, onRegenerate),
-          if (meta != null) ...[
-            gap,
-            Flexible(
-              child: Text(
-                meta!,
-                style: caption,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ],
-      AiReplyStatus.failed => [
-          Expanded(
-            child: PortalPrompt(
-              size: PortalPromptSize.inline,
-              sentiment: PortalSentiment.negative,
-              message: failure ?? '',
-              action: onRetry == null
-                  ? null
-                  : (label: retry, onPressed: onRetry!),
+        if (mark != null) ...[mark!, gap],
+        iconButton(copyReply, PortalIcons.content_copy_rounded, onCopy),
+        if (onRegenerate != null)
+          iconButton(regenerate, PortalIcons.refresh_rounded, onRegenerate),
+        if (meta != null) ...[
+          gap,
+          Flexible(
+            child: Text(
+              meta!,
+              style: caption,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
+      ],
+      AiReplyStatus.failed => [
+        Expanded(
+          child: PortalPrompt(
+            size: PortalPromptSize.inline,
+            sentiment: PortalSentiment.negative,
+            message: failure ?? '',
+            action: onRetry == null
+                ? null
+                : (label: retry, onPressed: onRetry!),
+          ),
+        ),
+      ],
     };
 
     return ConstrainedBox(

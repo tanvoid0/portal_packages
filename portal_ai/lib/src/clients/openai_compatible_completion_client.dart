@@ -97,7 +97,9 @@ class OpenAiCompatibleCompletionClient
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw AiCompletionException(_errorMessage(response.statusCode, response.body));
+      throw AiCompletionException(
+        _errorMessage(response.statusCode, response.body),
+      );
     }
 
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
@@ -127,7 +129,10 @@ class OpenAiCompatibleCompletionClient
     required String userPrompt,
     AiSamplerConfig sampler = const AiSamplerConfig(),
   }) async* {
-    final request = http.Request('POST', Uri.parse('$baseUrl/chat/completions'));
+    final request = http.Request(
+      'POST',
+      Uri.parse('$baseUrl/chat/completions'),
+    );
     request.headers.addAll(_headers);
     request.body = jsonEncode(
       _body(
@@ -142,15 +147,17 @@ class OpenAiCompatibleCompletionClient
     final streamed = await _client.send(request);
     if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
       final errorBody = await streamed.stream.bytesToString();
-      throw AiCompletionException(_errorMessage(streamed.statusCode, errorBody));
+      throw AiCompletionException(
+        _errorMessage(streamed.statusCode, errorBody),
+      );
     }
 
     // LineSplitter, not a per-chunk split: a network read can end mid-line,
     // and a `data:` frame split across two reads would otherwise lose
     // whichever half arrived in the second chunk. It also folds CRLF for us.
-    final lines = streamed.stream.transform(utf8.decoder).transform(
-      const LineSplitter(),
-    );
+    final lines = streamed.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
     await for (final line in lines) {
       final trimmed = line.trim();
       if (!trimmed.startsWith('data:')) continue;
@@ -221,7 +228,10 @@ const openAiCompatiblePresets = <OpenAiCompatiblePreset>[
     label: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com/v1',
   ),
-  OpenAiCompatiblePreset(label: 'Mistral', baseUrl: 'https://api.mistral.ai/v1'),
+  OpenAiCompatiblePreset(
+    label: 'Mistral',
+    baseUrl: 'https://api.mistral.ai/v1',
+  ),
   OpenAiCompatiblePreset(label: 'xAI', baseUrl: 'https://api.x.ai/v1'),
   OpenAiCompatiblePreset(
     label: 'Together',
@@ -231,6 +241,9 @@ const openAiCompatiblePresets = <OpenAiCompatiblePreset>[
     label: 'Gemini',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
   ),
-  OpenAiCompatiblePreset(label: 'LM Studio', baseUrl: 'http://localhost:1234/v1'),
+  OpenAiCompatiblePreset(
+    label: 'LM Studio',
+    baseUrl: 'http://localhost:1234/v1',
+  ),
   OpenAiCompatiblePreset(label: 'Ollama', baseUrl: 'http://localhost:11434/v1'),
 ];

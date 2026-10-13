@@ -36,7 +36,10 @@ void main() {
       );
 
       expect(reply, 'hi there');
-      expect(seen!.url.toString(), 'https://api.example.com/v1/chat/completions');
+      expect(
+        seen!.url.toString(),
+        'https://api.example.com/v1/chat/completions',
+      );
       expect(seen!.headers['Authorization'], 'Bearer sk-secret');
       final body = jsonDecode(seen!.body) as Map;
       expect(body['model'], 'gpt-test');
@@ -50,34 +53,37 @@ void main() {
       expect(client.lastStats?.replyTokens, 2);
     });
 
-    test('omits the system message and the Authorization header when empty', () async {
-      http.Request? seen;
-      final client = OpenAiCompatibleCompletionClient(
-        baseUrl: 'http://localhost:1234/v1',
-        model: 'local-model',
-        httpClient: MockClient((request) async {
-          seen = request;
-          return http.Response(
-            jsonEncode({
-              'choices': [
-                {
-                  'message': {'content': 'ok'},
-                },
-              ],
-            }),
-            200,
-          );
-        }),
-      );
+    test(
+      'omits the system message and the Authorization header when empty',
+      () async {
+        http.Request? seen;
+        final client = OpenAiCompatibleCompletionClient(
+          baseUrl: 'http://localhost:1234/v1',
+          model: 'local-model',
+          httpClient: MockClient((request) async {
+            seen = request;
+            return http.Response(
+              jsonEncode({
+                'choices': [
+                  {
+                    'message': {'content': 'ok'},
+                  },
+                ],
+              }),
+              200,
+            );
+          }),
+        );
 
-      await client.complete(systemPrompt: '', userPrompt: 'hi');
+        await client.complete(systemPrompt: '', userPrompt: 'hi');
 
-      expect(seen!.headers.containsKey('Authorization'), isFalse);
-      final body = jsonDecode(seen!.body) as Map;
-      expect(body['messages'], [
-        {'role': 'user', 'content': 'hi'},
-      ]);
-    });
+        expect(seen!.headers.containsKey('Authorization'), isFalse);
+        final body = jsonDecode(seen!.body) as Map;
+        expect(body['messages'], [
+          {'role': 'user', 'content': 'hi'},
+        ]);
+      },
+    );
 
     test('jsonMode asks for a JSON object response', () async {
       Map<String, dynamic>? sentBody;
@@ -188,37 +194,41 @@ void main() {
       expect(text, 'one two');
     });
 
-    test('a data: line split across two network reads is not dropped', () async {
-      // One SSE frame, cut mid-line -- not at a frame boundary -- the way a
-      // real socket read has no idea where the JSON ends.
-      final full = 'data: ${jsonEncode({
-        'choices': [
-          {
-            'delta': {'content': 'hello world'},
-          },
-        ],
-      })}\n\n';
-      final cut = full.length ~/ 2;
-      final client = OpenAiCompatibleCompletionClient(
-        baseUrl: 'https://api.example.com/v1',
-        model: 'gpt-test',
-        httpClient: MockClient.streaming((request, bodyStream) async {
-          return http.StreamedResponse(
-            Stream.fromIterable([
-              utf8.encode(full.substring(0, cut)),
-              utf8.encode(full.substring(cut)),
-            ]),
-            200,
-          );
-        }),
-      );
+    test(
+      'a data: line split across two network reads is not dropped',
+      () async {
+        // One SSE frame, cut mid-line -- not at a frame boundary -- the way a
+        // real socket read has no idea where the JSON ends.
+        final full =
+            'data: ${jsonEncode({
+              'choices': [
+                {
+                  'delta': {'content': 'hello world'},
+                },
+              ],
+            })}\n\n';
+        final cut = full.length ~/ 2;
+        final client = OpenAiCompatibleCompletionClient(
+          baseUrl: 'https://api.example.com/v1',
+          model: 'gpt-test',
+          httpClient: MockClient.streaming((request, bodyStream) async {
+            return http.StreamedResponse(
+              Stream.fromIterable([
+                utf8.encode(full.substring(0, cut)),
+                utf8.encode(full.substring(cut)),
+              ]),
+              200,
+            );
+          }),
+        );
 
-      final text = await client
-          .completeStream(systemPrompt: 'sys', userPrompt: 'hi')
-          .join();
+        final text = await client
+            .completeStream(systemPrompt: 'sys', userPrompt: 'hi')
+            .join();
 
-      expect(text, 'hello world');
-    });
+        expect(text, 'hello world');
+      },
+    );
 
     test('an error frame throws', () {
       final client = OpenAiCompatibleCompletionClient(

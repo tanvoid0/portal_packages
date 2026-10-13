@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 class _FakeCompletionClient implements AiCompletionClient {
   _FakeCompletionClient(this.reply);
@@ -46,6 +47,7 @@ void main() {
   }) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
         home: Scaffold(
           body: AiDocumentImportSheet(
             documents: documentsReturning('Klarna, 4 payments'),
@@ -110,11 +112,13 @@ void main() {
 
     expect(applyCalled, isFalse);
     expect(find.textContaining('did not return usable data'), findsOneWidget);
-    expect(
-      find.text('Choose a file'),
-      findsOneWidget,
-      reason: 'back to the start',
-    );
+    expect(find.text("Couldn't read contract.pdf"), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget, reason: 'a way forward');
+
+    // Retry reads the same file again rather than going back to the picker.
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(find.text("Couldn't read contract.pdf"), findsOneWidget);
   });
 
   testWidgets('an empty read says so instead of showing an empty list', (
@@ -126,6 +130,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Nothing to import from that file.'), findsOneWidget);
+    expect(find.text('Choose another file'), findsOneWidget);
   });
 
   testWidgets('a failed write keeps the review open', (tester) async {

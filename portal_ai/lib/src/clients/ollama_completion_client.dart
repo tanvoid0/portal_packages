@@ -135,9 +135,9 @@ class OllamaCompletionClient
     // LineSplitter, not a per-chunk split: a network read can end mid-line,
     // and an NDJSON line split across two reads would otherwise lose
     // whichever half arrived in the second chunk. It also folds CRLF for us.
-    final lines = streamed.stream.transform(utf8.decoder).transform(
-      const LineSplitter(),
-    );
+    final lines = streamed.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
     await for (final line in lines) {
       final trimmed = line.trim();
       if (trimmed.isEmpty) continue;

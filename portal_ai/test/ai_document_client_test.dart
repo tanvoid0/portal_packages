@@ -110,29 +110,32 @@ void main() {
     expect(result, <String, dynamic>{'instalments': 4});
   });
 
-  test('extractJson reads a long document in pieces and merges the rows', () async {
-    final prompts = <String>[];
-    final model = _CountingClient(prompts);
-    final text = List.generate(40, (i) => 'line $i').join('\n');
-    final result = await clientReturning(<String, dynamic>{'text': text})
-        .extractJson(
-          client: model,
-          bytes: <int>[1],
-          filename: 'statement.pdf',
-          instruction: 'Return JSON',
-          maxChunkChars: 60,
-        );
+  test(
+    'extractJson reads a long document in pieces and merges the rows',
+    () async {
+      final prompts = <String>[];
+      final model = _CountingClient(prompts);
+      final text = List.generate(40, (i) => 'line $i').join('\n');
+      final result = await clientReturning(<String, dynamic>{'text': text})
+          .extractJson(
+            client: model,
+            bytes: <int>[1],
+            filename: 'statement.pdf',
+            instruction: 'Return JSON',
+            maxChunkChars: 60,
+          );
 
-    expect(prompts.length, greaterThan(1));
-    expect(prompts.join(), text);
-    for (final p in prompts) {
-      expect(p.length, lessThanOrEqualTo(60));
-      expect(p.endsWith('\n') || p == prompts.last, isTrue);
-    }
-    final rows = (result as Map)['transactions'] as List;
-    expect(rows.length, prompts.length);
-    expect(result['currency'], 'GBP');
-  });
+      expect(prompts.length, greaterThan(1));
+      expect(prompts.join(), text);
+      for (final p in prompts) {
+        expect(p.length, lessThanOrEqualTo(60));
+        expect(p.endsWith('\n') || p == prompts.last, isTrue);
+      }
+      final rows = (result as Map)['transactions'] as List;
+      expect(rows.length, prompts.length);
+      expect(result['currency'], 'GBP');
+    },
+  );
 
   test('mergeJson concatenates bare lists', () {
     expect(

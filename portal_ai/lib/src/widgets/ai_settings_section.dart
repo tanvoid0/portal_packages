@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../clients/ollama_model_manager.dart';
@@ -134,17 +135,6 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     });
   }
 
-  /// [RadioGroup] hands back the tile's value; map it to the option it came
-  /// from. Unavailable tiles are disabled, so a null or unknown id is a no-op.
-  void _selectById(String? id) {
-    for (final option in _options) {
-      if (option.id == id) {
-        _select(option);
-        return;
-      }
-    }
-  }
-
   Future<void> _select(AiBackendOption option) async {
     if (!option.available) return;
     await widget.store.setSelectedKind(option.kind);
@@ -240,9 +230,11 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     }
     final manager = _managerFor(option);
     if (manager == null) return null;
-    return TextButton(
+    return PortalButton(
+      label: widget.labels.manageModels,
+      size: PortalButtonSize.sm,
+      variant: PortalButtonVariant.ghost,
       onPressed: () => _manageModels(manager),
-      child: Text(widget.labels.manageModels),
     );
   }
 
@@ -251,21 +243,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     final labels = widget.labels;
 
     if (_loading) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            const SizedBox(width: 12),
-            Text(labels.scanning),
-          ],
-        ),
-      );
+      return PortalListSection.skeleton(hasHeader: true, rows: 2);
     }
 
     final inference = _options.where((o) => o.supportsInAppInference).toList();
@@ -274,79 +252,127 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     if (inference.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Text(labels.noProviders),
+        child: PortalPrompt(
+          size: PortalPromptSize.compact,
+          sentiment: PortalSentiment.warning,
+          message: labels.noProviders,
+        ),
       );
     }
 
-    final titleStyle = Theme.of(
-      context,
-    ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600);
+    int? indexOf(List<AiBackendOption> list) {
+      final i = list.indexWhere((o) => o.kind == _selected);
+      return i < 0 ? null : i;
+    }
 
-    return RadioGroup<String>(
-      groupValue: _selected?.id,
-      onChanged: _selectById,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(labels.selectProvider, style: titleStyle),
-          const SizedBox(height: 8),
-          // Each provider's settings sit directly under its own row. A phone
-          // that cannot see Ollama yet still needs its address field, and that
-          // row is disabled -- so hiding the field behind "is selected" leaves
-          // the one control that would fix it unreachable.
-          for (final option in inference) ...[
-            _tile(option),
-            if (widget.showModelConfig) ..._configFor(option),
-          ],
-          if (delegates.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Text(labels.external, style: titleStyle),
-            const SizedBox(height: 8),
-            ...delegates.map(_tile),
-          ],
-          if (widget.hasServer && widget.showRouting && widget.showModelConfig) ...[
-            const SizedBox(height: 16),
-            Text(labels.routingTitle, style: titleStyle),
-            const SizedBox(height: 8),
-            _RoutingModeControl(
-              labels: labels,
-              mode: widget.store.routingMode,
-              onChanged: (mode) async {
-                await widget.store.setRoutingMode(mode);
-                if (!mounted) return;
-                setState(() {});
-                // Nothing about the selected backend moved, but routing mode
-                // alone changes what the runtime should be running --
-                // `applyBackend` re-resolves from the store as a whole
-                // (routing mode included), not just from this option, so
-                // re-firing it here is the same path a backend switch takes.
-                final opt = _selectedOption;
-                if (opt != null) widget.onChanged?.call(opt);
-              },
-            ),
-          ],
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              onPressed: () {
-                widget.onRescan?.call();
-                _scan();
-              },
-              child: Text(labels.rescan),
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PortalListSection.selectable(
+          header: labels.selectProvider,
+          selected: indexOf(inference),
+          children: [for (final option in inference) _tile(option)],
+        ),
+        // Each provider's settings sit directly under the list. A phone that
+        // cannot see Ollama yet still needs its address field, and that row is
+        // disabled -- so hiding the field behind "is selected" leaves the one
+        // control that would fix it unreachable. Actions live here too, not in
+        // the row: a disabled row is inert, and a download is for exactly the
+        // provider that is not ready yet.
+        for (final option in inference) ..._extrasFor(option),
+        if (delegates.isNotEmpty)
+          PortalListSection.selectable(
+            header: labels.external,
+            selected: indexOf(delegates),
+            children: [for (final option in delegates) _tile(option)],
+          ),
+        for (final option in delegates) ..._extrasFor(option),
+        if (widget.hasServer &&
+            widget.showRouting &&
+            widget.showModelConfig) ...[
+          PortalSectionHeader(title: labels.routingTitle),
+          _RoutingModeControl(
+            labels: labels,
+            mode: widget.store.routingMode,
+            onChanged: (mode) async {
+              await widget.store.setRoutingMode(mode);
+              if (!mounted) return;
+              setState(() {});
+              // Nothing about the selected backend moved, but routing mode
+              // alone changes what the runtime should be running --
+              // `applyBackend` re-resolves from the store as a whole
+              // (routing mode included), not just from this option, so
+              // re-firing it here is the same path a backend switch takes.
+              final opt = _selectedOption;
+              if (opt != null) widget.onChanged?.call(opt);
+            },
           ),
         ],
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: PortalButton(
+            label: labels.rescan,
+            size: PortalButtonSize.sm,
+            variant: PortalButtonVariant.ghost,
+            onPressed: () {
+              widget.onRescan?.call();
+              _scan();
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  PortalListItem _tile(AiBackendOption option) {
+    final labels = widget.labels;
+    final description = labels.descriptionFor(option.kind);
+    final highlighted = option.kind == _selected && option.available;
+    return PortalListItem(
+      title: labels.titleFor(option.kind),
+      titleMaxLines: 2,
+      subtitle: option.available
+          ? [description, ?option.modelsSummary].join('\n')
+          : null,
+      leading: PortalListLeading.tile(labels.iconFor(option.kind)),
+      disabledReason: option.available
+          ? null
+          : (option.unavailableReason ?? labels.unavailable),
+      // Words, not colour alone: the radio dot is not the only mark.
+      chips: [
+        if (highlighted)
+          PortalBadge(
+            label: labels.selectedBadge,
+            tone: PortalBadgeTone.primary,
+          )
+        else if (!option.available)
+          PortalBadge(label: labels.unavailable, tone: PortalBadgeTone.danger),
+      ],
+      trailing: PortalListAccessory.radio(
+        checked: option.kind == _selected,
+        onChanged: option.available ? (_) => _select(option) : null,
       ),
     );
   }
 
-  Widget _tile(AiBackendOption option) => _OptionTile(
-    option: option,
-    labels: widget.labels,
-    selected: option.kind == _selected,
-    trailing: _trailingFor(option),
-  );
+  /// What sits under the list for [option]: its action, then its settings.
+  List<Widget> _extrasFor(AiBackendOption option) {
+    final trailing = _trailingFor(option);
+    final config = widget.showModelConfig
+        ? _configFor(option)
+        : const <Widget>[];
+    if (trailing == null && config.isEmpty) return const [];
+    return [
+      PortalSectionHeader(title: widget.labels.titleFor(option.kind)),
+      PortalFormStack(
+        children: [
+          if (trailing != null)
+            Align(alignment: AlignmentDirectional.centerStart, child: trailing),
+          ...config,
+        ],
+      ),
+    ];
+  }
 
   /// Settings belonging to [option].
   ///
@@ -374,30 +400,22 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
           },
         ),
         Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: _scanningLan ? null : _findOllama,
-            icon: _scanningLan
-                ? const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.wifi_find_outlined, size: 18),
-            label: Text(
-              _scanningLan ? labels.searchingOllama : labels.findOllama,
-            ),
+          alignment: AlignmentDirectional.centerStart,
+          child: PortalButton(
+            label: labels.findOllama,
+            busyLabel: labels.searchingOllama,
+            isLoading: _scanningLan,
+            size: PortalButtonSize.sm,
+            variant: PortalButtonVariant.secondary,
+            leading: const Icon(Icons.wifi_find_outlined),
+            onPressed: _findOllama,
           ),
         ),
         if (_lanScanFailed)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              labels.ollamaNotFound,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.error,
-              ),
-            ),
+          PortalPrompt(
+            size: PortalPromptSize.inline,
+            sentiment: PortalSentiment.negative,
+            message: labels.ollamaNotFound,
           ),
       ]);
     }
@@ -431,24 +449,25 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     final stored = widget.store.modelFor(option.kind);
     if (option.models.isNotEmpty) {
       widgets.add(
-        _ModelDropdown(
+        PortalSelect<String>(
+          key: ValueKey(
+            'ai-model-${option.models.contains(stored) ? stored : option.models.first}',
+          ),
           label: labels.model,
-          models: option.models,
+          items: [
+            for (final m in option.models) PortalSelectItem(value: m, label: m),
+          ],
           // A stored model the provider no longer lists must not become the
           // dropdown's value, or Flutter asserts on a missing item.
-          value: option.models.contains(stored) ? stored! : option.models.first,
-          onChanged: (model) => _setModel(option.kind, model),
+          value: option.models.contains(stored) ? stored : option.models.first,
+          onChanged: (model) {
+            if (model != null) _setModel(option.kind, model);
+          },
         ),
       );
     } else if (option.kind == AiBackendKind.systemOnDevice) {
       widgets.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Text(
-            labels.noModels,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ),
+        PortalPrompt(size: PortalPromptSize.inline, message: labels.noModels),
       );
     }
     return widgets;
@@ -467,185 +486,14 @@ class _DownloadButton extends StatelessWidget {
   final AiBackendLabels labels;
 
   @override
-  Widget build(BuildContext context) {
-    if (busy) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Text(
-          labels.downloading,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-      );
-    }
-    return TextButton(onPressed: onPressed, child: Text(labels.download));
-  }
-}
-
-class _OptionTile extends StatelessWidget {
-  const _OptionTile({
-    required this.option,
-    required this.labels,
-    required this.selected,
-    this.trailing,
-  });
-
-  final AiBackendOption option;
-  final AiBackendLabels labels;
-
-  /// Whether this is the account's current provider — draws the card's
-  /// highlight and the "Selected" badge, independent of the radio's own dot
-  /// so the choice reads at a glance while scanning the list.
-  final bool selected;
-
-  final Widget? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final title = labels.titleFor(option.kind);
-    final description = labels.descriptionFor(option.kind);
-    final modelsSummary = option.modelsSummary;
-    final subtitle = option.available
-        ? [description, ?modelsSummary].join('\n')
-        : (option.unavailableReason ?? labels.unavailable);
-
-    final highlighted = selected && option.available;
-    final borderColor = highlighted
-        ? cs.primary
-        : option.available
-        ? cs.outlineVariant
-        : cs.outlineVariant.withValues(alpha: 0.5);
-    final fillColor = highlighted
-        ? cs.primaryContainer.withValues(alpha: 0.45)
-        : cs.surfaceContainerHigh.withValues(alpha: 0.5);
-
-    return Opacity(
-      opacity: option.available ? 1 : 0.55,
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: RadioListTile<String>(
-          value: option.id,
-          enabled: option.available,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: borderColor, width: highlighted ? 1.5 : 1),
-          ),
-          tileColor: fillColor,
-          contentPadding: const EdgeInsets.fromLTRB(14, 6, 12, 6),
-          title: Row(
-            children: [
-              Icon(
-                labels.iconFor(option.kind),
-                size: 18,
-                color: cs.onSurfaceVariant,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  // Two lines, not one: the row carries a status badge and
-                  // now a Models button too, and at that width a one-line
-                  // title ellipses to "Ollama (lo...".
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              if (highlighted) ...[
-                const SizedBox(width: 8),
-                _StatusBadge(label: labels.selectedBadge, color: cs.primary),
-              ] else if (!option.available) ...[
-                const SizedBox(width: 8),
-                _StatusBadge(label: labels.unavailable, color: cs.error),
-              ],
-            ],
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 4, left: 26),
-            child: Text(
-              subtitle,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          secondary: trailing,
-        ),
-      ),
-    );
-  }
-}
-
-/// A short, coloured status pill next to a provider's title.
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-class _ModelDropdown extends StatelessWidget {
-  const _ModelDropdown({
-    required this.label,
-    required this.models,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String label;
-  final List<String> models;
-  final String value;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: DropdownButtonFormField<String>(
-        key: ValueKey('ai-model-$value'),
-        initialValue: value,
-        isExpanded: true,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-        ),
-        items: models
-            .map(
-              (m) => DropdownMenuItem<String>(
-                value: m,
-                child: Text(m, overflow: TextOverflow.ellipsis),
-              ),
-            )
-            .toList(),
-        onChanged: (model) {
-          if (model != null) onChanged(model);
-        },
-      ),
-    );
-  }
+  Widget build(BuildContext context) => PortalButton(
+    label: labels.download,
+    busyLabel: labels.downloading,
+    isLoading: busy,
+    size: PortalButtonSize.sm,
+    variant: PortalButtonVariant.secondary,
+    onPressed: onPressed,
+  );
 }
 
 class _OllamaHostField extends StatefulWidget {
@@ -677,17 +525,13 @@ class _OllamaHostFieldState extends State<_OllamaHostField> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: TextField(
-        controller: _controller,
-        decoration: InputDecoration(
-          labelText: widget.label,
-          hintText: defaultOllamaBaseUrl,
-          border: const OutlineInputBorder(),
-        ),
-        onSubmitted: widget.onSubmitted,
-      ),
+    return PortalTextField(
+      controller: _controller,
+      label: widget.label,
+      hint: defaultOllamaBaseUrl,
+      keyboardType: TextInputType.url,
+      textInputAction: TextInputAction.done,
+      onSubmitted: widget.onSubmitted,
     );
   }
 }
@@ -709,18 +553,18 @@ class _RoutingModeControl extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SegmentedButton<AiRoutingMode>(
-          segments: [
-            for (final m in AiRoutingMode.values)
-              ButtonSegment(value: m, label: Text(labels.routingLabelFor(m))),
+        PortalSegmentedTabs(
+          labels: [
+            for (final m in AiRoutingMode.values) labels.routingLabelFor(m),
           ],
-          selected: {mode},
-          onSelectionChanged: (selection) => onChanged(selection.first),
+          index: AiRoutingMode.values.indexOf(mode),
+          semanticLabel: labels.routingTitle,
+          onChanged: (i) => onChanged(AiRoutingMode.values[i]),
         ),
         const SizedBox(height: 4),
         Text(
           labels.routingDescriptionFor(mode),
-          style: Theme.of(context).textTheme.bodySmall,
+          style: PortalUiTheme.of(context).tokens.textStyles.caption,
         ),
       ],
     );
@@ -758,7 +602,6 @@ class _OpenAiCompatibleFieldsState extends State<_OpenAiCompatibleFields> {
   final FocusNode _baseUrlFocus = FocusNode();
   final FocusNode _modelFocus = FocusNode();
   final FocusNode _apiKeyFocus = FocusNode();
-  bool _obscureKey = true;
   bool _testing = false;
   bool? _testOk;
 
@@ -876,105 +719,68 @@ class _OpenAiCompatibleFieldsState extends State<_OpenAiCompatibleFields> {
   @override
   Widget build(BuildContext context) {
     final labels = widget.labels;
-    final cs = Theme.of(context).colorScheme;
     final currentPreset = _presetForBaseUrl(_baseUrlController.text);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: PortalUiTheme.of(context).tokens.spacing.lg,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: DropdownButtonFormField<String>(
-            initialValue: currentPreset?.label,
-            isExpanded: true,
-            decoration: InputDecoration(
-              labelText: labels.openAiPreset,
-              border: const OutlineInputBorder(),
-            ),
-            items: [
-              for (final preset in openAiCompatiblePresets)
-                DropdownMenuItem(
-                  value: preset.label,
-                  child: Text(preset.label),
-                ),
-              DropdownMenuItem(value: null, child: Text(labels.openAiCustomPreset)),
-            ],
-            onChanged: (label) {
-              final preset = _presetForLabel(label);
-              if (preset == null) return;
-              setState(() => _baseUrlController.text = preset.baseUrl);
-              _saveBaseUrl();
-            },
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: TextField(
-            controller: _baseUrlController,
-            focusNode: _baseUrlFocus,
-            decoration: InputDecoration(
-              labelText: labels.openAiBaseUrl,
-              border: const OutlineInputBorder(),
-            ),
-            onSubmitted: (_) => _saveBaseUrl(),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: TextField(
-            controller: _modelController,
-            focusNode: _modelFocus,
-            decoration: InputDecoration(
-              labelText: labels.model,
-              border: const OutlineInputBorder(),
-            ),
-            onSubmitted: (_) => _saveModel(),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: TextField(
-            controller: _apiKeyController,
-            focusNode: _apiKeyFocus,
-            obscureText: _obscureKey,
-            decoration: InputDecoration(
-              labelText: labels.openAiApiKey,
-              border: const OutlineInputBorder(),
-              suffixIcon: IconButton(
-                tooltip: _obscureKey ? labels.openAiShowKey : labels.openAiHideKey,
-                icon: Icon(
-                  _obscureKey
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
-                ),
-                onPressed: () => setState(() => _obscureKey = !_obscureKey),
-              ),
-            ),
-            onSubmitted: (_) => _saveApiKey(),
-          ),
-        ),
-        Row(
-          children: [
-            TextButton(
-              onPressed: _testing ? null : _test,
-              child: Text(labels.openAiTest),
-            ),
-            const SizedBox(width: 8),
-            if (_testing)
-              const SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            else if (_testOk != null)
-              Text(
-                _testOk! ? labels.openAiTestOk : labels.openAiTestFail,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: _testOk! ? cs.primary : cs.error,
-                ),
-              ),
+        PortalSelect<String>(
+          value: currentPreset?.label,
+          label: labels.openAiPreset,
+          // No item for "custom": it is what shows when the URL matches none.
+          hint: labels.openAiCustomPreset,
+          items: [
+            for (final preset in openAiCompatiblePresets)
+              PortalSelectItem(value: preset.label, label: preset.label),
           ],
+          onChanged: (label) {
+            final preset = _presetForLabel(label);
+            if (preset == null) return;
+            setState(() => _baseUrlController.text = preset.baseUrl);
+            _saveBaseUrl();
+          },
         ),
+        PortalTextField(
+          controller: _baseUrlController,
+          focusNode: _baseUrlFocus,
+          label: labels.openAiBaseUrl,
+          keyboardType: TextInputType.url,
+          onSubmitted: (_) => _saveBaseUrl(),
+        ),
+        PortalTextField(
+          controller: _modelController,
+          focusNode: _modelFocus,
+          label: labels.model,
+          onSubmitted: (_) => _saveModel(),
+        ),
+        PortalTextField(
+          controller: _apiKeyController,
+          focusNode: _apiKeyFocus,
+          label: labels.openAiApiKey,
+          obscureText: true,
+          obscureToggle: true,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _saveApiKey(),
+        ),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: PortalButton(
+            label: labels.openAiTest,
+            size: PortalButtonSize.sm,
+            variant: PortalButtonVariant.secondary,
+            isLoading: _testing,
+            onPressed: _test,
+          ),
+        ),
+        if (_testOk != null)
+          PortalPrompt(
+            size: PortalPromptSize.inline,
+            sentiment: _testOk!
+                ? PortalSentiment.positive
+                : PortalSentiment.negative,
+            message: _testOk! ? labels.openAiTestOk : labels.openAiTestFail,
+          ),
       ],
     );
   }

@@ -99,28 +99,31 @@ void main() {
       );
     });
 
-    test('a bare 5xx-shaped number in provider text is not a transport failure', () {
-      // "512 token limit exceeded" is the model answering, not the server
-      // being down -- retrying it against another backend would just re-run
-      // the same over-long prompt.
-      expect(
-        isTransportFailure(
-          const AiCompletionException('512 token limit exceeded'),
-        ),
-        isFalse,
-      );
-      expect(
-        isTransportFailure(const _FakeApiException('500 things in stock', 400)),
-        isFalse,
-      );
-    });
+    test(
+      'a bare 5xx-shaped number in provider text is not a transport failure',
+      () {
+        // "512 token limit exceeded" is the model answering, not the server
+        // being down -- retrying it against another backend would just re-run
+        // the same over-long prompt.
+        expect(
+          isTransportFailure(
+            const AiCompletionException('512 token limit exceeded'),
+          ),
+          isFalse,
+        );
+        expect(
+          isTransportFailure(
+            const _FakeApiException('500 things in stock', 400),
+          ),
+          isFalse,
+        );
+      },
+    );
   });
 
   group('FallbackCompletionClient.complete', () {
     test('a transport failure on primary falls back', () async {
-      final primary = _FakeClient(
-        completeError: const SocketException('down'),
-      );
+      final primary = _FakeClient(completeError: const SocketException('down'));
       final fallback = _FakeClient(answer: 'from fallback');
       Object? seenError;
       final client = FallbackCompletionClient(
@@ -129,7 +132,10 @@ void main() {
         onFallback: (e) => seenError = e,
       );
 
-      final reply = await client.complete(systemPrompt: 'sys', userPrompt: 'hi');
+      final reply = await client.complete(
+        systemPrompt: 'sys',
+        userPrompt: 'hi',
+      );
 
       expect(reply, 'from fallback');
       expect(client.lastAnsweredBy, AiAnsweredBy.fallback);
@@ -142,7 +148,10 @@ void main() {
         completeError: const AiCompletionException('HTTP 401'),
       );
       final fallback = _FakeClient(answer: 'from fallback');
-      final client = FallbackCompletionClient(primary: primary, fallback: fallback);
+      final client = FallbackCompletionClient(
+        primary: primary,
+        fallback: fallback,
+      );
 
       await expectLater(
         client.complete(systemPrompt: 'sys', userPrompt: 'hi'),
@@ -157,7 +166,10 @@ void main() {
         fallback: _FakeClient(answer: 'unused'),
       );
 
-      final reply = await client.complete(systemPrompt: 'sys', userPrompt: 'hi');
+      final reply = await client.complete(
+        systemPrompt: 'sys',
+        userPrompt: 'hi',
+      );
 
       expect(reply, 'from primary');
       expect(client.lastAnsweredBy, AiAnsweredBy.primary);
@@ -168,7 +180,10 @@ void main() {
     test('falls back when nothing has been yielded yet', () async {
       final primary = _FakeClient(streamError: const SocketException('down'));
       final fallback = _FakeClient(streamChunks: ['local ', 'reply']);
-      final client = FallbackCompletionClient(primary: primary, fallback: fallback);
+      final client = FallbackCompletionClient(
+        primary: primary,
+        fallback: fallback,
+      );
 
       final text = await client
           .completeStream(systemPrompt: 'sys', userPrompt: 'hi')
@@ -178,30 +193,36 @@ void main() {
       expect(client.lastAnsweredBy, AiAnsweredBy.fallback);
     });
 
-    test('a mid-stream failure is surfaced, not retried on the fallback', () async {
-      final primary = _FakeClient(
-        streamChunks: ['partial'],
-        streamError: const SocketException('dropped'),
-      );
-      final fallback = _FakeClient(streamChunks: ['should not run']);
-      final client = FallbackCompletionClient(primary: primary, fallback: fallback);
+    test(
+      'a mid-stream failure is surfaced, not retried on the fallback',
+      () async {
+        final primary = _FakeClient(
+          streamChunks: ['partial'],
+          streamError: const SocketException('dropped'),
+        );
+        final fallback = _FakeClient(streamChunks: ['should not run']);
+        final client = FallbackCompletionClient(
+          primary: primary,
+          fallback: fallback,
+        );
 
-      final emitted = <String>[];
-      Object? caught;
-      try {
-        await for (final chunk in client.completeStream(
-          systemPrompt: 'sys',
-          userPrompt: 'hi',
-        )) {
-          emitted.add(chunk);
+        final emitted = <String>[];
+        Object? caught;
+        try {
+          await for (final chunk in client.completeStream(
+            systemPrompt: 'sys',
+            userPrompt: 'hi',
+          )) {
+            emitted.add(chunk);
+          }
+        } catch (e) {
+          caught = e;
         }
-      } catch (e) {
-        caught = e;
-      }
 
-      expect(caught, isA<SocketException>());
-      expect(emitted, ['partial']);
-      expect(fallback.streamCalls, 0);
-    });
+        expect(caught, isA<SocketException>());
+        expect(emitted, ['partial']);
+        expect(fallback.streamCalls, 0);
+      },
+    );
   });
 }

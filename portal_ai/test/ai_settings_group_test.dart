@@ -226,17 +226,20 @@ void main() {
   group('aiInstalledModelsLabel', () {
     const mb = 1024 * 1024;
 
-    test('sums the sizes when the catalog knows every installed model', () async {
-      final engine = _FakeEngine(
-        installedIds: const ['a', 'b'],
-        catalogEntries: const [
-          AiModelDownload(id: 'a', label: 'A', sizeBytes: 300 * mb),
-          AiModelDownload(id: 'b', label: 'B', sizeBytes: 286 * mb),
-        ],
-      );
+    test(
+      'sums the sizes when the catalog knows every installed model',
+      () async {
+        final engine = _FakeEngine(
+          installedIds: const ['a', 'b'],
+          catalogEntries: const [
+            AiModelDownload(id: 'a', label: 'A', sizeBytes: 300 * mb),
+            AiModelDownload(id: 'b', label: 'B', sizeBytes: 286 * mb),
+          ],
+        );
 
-      expect(await aiInstalledModelsLabel(engine, labels), '586 MB');
-    });
+        expect(await aiInstalledModelsLabel(engine, labels), '586 MB');
+      },
+    );
 
     test('switches to GB from a gigabyte up', () async {
       final engine = _FakeEngine(

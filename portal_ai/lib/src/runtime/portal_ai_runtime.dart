@@ -14,6 +14,7 @@ import '../prefs/ai_backend_store.dart';
 import '../tools/ai_agent.dart';
 import '../tools/ai_tool.dart';
 import '../tools/web_search_tool.dart';
+import 'ai_persona.dart';
 
 /// One-call AI wiring for a Portal app: completion client plus the
 /// tool-calling agent.
@@ -39,6 +40,7 @@ class PortalAiRuntime {
     required AiCompletionClient client,
     this.appDescription = '',
     this.tools = const [],
+    this.personas = const [],
     this._store,
     this._clientFactory,
     this._serverClient,
@@ -66,6 +68,7 @@ class PortalAiRuntime {
     String feature = 'assistant',
     String appDescription = '',
     List<AiTool> tools = const [],
+    List<AiPersona> personas = const [],
     AiBackendStore? store,
     AiCompletionClientFactory? clientFactory,
   }) {
@@ -121,6 +124,7 @@ class PortalAiRuntime {
         if (searchKey != null && searchKey.isNotEmpty)
           webSearchTool(apiKey: searchKey),
       ],
+      personas: personas,
       store: store,
       clientFactory: factory,
       serverClient: server,
@@ -167,25 +171,30 @@ class PortalAiRuntime {
       // out of `create()`. That throw is reachable from prefs sync landing
       // an unbuildable choice (e.g. `openai_compatible` with no base URL)
       // made on another device, which the app never gets a chance to guard.
-      AiRoutingMode.localOnly => local == null
-          ? (
-              client: server,
-              hint:
-                  'AI routing is set to local-only but no local backend is '
-                  'configured, so the server is answering instead. Pick a '
-                  'backend in AI settings, or switch routing to include the '
-                  'server.',
-            )
-          : (client: local, hint: null),
+      AiRoutingMode.localOnly =>
+        local == null
+            ? (
+                client: server,
+                hint:
+                    'AI routing is set to local-only but no local backend is '
+                    'configured, so the server is answering instead. Pick a '
+                    'backend in AI settings, or switch routing to include the '
+                    'server.',
+              )
+            : (client: local, hint: null),
       // A local backend not being usable yet is not an error here -- the
       // server is a working assistant on its own, same as before fallback
       // routing existed.
-      AiRoutingMode.serverFirst => local == null
-          ? (client: server, hint: null)
-          : (
-              client: FallbackCompletionClient(primary: server, fallback: local),
-              hint: null,
-            ),
+      AiRoutingMode.serverFirst =>
+        local == null
+            ? (client: server, hint: null)
+            : (
+                client: FallbackCompletionClient(
+                  primary: server,
+                  fallback: local,
+                ),
+                hint: null,
+              ),
     };
   }
 
@@ -300,6 +309,19 @@ class PortalAiRuntime {
   /// Actions the assistant may take in this app.
   final List<AiTool> tools;
 
+  /// The roles this assistant can take. Empty for a single-agent app, which
+  /// is every app but the dedicated assistant -- [route] then returns null and
+  /// [ask] runs on [appDescription]/[tools] exactly as it always has.
+  final List<AiPersona> personas;
+
+  AiPersona? personaById(String? id) {
+    if (id == null) return null;
+    for (final p in personas) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
+
   /// Whether the backing model can be reached right now. The server client
   /// answers optimistically; Ollama is probed.
   Future<bool> get isReady => client.isAvailable();
@@ -384,10 +406,59 @@ class PortalAiRuntime {
     appDescription: appDescription,
   ).systemPrompt;
 
+  /// Picks the persona that should answer [prompt], or null when there is
+  /// nothing to route (no personas) or routing could not decide.
+  ///
+  /// A keyword hit wins first and for free. Otherwise one cheap classify call
+  /// asks the model to choose from the roster and return its confidence; a
+  /// confidence below [minConfidence], an unknown id, or any failure returns
+  /// null so the caller falls back to its default. Never throws -- a broken
+  /// backend must not take the assistant down, same as [suggestPrompts].
+  Future<AiPersona?> route(
+    String prompt, {
+    List<AiChatTurn> history = const [],
+    double minConfidence = 0.5,
+  }) async {
+    if (personas.isEmpty) return null;
+    final lower = prompt.toLowerCase();
+    for (final p in personas) {
+      if (p.keywords.any((k) => lower.contains(k.toLowerCase()))) return p;
+    }
+    try {
+      final reply = await client.complete(
+        systemPrompt:
+            'You route a user request to the one assistant best suited to '
+            'it. Choose from this roster:\n'
+            '${personas.map((p) => p.rosterLine).join('\n')}\n'
+            'Reply with JSON only: '
+            '{"agent": "<id>", "confidence": 0.0-1.0}. '
+            'Use an id exactly as written above. If none clearly fits, pick '
+            'the most general one with a low confidence.',
+        userPrompt: prompt,
+        jsonMode: true,
+      );
+      final decoded = extractJsonObject(splitThinking(reply).rest);
+      final id = decoded?['agent'];
+      final confidence = switch (decoded?['confidence']) {
+        final num n => n.toDouble(),
+        _ => 1.0, // A model that named an agent but no number still chose.
+      };
+      if (id is! String || confidence < minConfidence) return null;
+      return personaById(id.trim());
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Runs [prompt] through the tool loop. See [AiAgent.run] for [confirm].
+  ///
+  /// [appDescription] overrides the runtime's own for this one run -- a
+  /// persona passes its [AiPersona.description] here so the system prompt
+  /// speaks in that role. Null keeps the runtime's.
   Future<AiAgentResult> ask(
     String prompt, {
     List<AiTool>? tools,
+    String? appDescription,
     Future<AiToolDecision> Function(AiTool tool, AiToolCall call)? confirm,
     void Function(AiAgentStep step)? onStep,
     void Function(String delta)? onReply,
@@ -397,7 +468,7 @@ class PortalAiRuntime {
     final agent = AiAgent(
       client: client,
       tools: tools ?? this.tools,
-      appDescription: appDescription,
+      appDescription: appDescription ?? this.appDescription,
       maxSteps: maxSteps,
     );
     return agent.run(

@@ -135,7 +135,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.history_rounded));
     await tester.pumpAndSettle();
     expect(find.text('4 messages'), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.close));
+    await tester.tap(find.byTooltip('Close'));
     await tester.pumpAndSettle();
 
     final saved = store.listSummaries().single;
@@ -149,10 +149,10 @@ void main() {
     await tester.pumpAndSettle();
     // Scoped to the sheet: the chat header now carries an overflow menu of
     // its own, so a bare byIcon matches two.
-    await tester.tap(
+    await tester.longPress(
       find.descendant(
         of: find.byType(AiChatHistoryList),
-        matching: find.byIcon(Icons.more_vert),
+        matching: find.text('what is on my list'),
       ),
     );
     await tester.pumpAndSettle();

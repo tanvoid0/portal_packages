@@ -102,17 +102,20 @@ void main() {
       },
     );
 
-    test('local-only with nothing configured at all is a wiring error', () async {
-      // No server and nothing local: genuinely nothing to build.
-      final store = await storeWith({
-        'test_routing_mode': AiRoutingMode.localOnly.id,
-      });
+    test(
+      'local-only with nothing configured at all is a wiring error',
+      () async {
+        // No server and nothing local: genuinely nothing to build.
+        final store = await storeWith({
+          'test_routing_mode': AiRoutingMode.localOnly.id,
+        });
 
-      expect(
-        () => PortalAiRuntime.create(store: store),
-        throwsA(isA<ArgumentError>()),
-      );
-    });
+        expect(
+          () => PortalAiRuntime.create(store: store),
+          throwsA(isA<ArgumentError>()),
+        );
+      },
+    );
   });
 
   test('a half-configured provider falls back rather than throwing', () async {

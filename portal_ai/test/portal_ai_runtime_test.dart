@@ -125,6 +125,52 @@ void main() {
     // Nothing said yet, nothing to name -- and no call made.
     expect(await runtime.suggestTitle(const []), '');
   });
+
+  group('route', () {
+    const personas = [
+      AiPersona(id: 'general', label: 'General', description: 'general'),
+      AiPersona(
+        id: 'gym',
+        label: 'Gym',
+        description: 'fitness',
+        keywords: ['workout'],
+      ),
+    ];
+    PortalAiRuntime runtimeWith(List<String> replies) =>
+        PortalAiRuntime(client: _ScriptedClient(replies), personas: personas);
+
+    test('a keyword hit wins without an LLM call', () async {
+      // Empty reply list: _ScriptedClient.complete would throw on .last, so a
+      // persona coming back at all proves the classifier was never called.
+      final runtime = runtimeWith(const []);
+      expect((await runtime.route('log my workout'))?.id, 'gym');
+    });
+
+    test('classifies when no keyword matches', () async {
+      final runtime = runtimeWith(['{"agent":"gym","confidence":0.9}']);
+      expect((await runtime.route('I went running'))?.id, 'gym');
+    });
+
+    test('low confidence falls back to null', () async {
+      final runtime = runtimeWith(['{"agent":"gym","confidence":0.3}']);
+      expect(await runtime.route('something vague'), isNull);
+    });
+
+    test('an unknown id is null, not a guess', () async {
+      final runtime = runtimeWith(['{"agent":"nope","confidence":0.9}']);
+      expect(await runtime.route('something'), isNull);
+    });
+
+    test('a broken reply is null, never a throw', () async {
+      final runtime = runtimeWith(['not json at all']);
+      expect(await runtime.route('something'), isNull);
+    });
+
+    test('no personas means nothing to route', () async {
+      final runtime = PortalAiRuntime(client: _ScriptedClient(const []));
+      expect(await runtime.route('log my workout'), isNull);
+    });
+  });
 }
 
 class _ScriptedClient implements AiCompletionClient {

@@ -13,6 +13,7 @@ import '../tools/ai_tool.dart';
 import '../widgets/ai_assistant_page.dart';
 import '../widgets/ai_settings_group.dart';
 import '../widgets/ai_settings_section.dart';
+import 'ai_persona.dart';
 import 'portal_ai_runtime.dart';
 
 /// The route segment every app's own assistant route is named, so an app
@@ -89,6 +90,7 @@ class PortalAiAppKit {
     Map<String, String> env = const {},
     String appDescription = '',
     List<AiTool> tools = const [],
+    List<AiPersona> personas = const [],
     AiCompletionClientFactory? clientFactory,
   }) async {
     final store = await AiSettingsSection.openStore(storeKey);
@@ -105,6 +107,7 @@ class PortalAiAppKit {
       feature: feature,
       appDescription: appDescription,
       tools: tools,
+      personas: personas,
       clientFactory: clientFactory,
     );
   }

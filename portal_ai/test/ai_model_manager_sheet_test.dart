@@ -3,14 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 /// Stands in for Ollama or an on-device engine: the sheet only ever sees
 /// [AiModelManager], which is the point of the seam.
 class _FakeManager implements AiModelManager {
-  _FakeManager({
-    List<String> installed = const [],
-    this.failInstall = false,
-  }) : _installed = [...installed];
+  _FakeManager({List<String> installed = const [], this.failInstall = false})
+    : _installed = [...installed];
 
   final List<String> _installed;
   final bool failInstall;
@@ -53,9 +52,8 @@ class _FakeManager implements AiModelManager {
 Future<void> _open(WidgetTester tester, AiModelManager manager) async {
   await tester.pumpWidget(
     MaterialApp(
-      home: Scaffold(
-        body: AiModelManagerSheet(manager: manager),
-      ),
+      theme: buildPortalTheme(brightness: Brightness.light),
+      home: Scaffold(body: AiModelManagerSheet(manager: manager)),
     ),
   );
   await tester.pumpAndSettle();
@@ -87,7 +85,7 @@ void main() {
       final manager = _FakeManager();
       await _open(tester, manager);
 
-      await tester.tap(find.widgetWithText(TextButton, 'Download').first);
+      await tester.tap(find.text('Download').first);
       await tester.pump();
       await tester.pumpAndSettle();
 
@@ -98,7 +96,7 @@ void main() {
     testWidgets('a failed download is reported, not swallowed', (tester) async {
       await _open(tester, _FakeManager(failInstall: true));
 
-      await tester.tap(find.widgetWithText(TextButton, 'Download').first);
+      await tester.tap(find.text('Download').first);
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Download failed'), findsOneWidget);
@@ -113,7 +111,7 @@ void main() {
 
       await tester.tap(find.byTooltip('Delete'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
 
       expect(manager.removed, isEmpty);
@@ -126,7 +124,7 @@ void main() {
 
       await tester.tap(find.byTooltip('Delete'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(TextButton, 'Delete').last);
+      await tester.tap(find.text('Delete').last);
       await tester.pumpAndSettle();
 
       expect(manager.removed, ['qwen3:1.7b']);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 AiChatSessionSummary _summary(
   String id, {
@@ -27,6 +28,7 @@ Future<void> _pump(
   Future<void> Function(String id, bool pinned)? onSetPinned,
 }) => tester.pumpWidget(
   MaterialApp(
+    theme: buildPortalTheme(brightness: Brightness.light),
     home: Scaffold(
       body: AiChatHistoryList(
         sessions: sessions,
@@ -41,13 +43,7 @@ Future<void> _pump(
 );
 
 Future<void> _openMenu(WidgetTester tester, String rowTitle) async {
-  final row = find.ancestor(
-    of: find.text(rowTitle),
-    matching: find.byType(ListTile),
-  );
-  await tester.tap(
-    find.descendant(of: row, matching: find.byIcon(Icons.more_vert)),
-  );
+  await tester.longPress(find.text(rowTitle));
   await tester.pumpAndSettle();
 }
 
@@ -109,12 +105,10 @@ void main() {
     expect(find.text('b'), findsNothing);
   });
 
-  testWidgets('search is offered as soon as there is a thread', (tester) async {
-    await _pump(tester, sessions: [_summary('a')]);
-    expect(find.byType(TextField), findsOneWidget);
-
+  testWidgets('search and New chat are always offered', (tester) async {
     await _pump(tester, sessions: const []);
-    expect(find.byType(TextField), findsNothing);
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.byTooltip('New chat'), findsOneWidget);
   });
 
   testWidgets('pinned threads sit in their own group above the days', (
@@ -175,6 +169,7 @@ void main() {
 
   testWidgets('no menu at all when the host wires nothing', (tester) async {
     await _pump(tester, sessions: [_summary('a')]);
-    expect(find.byIcon(Icons.more_vert), findsNothing);
+    await _openMenu(tester, 'a');
+    expect(find.text('Delete'), findsNothing);
   });
 }

@@ -711,7 +711,7 @@ class _AppearancePage extends StatelessWidget {
               onTap: () => PortalSheet.show<void>(
                 context,
                 title: labels.theme,
-                builder: (_) => _ThemeSheet(controller: theme),
+                builder: (_) => _ThemeSheet(controller: theme, labels: labels),
               ),
             ),
             if (palette != null)
@@ -1142,6 +1142,7 @@ class _NameSheetState extends State<_NameSheet> {
               size: PortalButtonSize.lg,
               expand: true,
               isLoading: _busy,
+              busyLabel: labels.savingName,
               onPressed: _name.text.trim().isEmpty ? null : _save,
             ),
           ),
@@ -1153,9 +1154,10 @@ class _NameSheetState extends State<_NameSheet> {
 
 /// The Theme row's picker: applies on tap, so no dock.
 class _ThemeSheet extends StatelessWidget {
-  const _ThemeSheet({required this.controller});
+  const _ThemeSheet({required this.controller, required this.labels});
 
   final PortalThemeController controller;
+  final PortalSettingsLabels labels;
 
   static IconData _icon(ThemeMode mode) => switch (mode) {
     ThemeMode.system => PortalIcons.brightness_auto_rounded,
@@ -1172,6 +1174,7 @@ class _ThemeSheet extends StatelessWidget {
         for (final mode in ThemeMode.values)
           PortalListItem(
             title: PortalThemeController.labelFor(mode),
+            subtitle: mode == ThemeMode.system ? labels.themeSystemHint : null,
             leading: PortalListLeading.icon(_icon(mode)),
             trailing: PortalListAccessory.radio(
               checked: mode == current,
@@ -1248,8 +1251,8 @@ class _HapticsSheet extends StatelessWidget {
   }
 }
 
-/// The Accent colour row's picker: a disc and its name per palette, applied on
-/// tap. The pick carries a check glyph, so it never rests on fill alone.
+/// The Accent colour row's picker: swatches in a [PortalChoiceGrid], applied
+/// on tap; the grid announces the selected one and checks it.
 class _AccentSheet extends StatelessWidget {
   const _AccentSheet({required this.controller, required this.palettes});
 
@@ -1258,88 +1261,24 @@ class _AccentSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = PortalUiTheme.of(context).tokens;
-    final cs = Theme.of(context).colorScheme;
+    final sheet = Theme.of(context).bottomSheetTheme;
+    final ground =
+        sheet.modalBackgroundColor ??
+        sheet.backgroundColor ??
+        Theme.of(context).colorScheme.surfaceContainerLow;
     return Obx(() {
       final picked = _currentPalette(controller, palettes);
-      return Wrap(
-        spacing: t.spacing.sm,
-        runSpacing: t.spacing.sm,
-        children: [
-          for (final p in palettes)
-            Semantics(
-              selected: p == picked,
-              inMutuallyExclusiveGroup: true,
-              button: true,
-              label: p.label,
-              excludeSemantics: true,
-              onTap: () => _pick(context, p),
-              child: InkWell(
-                onTap: () => _pick(context, p),
-                borderRadius: BorderRadius.circular(t.radii.md),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minWidth: t.minTapTarget,
-                    maxWidth: t.minTapTarget * 1.5,
-                    minHeight: t.minTapTarget,
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(t.spacing.xs),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 28,
-                          height: 28,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: p.swatch,
-                            shape: BoxShape.circle,
-                            border: p == picked
-                                ? Border.all(color: cs.onSurface, width: 2)
-                                : null,
-                          ),
-                          child: p == picked
-                              ? Container(
-                                  width: 18,
-                                  height: 18,
-                                  decoration: BoxDecoration(
-                                    color: cs.primary,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    PortalIcons.check_rounded,
-                                    size: 14,
-                                    color: cs.onPrimary,
-                                  ),
-                                )
-                              : null,
-                        ),
-                        SizedBox(height: t.spacing.xs),
-                        Text(
-                          p.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: t.textStyles.caption.copyWith(
-                            color: p == picked
-                                ? cs.onSurface
-                                : cs.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
+      return PortalChoiceGrid(
+        groundColor: ground,
+        choices: [
+          for (final p in palettes) PortalChoiceOption.color(p.label, p.swatch),
         ],
+        selected: picked == null ? null : palettes.indexOf(picked),
+        onSelected: (i) {
+          controller.setPaletteId(palettes[i].id);
+          Navigator.pop(context);
+        },
       );
     });
-  }
-
-  void _pick(BuildContext context, PortalPaletteOption p) {
-    controller.setPaletteId(p.id);
-    Navigator.pop(context);
   }
 }

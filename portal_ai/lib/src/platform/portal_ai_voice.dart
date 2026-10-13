@@ -76,10 +76,8 @@ abstract final class PortalAiVoice {
         return true;
       })
       .map(
-        (map) => (
-          text: map['text'] as String? ?? '',
-          isFinal: map['final'] == true,
-        ),
+        (map) =>
+            (text: map['text'] as String? ?? '', isFinal: map['final'] == true),
       );
 
   /// Reads [text] aloud after whatever is already queued, or in place of

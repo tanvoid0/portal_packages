@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 import '../models/ai_backend_labels.dart';
 import '../models/ai_model_manager.dart';
@@ -27,16 +28,9 @@ class AiModelManagerSheet extends StatefulWidget {
     required AiModelManager manager,
     AiBackendLabels labels = const AiBackendLabels(),
   }) async {
-    final changed = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: AiModelManagerSheet(manager: manager, labels: labels),
-      ),
+    final changed = await PortalSheet.show<bool>(
+      context,
+      builder: (_) => AiModelManagerSheet(manager: manager, labels: labels),
     );
     return changed ?? false;
   }
@@ -123,23 +117,15 @@ class _AiModelManagerSheetState extends State<AiModelManagerSheet> {
   }
 
   Future<void> _remove(String id) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        content: Text(widget.labels.removeModelConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(widget.labels.cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(widget.labels.removeModel),
-          ),
-        ],
-      ),
+    final confirmed = await portalConfirm(
+      context,
+      title: widget.labels.removeModel,
+      message: widget.labels.removeModelConfirm,
+      confirmLabel: widget.labels.removeModel,
+      cancelLabel: widget.labels.cancel,
+      isDestructive: true,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     try {
       await widget.manager.remove(id);
       _changed = true;
@@ -153,158 +139,158 @@ class _AiModelManagerSheetState extends State<AiModelManagerSheet> {
   @override
   Widget build(BuildContext context) {
     final labels = widget.labels;
-    final theme = Theme.of(context);
 
     return PopScope(
       canPop: _installingId == null,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
       },
-      child: SafeArea(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.8,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        labels.manageModelsTitle,
-                        style: theme.textTheme.titleMedium,
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: labels.cancel,
-                      icon: const Icon(Icons.close_rounded),
-                      onPressed: _installingId != null
-                          ? null
-                          : () => Navigator.of(context).pop(_changed),
-                    ),
-                  ],
-                ),
-              ),
-              Flexible(child: _body(theme, labels)),
-            ],
-          ),
-        ),
+      child: PortalSheetScaffold(
+        title: labels.manageModelsTitle,
+        gutter: false,
+        onClose: _installingId != null
+            ? null
+            : () => Navigator.of(context).pop(_changed),
+        body: _body(labels),
       ),
     );
   }
 
-  Widget _body(ThemeData theme, AiBackendLabels labels) {
+  /// A fraction once the backend reports one, else the indeterminate word.
+  String _progressLabel(AiBackendLabels labels) =>
+      _progress == null ? labels.installing : '${(_progress! * 100).round()}%';
+
+  Widget _body(AiBackendLabels labels) {
+    final spacing = PortalUiTheme.of(context).tokens.spacing;
     if (_loading) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 48),
-        child: Center(child: CircularProgressIndicator()),
+      return PortalListSection.skeleton(
+        hasHeader: true,
+        rows: 3,
+        leading: PortalSkeletonLeading.none,
       );
     }
 
     if (_loadError != null) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        padding: EdgeInsets.all(spacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: spacing.md,
           children: [
-            Text(_loadError!, style: theme.textTheme.bodyMedium),
-            const SizedBox(height: 12),
-            FilledButton.tonal(
+            PortalPrompt(
+              size: PortalPromptSize.inline,
+              sentiment: PortalSentiment.negative,
+              message: _loadError!,
+            ),
+            PortalButton(
+              label: labels.rescan,
+              variant: PortalButtonVariant.secondary,
               onPressed: _load,
-              child: Text(labels.rescan),
             ),
           ],
         ),
       );
     }
 
-    return ListView(
-      shrinkWrap: true,
-      padding: const EdgeInsets.fromLTRB(8, 0, 8, 24),
+    final busy = _installingId != null;
+    final gutter = EdgeInsets.fromLTRB(spacing.lg, 0, spacing.lg, spacing.md);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (_installError != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            child: Text(
-              '${labels.installFailed}: $_installError',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.error,
-              ),
+            padding: gutter,
+            child: PortalPrompt(
+              size: PortalPromptSize.inline,
+              sentiment: PortalSentiment.negative,
+              message: '${labels.installFailed}: $_installError',
             ),
           ),
-        _SectionHeader(labels.installedModels),
-        if (_installed.isEmpty)
+        if (_installed.isEmpty) ...[
+          PortalSectionHeader(title: labels.installedModels),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-            child: Text(
-              labels.noInstalledModels,
-              style: theme.textTheme.bodySmall,
+            padding: gutter,
+            child: PortalPrompt(
+              size: PortalPromptSize.inline,
+              message: labels.noInstalledModels,
             ),
-          )
-        else
-          for (final id in _installed)
-            ListTile(
-              leading: const Icon(Icons.check_circle_outline_rounded),
-              title: Text(id),
-              trailing: IconButton(
-                tooltip: labels.removeModel,
-                icon: const Icon(Icons.delete_outline_rounded),
-                onPressed: _installingId != null ? null : () => _remove(id),
-              ),
-            ),
-        if (_catalog.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          _SectionHeader(labels.availableModels),
-          for (final model in _catalog)
-            ListTile(
-              title: Text(model.label),
-              subtitle: Text(
-                [
-                  if (model.sizeBytes != null) _formatSize(model.sizeBytes!),
-                  if (model.note != null) model.note!,
-                ].join(' · '),
-              ),
-              trailing: _installingId == model.id
-                  ? _ProgressBadge(progress: _progress, labels: labels)
-                  : TextButton(
-                      onPressed: _installingId != null
-                          ? null
-                          : () => _install(model.id),
-                      child: Text(labels.install),
-                    ),
-            ),
-        ],
-        const SizedBox(height: 8),
+          ),
+        ] else
+          PortalListSection(
+            header: labels.installedModels,
+            style: PortalListStyle.fullBleed,
+            children: [
+              for (final id in _installed)
+                PortalListItem(
+                  title: id,
+                  leading: PortalListLeading.icon(
+                    Icons.check_circle_outline_rounded,
+                  ),
+                  trailing: PortalListAccessory.iconButton(
+                    icon: Icons.delete_outline_rounded,
+                    tooltip: labels.removeModel,
+                    onPressed: busy ? null : () => _remove(id),
+                  ),
+                ),
+            ],
+          ),
+        if (_catalog.isNotEmpty)
+          PortalListSection(
+            header: labels.availableModels,
+            style: PortalListStyle.fullBleed,
+            children: [
+              for (final model in _catalog)
+                PortalListItem(
+                  title: model.label,
+                  subtitle: [
+                    if (model.sizeBytes != null) _formatSize(model.sizeBytes!),
+                    if (model.note != null) model.note!,
+                  ].join(' · '),
+                  trailing: _installingId == model.id
+                      ? PortalListAccessory.button(
+                          label: labels.install,
+                          busy: true,
+                          busyLabel: _progressLabel(labels),
+                          onPressed: null,
+                        )
+                      : PortalListAccessory.button(
+                          label: labels.install,
+                          onPressed: busy ? null : () => _install(model.id),
+                        ),
+                ),
+            ],
+          ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          padding: EdgeInsets.fromLTRB(
+            spacing.lg,
+            spacing.md,
+            spacing.lg,
+            spacing.lg,
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
+            spacing: spacing.sm,
             children: [
               Expanded(
-                child: TextField(
+                child: PortalTextField(
                   controller: _customController,
-                  enabled: _installingId == null,
-                  decoration: InputDecoration(
-                    labelText: labels.customModelHint,
-                    isDense: true,
-                  ),
+                  enabled: !busy,
+                  label: labels.customModelHint,
+                  textInputAction: TextInputAction.done,
                   onSubmitted: _install,
                 ),
               ),
-              const SizedBox(width: 8),
-              _installingId != null &&
-                      _installingId == _customController.text.trim()
-                  ? _ProgressBadge(progress: _progress, labels: labels)
-                  : TextButton(
-                      onPressed: _installingId != null
-                          ? null
-                          : () => _install(_customController.text),
-                      child: Text(labels.install),
-                    ),
+              PortalButton(
+                label: labels.install,
+                busyLabel: _progressLabel(labels),
+                isLoading:
+                    busy && _installingId == _customController.text.trim(),
+                size: PortalButtonSize.sm,
+                variant: PortalButtonVariant.secondary,
+                onPressed: busy ? null : () => _install(_customController.text),
+              ),
             ],
           ),
         ),
@@ -316,58 +302,5 @@ class _AiModelManagerSheetState extends State<AiModelManagerSheet> {
     const gb = 1024 * 1024 * 1024;
     if (bytes >= gb) return '${(bytes / gb).toStringAsFixed(1)} GB';
     return '${(bytes / (1024 * 1024)).round()} MB';
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      child: Text(
-        text.toUpperCase(),
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          letterSpacing: 0.8,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-}
-
-class _ProgressBadge extends StatelessWidget {
-  const _ProgressBadge({required this.progress, required this.labels});
-
-  /// Null while the backend has not reported a fraction yet, which is an
-  /// indeterminate spinner rather than a bar stuck at zero.
-  final double? progress;
-  final AiBackendLabels labels;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2, value: progress),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            progress == null
-                ? labels.installing
-                : '${(progress! * 100).round()}%',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
-      ),
-    );
   }
 }

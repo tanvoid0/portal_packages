@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _FixedDiscovery extends AiBackendDiscovery {
@@ -33,6 +34,7 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
         home: Scaffold(
           body: SingleChildScrollView(
             child: AiSettingsSection(
@@ -81,10 +83,7 @@ void main() {
     // Cloud is first and available, so it is what resolveSelectedKind picks.
     expect(find.text(labels.model), findsOneWidget);
     expect(find.text('gemini-2.0-flash'), findsWidgets);
-    expect(
-      find.widgetWithText(DropdownButtonFormField<String>, 'gemma4'),
-      findsNothing,
-    );
+    expect(find.widgetWithText(PortalSelect<String>, 'gemma4'), findsNothing);
   });
 
   testWidgets('badges mark the selected provider and the unavailable one', (

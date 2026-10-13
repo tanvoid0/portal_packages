@@ -549,7 +549,9 @@ void main() {
     expect(find.byTooltip('Copy reply'), findsNothing);
   });
 
-  testWidgets('the foot says Writing while the reply is coming', (tester) async {
+  testWidgets('the foot says Writing while the reply is coming', (
+    tester,
+  ) async {
     final client = _GatedClient()..gate = Completer<void>();
     await pumpKept(tester, client);
 
@@ -689,68 +691,74 @@ void main() {
     ]);
   });
 
-  testWidgets('a reload draws receipts from the saved tools, and survives none', (
-    tester,
-  ) async {
-    final store = _MemoryStore();
-    Future<void> save(String id, Object? tools) => store.save(
-      AiChatSession(
-        id: id,
-        title: id,
-        createdAt: DateTime(2026, 10, 1),
-        updatedAt: DateTime(2026, 10, 1),
-        turns: [
-          const AiChatTurn(role: 'user', content: 'add milk'),
-          AiChatTurn(
-            role: 'assistant',
-            content: 'Done.',
-            payload: {'tools': ?tools},
-          ),
-        ],
-      ),
-    );
-    Future<void> open(String id) => tester.pumpWidget(
-      MaterialApp(
-        theme: buildPortalTheme(brightness: Brightness.light),
-        home: Scaffold(
-          body: AiAssistantPage(
-            key: UniqueKey(),
-            runtime: PortalAiRuntime(client: _ScriptedClient(const [])),
-            store: store,
-            initialSessionId: id,
+  testWidgets(
+    'a reload draws receipts from the saved tools, and survives none',
+    (tester) async {
+      final store = _MemoryStore();
+      Future<void> save(String id, Object? tools) => store.save(
+        AiChatSession(
+          id: id,
+          title: id,
+          createdAt: DateTime(2026, 10, 1),
+          updatedAt: DateTime(2026, 10, 1),
+          turns: [
+            const AiChatTurn(role: 'user', content: 'add milk'),
+            AiChatTurn(
+              role: 'assistant',
+              content: 'Done.',
+              payload: {'tools': ?tools},
+            ),
+          ],
+        ),
+      );
+      Future<void> open(String id) => tester.pumpWidget(
+        MaterialApp(
+          theme: buildPortalTheme(brightness: Brightness.light),
+          home: Scaffold(
+            body: AiAssistantPage(
+              key: UniqueKey(),
+              runtime: PortalAiRuntime(client: _ScriptedClient(const [])),
+              store: store,
+              initialSessionId: id,
+            ),
           ),
         ),
-      ),
-    );
+      );
 
-    await save('ran', [
-      {'name': 'add_item', 'failed': false, 'mutates': true},
-      // Neither of these changed anything, so neither earns a receipt.
-      {'name': 'list_items', 'failed': false, 'mutates': false},
-      {'name': 'delete_item', 'failed': true, 'mutates': true},
-    ]);
-    await open('ran');
-    expect(find.text('Add item'), findsOneWidget);
-    expect(find.text('List items'), findsNothing);
-    expect(find.text('Delete item'), findsNothing);
+      await save('ran', [
+        {'name': 'add_item', 'failed': false, 'mutates': true},
+        // Neither of these changed anything, so neither earns a receipt.
+        {'name': 'list_items', 'failed': false, 'mutates': false},
+        {'name': 'delete_item', 'failed': true, 'mutates': true},
+      ]);
+      await open('ran');
+      expect(find.text('Add item'), findsOneWidget);
+      expect(find.text('List items'), findsNothing);
+      expect(find.text('Delete item'), findsNothing);
 
-    // A thread from before turns recorded tools, and one with junk in the key.
-    await save('old', null);
-    await open('old');
-    expect(find.text('Done.'), findsOneWidget);
-    expect(find.text('Add item'), findsNothing);
+      // A thread from before turns recorded tools, and one with junk in the key.
+      await save('old', null);
+      await open('old');
+      expect(find.text('Done.'), findsOneWidget);
+      expect(find.text('Add item'), findsNothing);
 
-    await save('odd', ['oops', 3, {'name': 5, 'mutates': true}, <String, Object?>{}]);
-    await open('odd');
-    expect(tester.takeException(), isNull);
-    expect(find.text('Done.'), findsOneWidget);
-    expect(find.text('Add item'), findsNothing);
+      await save('odd', [
+        'oops',
+        3,
+        {'name': 5, 'mutates': true},
+        <String, Object?>{},
+      ]);
+      await open('odd');
+      expect(tester.takeException(), isNull);
+      expect(find.text('Done.'), findsOneWidget);
+      expect(find.text('Add item'), findsNothing);
 
-    await save('worse', 'not a list');
-    await open('worse');
-    expect(tester.takeException(), isNull);
-    expect(find.text('Done.'), findsOneWidget);
-  });
+      await save('worse', 'not a list');
+      await open('worse');
+      expect(tester.takeException(), isNull);
+      expect(find.text('Done.'), findsOneWidget);
+    },
+  );
 
   testWidgets('a new calendar day gets a stamp between turns', (tester) async {
     final now = DateTime.now();
@@ -957,6 +965,46 @@ void main() {
     await open(id: 'gone', resume: true);
     expect(find.textContaining('question'), findsNothing);
   });
+
+  testWidgets('picking a persona swaps the opening deck to its prompts', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
+        home: Scaffold(
+          body: AiAssistantPage(
+            runtime: PortalAiRuntime(client: _ScriptedClient(const [])),
+            suggestions: AiSuggestion.prompts(const ['Add milk']),
+            personas: const [
+              AiPersona(
+                id: 'writer',
+                label: 'Writer',
+                description: 'writing',
+                suggestions: [AiSuggestion(prompt: 'Draft an email')],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    // Auto shows the app's own deck.
+    expect(find.widgetWithText(AiSuggestionCards, 'Add milk'), findsOneWidget);
+    expect(
+      find.widgetWithText(AiSuggestionCards, 'Draft an email'),
+      findsNothing,
+    );
+
+    // Pinning Writer swaps the deck to the persona's starter prompts.
+    await tester.tap(find.text('Writer'));
+    await tester.pumpAndSettle();
+    expect(
+      find.widgetWithText(AiSuggestionCards, 'Draft an email'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(AiSuggestionCards, 'Add milk'), findsNothing);
+  });
 }
 
 /// A store that keeps threads in memory, so the page records turns without
@@ -984,5 +1032,4 @@ class _MemoryStore implements AiChatStore {
 
   @override
   Future<void> delete(String id) async => _sessions.remove(id);
-
 }

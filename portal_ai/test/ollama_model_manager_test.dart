@@ -47,29 +47,28 @@ void main() {
       expect(ids, contains('llama3.2:3b'));
     });
 
-    test('pull reports a fraction per layer and ignores status-only lines',
-        () async {
-      final manager = OllamaModelManager(
-        baseUrl: 'http://host:11434',
-        client: MockClient.streaming((request, _) async {
-          expect(request.url.path, '/api/pull');
-          final lines = [
-            '{"status":"pulling manifest"}',
-            '{"status":"downloading","completed":50,"total":200}',
-            '',
-            'not json at all',
-            '{"status":"downloading","completed":200,"total":200}',
-            '{"status":"success"}',
-          ].join('\n');
-          return http.StreamedResponse(
-            Stream.value(utf8.encode(lines)),
-            200,
-          );
-        }),
-      );
+    test(
+      'pull reports a fraction per layer and ignores status-only lines',
+      () async {
+        final manager = OllamaModelManager(
+          baseUrl: 'http://host:11434',
+          client: MockClient.streaming((request, _) async {
+            expect(request.url.path, '/api/pull');
+            final lines = [
+              '{"status":"pulling manifest"}',
+              '{"status":"downloading","completed":50,"total":200}',
+              '',
+              'not json at all',
+              '{"status":"downloading","completed":200,"total":200}',
+              '{"status":"success"}',
+            ].join('\n');
+            return http.StreamedResponse(Stream.value(utf8.encode(lines)), 200);
+          }),
+        );
 
-      expect(await manager.install('qwen3:1.7b').toList(), [0.25, 1.0]);
-    });
+        expect(await manager.install('qwen3:1.7b').toList(), [0.25, 1.0]);
+      },
+    );
 
     test('an error line in the stream fails the pull', () async {
       final manager = OllamaModelManager(
@@ -92,8 +91,7 @@ void main() {
       final manager = OllamaModelManager(
         baseUrl: 'http://host:11434',
         client: MockClient.streaming(
-          (_, _) async =>
-              http.StreamedResponse(const Stream.empty(), 500),
+          (_, _) async => http.StreamedResponse(const Stream.empty(), 500),
         ),
       );
 

@@ -33,8 +33,9 @@ class _Scripted implements AiCompletionClient {
 /// The refusal string is written for the model; the step log is read by the
 /// user, and used to print it word for word.
 void main() {
-  testWidgets('a correction is not read back as third-person tool output',
-      (tester) async {
+  testWidgets('a correction is not read back as third-person tool output', (
+    tester,
+  ) async {
     final runtime = PortalAiRuntime(
       client: _Scripted([
         '{"tool":"add_item","args":{"name":"Milk"}}',

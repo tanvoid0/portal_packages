@@ -136,4 +136,6 @@ bool isTransportFailure(Object error) {
 /// provider text like "512 token limit exceeded", which is a real reply (the
 /// prompt is too long) and must be surfaced, not retried against the same
 /// over-long prompt on another backend.
-final _serverErrorStatus = RegExp(r'(status: 5\d{2})|(http 5\d{2})|(\[5\d{2} )');
+final _serverErrorStatus = RegExp(
+  r'(status: 5\d{2})|(http 5\d{2})|(\[5\d{2} )',
+);

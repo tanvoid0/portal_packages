@@ -51,6 +51,10 @@ class AiChatLabels {
     this.assistantSaid = 'Assistant said',
     this.searchInChat = 'Find in conversation',
     this.searchInChatHint = 'Find a message',
+    this.searchMatches = '@current of @total',
+    this.searchNoMatches = 'No matches',
+    this.searchPrevious = 'Previous match',
+    this.searchNext = 'Next match',
     this.share = 'Share',
     this.copyAsMarkdown = 'Copy as markdown',
     this.copyAsJson = 'Copy as JSON',
@@ -77,7 +81,24 @@ class AiChatLabels {
     this.changeModel = 'Change model',
     this.aiSettings = 'AI settings',
     this.aiProvider = 'AI provider',
+    this.assistantRole = 'Assistant role',
+    this.autoRole = 'Auto',
+    this.micDeniedTitle = 'Portal Assistant needs the microphone to listen',
+    this.micDeniedMessage = 'Allow it in Settings, then come back to talk.',
+    this.micDeniedNoSettings = 'Allow it in Settings, or close this and type.',
+    this.openSettings = 'Open settings',
+    this.voiceErrorTitle = "Voice isn't available right now",
   });
+
+  /// Voice page, microphone refused: [micDeniedMessage] when the host can open
+  /// settings, [micDeniedNoSettings] when it can only point the way back.
+  final String micDeniedTitle;
+  final String micDeniedMessage;
+  final String micDeniedNoSettings;
+  final String openSettings;
+
+  /// Voice page, session failed; the session's own error is the message.
+  final String voiceErrorTitle;
 
   final String inputHint;
 
@@ -161,6 +182,12 @@ class AiChatLabels {
   /// attachment chip.
   final String searchInChat;
   final String searchInChatHint;
+
+  /// Match counter: `@current` and `@total` are replaced.
+  final String searchMatches;
+  final String searchNoMatches;
+  final String searchPrevious;
+  final String searchNext;
   final String share;
   final String copyAsMarkdown;
   final String copyAsJson;
@@ -205,4 +232,10 @@ class AiChatLabels {
   final String changeModel;
   final String aiSettings;
   final String aiProvider;
+
+  /// The role-picker chip row: [assistantRole] names the mutually-exclusive
+  /// group for a screen reader; [autoRole] is the default chip that lets the
+  /// router choose per message.
+  final String assistantRole;
+  final String autoRole;
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 void main() {
   testWidgets('orb paints through every phase and types its label', (
@@ -10,6 +11,7 @@ void main() {
     for (final phase in AiVoicePhase.values) {
       await tester.pumpWidget(
         MaterialApp(
+          theme: buildPortalTheme(brightness: Brightness.light),
           home: Scaffold(
             body: AiVoiceOrb(phase: phase, level: level, label: 'Listening'),
           ),

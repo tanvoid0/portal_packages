@@ -40,6 +40,8 @@ class PortalSettingsLabels {
     this.appVersion = 'App version',
     this.theme = 'Theme',
     this.accentColour = 'Accent colour',
+    this.themeSystemHint = "Follows your phone's setting",
+    this.savingName = 'Saving name',
     this.haptics = 'Haptics',
     this.hapticsOff = 'Off',
     this.hapticsLight = 'Light',
@@ -65,6 +67,9 @@ class PortalSettingsLabels {
     this.showPassword = 'Show password',
     this.hidePassword = 'Hide password',
     this.serverTitle = 'Server',
+    this.serverCurrent = 'Current',
+    this.serverPresets = 'Presets',
+    this.back = 'Back',
     this.serverOnline = 'Online',
     this.serverUnreachable = 'Unreachable',
     this.assistantNeedsServer = 'Needs the server',
@@ -145,6 +150,8 @@ class PortalSettingsLabels {
   // Appearance, Status and updates.
   final String theme;
   final String accentColour;
+  final String themeSystemHint;
+  final String savingName;
   final String haptics;
   final String hapticsOff;
   final String hapticsLight;
@@ -172,6 +179,9 @@ class PortalSettingsLabels {
 
   // Status rows.
   final String serverTitle;
+  final String serverCurrent;
+  final String serverPresets;
+  final String back;
   final String serverOnline;
   final String serverUnreachable;
   final String assistantNeedsServer;
