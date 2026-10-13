@@ -1,11 +1,5 @@
 ## Unreleased
 
-- `PortalAppRoot.router` (new named constructor): the same themed root for an
-  app on GetX nav2 (`GetMaterialApp.router`) instead of the named-route push
-  model — same theme, `builder`, and `shouldGuardRoute` gate, driven off the
-  given `routerDelegate`'s own `ChangeNotifier` rather than `routingCallback`
-  (which `GetMaterialApp.router` never wires). Every app is now on
-  `PortalAppRoot` or `PortalAppRoot.router`.
 - `PortalAppRoot.shouldGuardRoute` (new, nullable `bool Function(String route)`):
   wires `PortalDeviceSecurityGate` and the route-change plumbing it needs for
   an app with the shared app lock, so the lock no longer forces a hand-rolled
