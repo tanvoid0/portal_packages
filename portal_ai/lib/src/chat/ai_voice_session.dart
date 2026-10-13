@@ -135,8 +135,25 @@ class AiVoiceSession extends ChangeNotifier {
     );
   }
 
-  bool _isEcho(String text) =>
-      reply.toLowerCase().contains(text.trim().toLowerCase());
+  // ponytail: exact-substring echo check broke on real devices -- a
+  // recognizer reading its own TTS back rarely transcribes it word-for-word
+  // (dropped/garbled words, punctuation), so it failed the substring test and
+  // got treated as a barge-in. Word-overlap ratio tolerates that noise;
+  // raise the threshold (or swap for a real speaker-bleed level, as
+  // agent-platform does) if genuine short barge-ins start getting swallowed.
+  bool _isEcho(String text) {
+    final heardWords =
+        _normalizeWords(text).where((w) => w.isNotEmpty).toList();
+    if (heardWords.isEmpty) return true;
+    final replyWords = _normalizeWords(reply).toSet();
+    final matched = heardWords.where(replyWords.contains).length;
+    return matched / heardWords.length >= 0.6;
+  }
+
+  Iterable<String> _normalizeWords(String s) => s
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9 ]'), ' ')
+      .split(' ');
 
   void _bargeIn() {
     unawaited(PortalAiVoice.stopSpeaking());

@@ -71,6 +71,7 @@ class AiAssistantPage extends StatefulWidget {
     this.canEditToolCall,
     this.initialPrompt,
     this.autoSend = false,
+    this.openVoice = false,
     this.resumeLastSession = false,
     this.initialSessionId,
     this.consent,
@@ -83,6 +84,12 @@ class AiAssistantPage extends StatefulWidget {
          'give the page a runtime to drive the agent, or an onSend that '
          'generates the reply itself',
        );
+
+  /// Opens the voice conversation as soon as voice is known available, for
+  /// a host launched into "talk now" context -- the Android system assist
+  /// gesture lands here. No-op where the device has no on-device speech, which
+  /// degrades to the plain text chat.
+  final bool openVoice;
 
   /// Opens on the most recent stored thread instead of a blank deck.
   ///
@@ -934,7 +941,16 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
 
   Future<void> _probeVoice() async {
     final voice = await PortalAiVoice.describe();
-    if (mounted && voice.isAvailable) setState(() => _voice = voice);
+    if (!mounted || !voice.isAvailable) return;
+    setState(() => _voice = voice);
+    // Launched into a "talk now" context (the system assist gesture): open the
+    // voice page once we know the device can. Post-frame so the push sits on a
+    // mounted route; _openVoice guards re-entry if the probe races a tap.
+    if (widget.openVoice && !_voiceMode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_openVoice());
+      });
+    }
   }
 
   /// Opens the voice conversation on its own page. Denied microphone is a
