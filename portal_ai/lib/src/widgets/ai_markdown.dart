@@ -43,6 +43,21 @@ class AiMarkdown extends StatelessWidget {
     return MarkdownBlock(
       data: text,
       selectable: true,
+      generator: MarkdownGenerator(
+        generators: [
+          SpanNodeGeneratorWithTag(
+            tag: MarkdownTag.table.name,
+            generator: (e, config, visitor) =>
+                _AlignedTableNode(config, visitor),
+          ),
+          for (final tag in [MarkdownTag.th.name, MarkdownTag.td.name])
+            SpanNodeGeneratorWithTag(
+              tag: tag,
+              generator: (e, config, visitor) =>
+                  _CellNode(e.attributes['align'], e.textContent),
+            ),
+        ],
+      ),
       config: MarkdownConfig(
         configs: [
           PConfig(textStyle: body),
@@ -131,6 +146,108 @@ class AiMarkdown extends StatelessWidget {
         RegExp(r'(^|\n)\s*([*\-+]\s|\d+\.\s|#{1,6}\s|>\s)').hasMatch(text) ||
         // A table's rule row; without it a table reads as bare pipes.
         RegExp(r'(^|\n)\s*\|?\s*:?-{3,}:?\s*\|').hasMatch(text);
+  }
+}
+
+/// A `th`/`td` that keeps the delimiter row's alignment (`:--`, `:-:`, `--:`)
+/// and its plain text, both of which the stock cell nodes drop.
+class _CellNode extends ElementNode {
+  _CellNode(this.align, this.plain);
+
+  final String? align;
+  final String plain;
+
+  @override
+  TextStyle? get style => parentStyle;
+}
+
+/// Numbers, money, percentages: `12`, `-3.5`, `+4%`, `$1,200.00`, `(40)`.
+final _numeric = RegExp(r'^\(?[+\-−]?[\$£€¥]?[+\-−]?\d[\d,]*(\.\d+)?%?\)?$');
+
+/// The stock table centres every header and honours alignment only on body
+/// cells. This one sizes columns to content, applies the delimiter alignment
+/// to header and body alike, and right-aligns a column the author left
+/// unaligned when every body cell in it is a number.
+class _AlignedTableNode extends TableNode {
+  _AlignedTableNode(super.config, this.visitor);
+
+  final WidgetVisitor visitor;
+
+  @override
+  InlineSpan build() {
+    final head = children.whereType<THeadNode>().expand((h) => h.children);
+    final body = children.whereType<TBodyNode>().expand((b) => b.children);
+    final headRow = head.isEmpty
+        ? <SpanNode>[]
+        : (head.first as TrNode).children;
+    final bodyRows = [for (final r in body) (r as TrNode).children];
+
+    Alignment alignOf(int col) {
+      final explicit = col < headRow.length
+          ? (headRow[col] as _CellNode).align
+          : null;
+      if (explicit != null) {
+        return explicit == 'right'
+            ? Alignment.centerRight
+            : explicit == 'center'
+            ? Alignment.center
+            : Alignment.centerLeft;
+      }
+      final cells = [
+        for (final r in bodyRows)
+          if (col < r.length && (r[col] as _CellNode).plain.trim().isNotEmpty)
+            (r[col] as _CellNode).plain.trim(),
+      ];
+      return cells.isNotEmpty && cells.every(_numeric.hasMatch)
+          ? Alignment.centerRight
+          : Alignment.centerLeft;
+    }
+
+    TableRow row(
+      List<SpanNode> cells,
+      int count,
+      EdgeInsets pad,
+      Decoration? d,
+    ) => TableRow(
+      decoration: d,
+      children: [
+        for (var i = 0; i < count; i++)
+          i < cells.length
+              ? Padding(
+                  padding: pad,
+                  child: Align(
+                    alignment: alignOf(i),
+                    child: ProxyRichText(
+                      cells[i].build(),
+                      richTextBuilder: visitor.richTextBuilder,
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
+      ],
+    );
+
+    final n = headRow.length;
+    final table = Table(
+      defaultColumnWidth: const IntrinsicColumnWidth(),
+      border: tbConfig.border,
+      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+      children: [
+        if (n > 0)
+          row(headRow, n, tbConfig.headPadding, tbConfig.headerRowDecoration),
+        for (final r in bodyRows)
+          row(r, n, tbConfig.bodyPadding, tbConfig.bodyRowDecoration),
+      ],
+    );
+    // ponytail: columns are content-sized, so a wide table scrolls sideways
+    // instead of wrapping long cells; give the long column a FlexColumnWidth
+    // inside a bounded box if wrapping is wanted.
+    return WidgetSpan(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: table,
+      ),
+    );
   }
 }
 

@@ -190,9 +190,9 @@ class _AiVoiceOrbState extends State<AiVoiceOrb>
             // The phase is status, quieter than the caption it heads.
             child: Text(
               typed,
-              style: PortalUiTheme.of(context).tokens.textStyles.body.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+              style: PortalUiTheme.of(
+                context,
+              ).tokens.textStyles.body.copyWith(color: scheme.onSurfaceVariant),
             ),
           ),
         ],

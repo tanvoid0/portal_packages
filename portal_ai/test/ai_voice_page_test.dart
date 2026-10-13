@@ -25,7 +25,9 @@ void main() {
     expect(opened, isTrue);
   });
 
-  testWidgets('a session error is its own state, not a caption', (tester) async {
+  testWidgets('a session error is its own state, not a caption', (
+    tester,
+  ) async {
     final session = AiVoiceSession(ask: (_) async => null)
       ..error = 'The speech service did not answer.';
     await tester.pumpWidget(

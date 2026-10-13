@@ -179,7 +179,12 @@ class _Captions extends StatelessWidget {
     final big = t.textStyles.title.copyWith(color: cs.onSurface, height: 1.25);
     return SingleChildScrollView(
       reverse: true,
-      padding: EdgeInsets.fromLTRB(t.spacing.xl, 0, t.spacing.xl, t.spacing.xxl),
+      padding: EdgeInsets.fromLTRB(
+        t.spacing.xl,
+        0,
+        t.spacing.xl,
+        t.spacing.xxl,
+      ),
       // Not a live region: the reply is already spoken aloud.
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

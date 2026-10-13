@@ -65,6 +65,7 @@ class AiAssistantPage extends StatefulWidget {
     this.busy = false,
     this.onRewind,
     this.onCancel,
+    this.onOpenSettings,
     this.labels = const AiChatLabels(),
     this.fill = false,
     this.store,
@@ -197,6 +198,11 @@ class AiAssistantPage extends StatefulWidget {
 
   /// Shows a stop button while busy when set.
   final VoidCallback? onCancel;
+
+  /// Opens the OS settings page when the microphone is denied. The package
+  /// carries no permission plugin; the host supplies this. Null hides the
+  /// button and the voice page tells the user to find Settings themselves.
+  final VoidCallback? onOpenSettings;
 
   final AiChatLabels labels;
 
@@ -1023,6 +1029,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
             session: session,
             labels: widget.labels,
             micDenied: true,
+            onOpenSettings: widget.onOpenSettings,
           ),
         ),
       );
