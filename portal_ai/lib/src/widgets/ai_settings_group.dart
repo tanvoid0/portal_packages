@@ -9,7 +9,7 @@ import '../models/ai_backend_labels.dart';
 import '../models/ai_backend_option.dart';
 import '../models/ai_model_manager.dart';
 import '../prefs/ai_backend_store.dart';
-import 'ai_model_manager_sheet.dart';
+import 'ai_models_page.dart';
 import 'ai_routing_sheet.dart';
 import 'ai_settings_section.dart';
 
@@ -56,7 +56,7 @@ class AiSettingsGroup extends StatefulWidget {
   /// ones the models row manages.
   final LocalLlmEngine? localLlm;
 
-  /// Replaces the built-in models sheet, for a host with a screen of its own.
+  /// Replaces the built-in models page, for a host with a screen of its own.
   final VoidCallback? onModels;
 
   @override
@@ -167,7 +167,7 @@ class _AiSettingsGroupState extends State<AiSettingsGroup> {
   Future<void> _openModels(AiModelManager manager) async {
     final onModels = widget.onModels;
     if (onModels != null) return onModels();
-    final changed = await AiModelManagerSheet.show(
+    final changed = await AiModelsPage.open(
       context,
       manager: manager,
       labels: widget.labels,

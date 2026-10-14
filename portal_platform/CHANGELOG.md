@@ -1,5 +1,9 @@
 ## Unreleased
 
+- `PortalImagePickerSheet.photoBuilder` (new, optional): draws each search
+  result's picture itself instead of the cached network image, so the design
+  kit and tests can render the sheet with no network.
+
 - `PortalSettingsPage` is one flat grouped page: Appearance, Assistant, About
   (Status) and Account render inline as sections instead of nav rows that push
   sub-pages, and Portal apps is an inline section. Sheets (name, theme, accent,

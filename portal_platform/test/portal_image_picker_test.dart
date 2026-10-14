@@ -120,6 +120,23 @@ void main() {
     expect(picked, 'https://media.portal.test/stored-1.jpg');
   });
 
+  testWidgets('photoBuilder replaces the network image', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: PortalImagePickerSheet(
+          initialQuery: 'pasta',
+          service: _FakeSearch([_photo('a')]),
+          mediaService: _FakeMedia(),
+          photoBuilder: (_, p) => Text('drawn ${p.id}'),
+        ),
+      ),
+    ));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('drawn a'), findsOneWidget);
+  });
+
   testWidgets('a pasted link is fetched by the server, not stored raw',
       (tester) async {
     final fake = _FakeSearch(const []);

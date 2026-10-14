@@ -16,7 +16,7 @@ import '../models/ai_routing_mode.dart';
 import '../platform/edge_gallery_launcher.dart';
 import '../platform/portal_ai_platform.dart';
 import '../prefs/ai_backend_store.dart';
-import 'ai_model_manager_sheet.dart';
+import 'ai_models_page.dart';
 
 /// The whole AI group for a settings screen: which provider, which of that
 /// provider's models, and the one setting a provider needs to be reachable.
@@ -184,7 +184,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     await _scan();
   }
 
-  /// The backends that keep model files of their own get one shared sheet.
+  /// The backends that keep model files of their own get one shared page.
   /// Ollama's host can change between builds of this widget, so its manager
   /// is built per call rather than held.
   AiModelManager? _managerFor(AiBackendOption option) => switch (option.kind) {
@@ -197,7 +197,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
   };
 
   Future<void> _manageModels(AiModelManager manager) async {
-    final changed = await AiModelManagerSheet.show(
+    final changed = await AiModelsPage.open(
       context,
       manager: manager,
       labels: widget.labels,

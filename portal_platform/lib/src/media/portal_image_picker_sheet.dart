@@ -25,6 +25,7 @@ class PortalImagePickerSheet extends StatefulWidget {
     this.currentUrl,
     this.service,
     this.mediaService,
+    this.photoBuilder,
   });
 
   /// Searched immediately on open when non-empty.
@@ -44,6 +45,11 @@ class PortalImagePickerSheet extends StatefulWidget {
 
   /// Injectable for tests; defaults to the shared media store client.
   final PortalMediaService? mediaService;
+
+  /// Draws a result's picture in place of the network image — for design
+  /// books and tests, which have no network.
+  final Widget Function(BuildContext context, PortalImageResult photo)?
+  photoBuilder;
 
   /// Presents the picker and resolves to the chosen URL, or null if dismissed.
   static Future<String?> show(
@@ -396,6 +402,7 @@ class _PortalImagePickerSheetState extends State<PortalImagePickerSheet> {
         return _PhotoTile(
           photo: photo,
           selected: photo.regularUrl == _selectedUrl,
+          photoBuilder: widget.photoBuilder,
           onTap: () => _resolve(_media.importUrl(photo.regularUrl)),
         );
       },
@@ -509,8 +516,10 @@ class _PhotoTile extends StatelessWidget {
     required this.photo,
     required this.selected,
     required this.onTap,
+    this.photoBuilder,
   });
 
+  final Widget Function(BuildContext, PortalImageResult)? photoBuilder;
   final PortalImageResult photo;
   final bool selected;
   final VoidCallback onTap;
@@ -532,19 +541,23 @@ class _PhotoTile extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              CachedNetworkImage(
-                imageUrl: photo.smallUrl,
-                fit: BoxFit.cover,
-                fadeInDuration: const Duration(milliseconds: 150),
-                placeholder: (_, _) => ColoredBox(
-                  color:
-                      parseHexColor(photo.color) ?? cs.surfaceContainerHighest,
+              if (photoBuilder != null)
+                photoBuilder!(context, photo)
+              else
+                CachedNetworkImage(
+                  imageUrl: photo.smallUrl,
+                  fit: BoxFit.cover,
+                  fadeInDuration: const Duration(milliseconds: 150),
+                  placeholder: (_, _) => ColoredBox(
+                    color:
+                        parseHexColor(photo.color) ??
+                        cs.surfaceContainerHighest,
+                  ),
+                  errorWidget: (_, _, _) => ColoredBox(
+                    color: cs.errorContainer,
+                    child: Icon(Icons.broken_image, color: cs.onErrorContainer),
+                  ),
                 ),
-                errorWidget: (_, _, _) => ColoredBox(
-                  color: cs.errorContainer,
-                  child: Icon(Icons.broken_image, color: cs.onErrorContainer),
-                ),
-              ),
               Positioned(
                 bottom: 0,
                 left: 0,

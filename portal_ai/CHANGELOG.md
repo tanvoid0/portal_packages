@@ -1,3 +1,31 @@
+## Unreleased
+
+- **Breaking:** `AiModelManagerSheet` is removed. `AiModelsPage` (a dedicated
+  page, `AiModelsPage.open(context, manager:)` returns true when anything
+  changed) replaces it, and `AiSettingsSection` / `AiSettingsGroup` open it from
+  their "On-device models" row. A download is its own page,
+  `AiModelDownloadPage`, on `PortalResultScreen`: live meter with size and time
+  left, Cancel, Done, and the failure with Try again, driven by
+  `AiModelManager.install`. New `AiBackendLabels` strings (`cancelDownload`,
+  `done`, `tryAgain`, `startingDownload`, `downloadKeepOpen`,
+  `downloadReadyBody`, `downloadingTitle`, `downloadReadyTitle`, `timeLeft`),
+  all with English defaults.
+
+## Unreleased
+
+- `AiAssistantPage.incognito` (+ `onLeaveIncognito`): a thread that is never
+  kept. Nothing is saved to the store and no earlier thread is resumed; the
+  page draws the kit's frame (inverse-surface ring and glow), an "Incognito:
+  this chat isn't saved" chip over the composer whose dismiss leaves, and an
+  empty-state note. New `AiChatLabels.incognitoChip`, `leaveIncognito`,
+  `incognitoEmpty`. Additive; off by default.
+
+## Unreleased
+
+- `AiDocumentImportSheet`: optional `autoStart`, `intro`, `emptyTitle`,
+  `emptyMessage`, `pickLabel` and `footerBuilder` (`show` takes the text ones).
+  Defaults keep today's behaviour.
+
 ## 0.4.0
 
 - **Breaking:** `AiAssistantPage.show` and `PortalAiAppKit.openAssistant`

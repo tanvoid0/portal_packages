@@ -5,14 +5,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_ai/portal_ai.dart';
 import 'package:portal_ui_core/portal_ui_core.dart';
 
-/// Stands in for Ollama or an on-device engine: the sheet only ever sees
+/// Stands in for Ollama or an on-device engine: the page only ever sees
 /// [AiModelManager], which is the point of the seam.
 class _FakeManager implements AiModelManager {
-  _FakeManager({List<String> installed = const [], this.failInstall = false})
+  _FakeManager({
+    List<String> installed = const [],
+    this.failInstall = false,
+    this.hang = false,
+  })
     : _installed = [...installed];
 
   final List<String> _installed;
   final bool failInstall;
+
+  /// Reports half way, then never finishes.
+  final bool hang;
 
   final removed = <String>[];
   final installs = <String>[];
@@ -38,6 +45,7 @@ class _FakeManager implements AiModelManager {
     installs.add(id);
     if (failInstall) throw const AiModelManagerException('disk full');
     yield 0.5;
+    if (hang) await Completer<void>().future;
     yield 1.0;
     _installed.add(id);
   }
@@ -53,14 +61,14 @@ Future<void> _open(WidgetTester tester, AiModelManager manager) async {
   await tester.pumpWidget(
     MaterialApp(
       theme: buildPortalTheme(brightness: Brightness.light),
-      home: Scaffold(body: AiModelManagerSheet(manager: manager)),
+      home: AiModelsPage(manager: manager),
     ),
   );
   await tester.pumpAndSettle();
 }
 
 void main() {
-  group('AiModelManagerSheet', () {
+  group('AiModelsPage', () {
     testWidgets('says so when nothing is installed yet', (tester) async {
       await _open(tester, _FakeManager());
 
@@ -79,28 +87,57 @@ void main() {
       expect(find.text('No models downloaded yet.'), findsNothing);
     });
 
-    testWidgets('downloading shows a percentage, then the model appears', (
+    testWidgets('a download opens its page, then the model appears', (
       tester,
     ) async {
       final manager = _FakeManager();
       await _open(tester, manager);
 
       await tester.tap(find.text('Download').first);
-      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Qwen 3 1.7B is ready'), findsOneWidget);
+      await tester.tap(find.text('Done'));
       await tester.pumpAndSettle();
 
       expect(manager.installs, ['qwen3:1.7b']);
+      expect(find.byType(AiModelDownloadPage), findsNothing);
       expect(find.text('qwen3:1.7b'), findsOneWidget);
     });
 
-    testWidgets('a failed download is reported, not swallowed', (tester) async {
-      await _open(tester, _FakeManager(failInstall: true));
+    testWidgets('a failed download is reported and can be retried', (
+      tester,
+    ) async {
+      final manager = _FakeManager(failInstall: true);
+      await _open(tester, manager);
 
       await tester.tap(find.text('Download').first);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Download failed'), findsOneWidget);
-      expect(find.textContaining('disk full'), findsOneWidget);
+      expect(find.text('Download failed'), findsOneWidget);
+      expect(find.text('disk full'), findsOneWidget);
+
+      await tester.tap(find.text('Try again'));
+      await tester.pumpAndSettle();
+      expect(manager.installs, ['qwen3:1.7b', 'qwen3:1.7b']);
+    });
+
+    testWidgets('cancel leaves the download page and installs nothing', (
+      tester,
+    ) async {
+      final manager = _FakeManager(hang: true);
+      await _open(tester, manager);
+
+      await tester.tap(find.text('Download').first);
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Downloading Qwen 3 1.7B'), findsOneWidget);
+
+      await tester.tap(find.text('Cancel download'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AiModelDownloadPage), findsNothing);
+      expect(find.text('No models downloaded yet.'), findsOneWidget);
     });
 
     testWidgets('delete asks first, and a cancel leaves the model alone', (

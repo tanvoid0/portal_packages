@@ -148,4 +148,35 @@ void main() {
     expect(find.textContaining('offline'), findsOneWidget);
     expect(find.text('Payment 1'), findsOneWidget);
   });
+
+  testWidgets('autoStart reads at once and shows intro and footer', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
+        home: Scaffold(
+          body: AiDocumentImportSheet(
+            documents: documentsReturning('x'),
+            client: _FakeCompletionClient('[{"id":"a","title":"Payment 1"}]'),
+            instruction: 'Return JSON',
+            autoStart: true,
+            pick: () async =>
+                const AiPickedFile(bytes: <int>[1], name: 'contract.pdf'),
+            toProposals: (json) => [
+              for (final row in json as List)
+                AiProposal(id: row['id'] as String, title: row['title'] as String),
+            ],
+            intro: (n, file) => '$n found in $file',
+            footerBuilder: (_) => const Text('Instalments'),
+            onApply: (_) async {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 found in contract.pdf'), findsOneWidget);
+    expect(find.text('Instalments'), findsOneWidget);
+  });
 }

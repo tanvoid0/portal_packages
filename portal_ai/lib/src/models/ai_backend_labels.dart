@@ -74,6 +74,13 @@ class AiBackendLabels {
     this.removeModelConfirm =
         'Delete this model from the device? It can be downloaded again.',
     this.cancel = 'Cancel',
+    this.cancelDownload = 'Cancel download',
+    this.done = 'Done',
+    this.tryAgain = 'Try again',
+    this.startingDownload = 'Starting download',
+    this.downloadKeepOpen = 'Keep this screen open until the download finishes.',
+    this.downloadReadyBody =
+        'It now runs on this device, even with no connection.',
     this.customModelHint = 'Or type a model name',
     this.ollamaNotFound =
         'No Ollama found on this network. Check it is running and reachable, '
@@ -141,6 +148,12 @@ class AiBackendLabels {
   final String removeModel;
   final String removeModelConfirm;
   final String cancel;
+  final String cancelDownload;
+  final String done;
+  final String tryAgain;
+  final String startingDownload;
+  final String downloadKeepOpen;
+  final String downloadReadyBody;
   final String customModelHint;
   final String assistantTitle;
   final String providerRow;
@@ -150,6 +163,12 @@ class AiBackendLabels {
   final String apply;
 
   String modelsInstalled(int n) => '$n installed';
+
+  String downloadingTitle(String model) => 'Downloading $model';
+
+  String downloadReadyTitle(String model) => '$model is ready';
+
+  String timeLeft(String duration) => 'About $duration left';
 
   String titleFor(AiBackendKind kind) => switch (kind) {
     AiBackendKind.cloudGemini => cloudGeminiTitle,

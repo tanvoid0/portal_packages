@@ -88,6 +88,9 @@ class AiChatLabels {
     this.micDeniedNoSettings = 'Allow it in Settings, or close this and type.',
     this.openSettings = 'Open settings',
     this.voiceErrorTitle = "Voice isn't available right now",
+    this.incognitoChip = "Incognito: this chat isn't saved",
+    this.leaveIncognito = 'Leave incognito',
+    this.incognitoEmpty = 'Not saved to history, and gone when you leave.',
   });
 
   /// Voice page, microphone refused: [micDeniedMessage] when the host can open
@@ -99,6 +102,12 @@ class AiChatLabels {
 
   /// Voice page, session failed; the session's own error is the message.
   final String voiceErrorTitle;
+
+  /// Incognito: the chip over the composer, its dismiss tooltip, and the
+  /// opening line.
+  final String incognitoChip;
+  final String leaveIncognito;
+  final String incognitoEmpty;
 
   final String inputHint;
 

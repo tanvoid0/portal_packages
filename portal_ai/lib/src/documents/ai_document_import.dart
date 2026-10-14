@@ -63,6 +63,12 @@ class AiDocumentImportSheet extends StatefulWidget {
     this.title = 'Import from a document',
     this.hint = 'A PDF, a photo or a screenshot.',
     this.applyLabel = 'Add selected',
+    this.autoStart = false,
+    this.intro,
+    this.emptyTitle = 'Nothing to import from that file.',
+    this.emptyMessage,
+    this.pickLabel = 'Choose another file',
+    this.footerBuilder,
   });
 
   final AiDocumentClient documents;
@@ -83,6 +89,23 @@ class AiDocumentImportSheet extends StatefulWidget {
   final String hint;
   final String applyLabel;
 
+  /// Opens the picker as the sheet mounts, for a host that already asked
+  /// ("Scan a receipt" has no use for a "Choose a file" step first).
+  final bool autoStart;
+
+  /// A muted line over the rows saying what was read and where it goes:
+  /// ("3 receipts found in receipts.jpg"). Given the count and the file name.
+  final String Function(int count, String fileName)? intro;
+
+  /// The nothing-found state: its title, a hint under it, and the retry label.
+  final String emptyTitle;
+  final String? emptyMessage;
+  final String pickLabel;
+
+  /// Read-only extra under the rows, e.g. an agreement's instalments. Given
+  /// the rows found.
+  final Widget Function(List<AiProposal> found)? footerBuilder;
+
   /// Shows the sheet. Resolves to how many rows were applied, or null if the
   /// user closed it without applying any.
   static Future<int?> show(
@@ -96,6 +119,10 @@ class AiDocumentImportSheet extends StatefulWidget {
     String title = 'Import from a document',
     String hint = 'A PDF, a photo or a screenshot.',
     String applyLabel = 'Add selected',
+    String Function(int count, String fileName)? intro,
+    String emptyTitle = 'Nothing to import from that file.',
+    String? emptyMessage,
+    String pickLabel = 'Choose another file',
   }) {
     return showModalBottomSheet<int>(
       context: context,
@@ -111,6 +138,10 @@ class AiDocumentImportSheet extends StatefulWidget {
         title: title,
         hint: hint,
         applyLabel: applyLabel,
+        intro: intro,
+        emptyTitle: emptyTitle,
+        emptyMessage: emptyMessage,
+        pickLabel: pickLabel,
       ),
     );
   }
@@ -131,6 +162,12 @@ class _AiDocumentImportSheetState extends State<AiDocumentImportSheet> {
   AiPickedFile? _file;
   List<AiProposal> _found = const [];
   final Set<String> _selected = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoStart) _choose();
+  }
 
   /// Picks a file, then reads it.
   Future<void> _choose() async {
@@ -253,8 +290,9 @@ class _AiDocumentImportSheetState extends State<AiDocumentImportSheet> {
           else if (_stage == _Stage.empty)
             PortalEmptyState(
               icon: PortalIcons.search_off_rounded,
-              title: 'Nothing to import from that file.',
-              actionLabel: 'Choose another file',
+              title: widget.emptyTitle,
+              message: widget.emptyMessage,
+              actionLabel: widget.pickLabel,
               onAction: _choose,
               inCard: false,
             )
@@ -264,6 +302,13 @@ class _AiDocumentImportSheetState extends State<AiDocumentImportSheet> {
                 size: PortalPromptSize.compact,
                 sentiment: PortalSentiment.negative,
                 message: e,
+              ),
+              SizedBox(height: t.spacing.sm),
+            ],
+            if (widget.intro case final intro?) ...[
+              Text(
+                intro(_found.length, name ?? ''),
+                style: t.textStyles.body.copyWith(color: cs.onSurfaceVariant),
               ),
               SizedBox(height: t.spacing.sm),
             ],
@@ -290,6 +335,8 @@ class _AiDocumentImportSheetState extends State<AiDocumentImportSheet> {
                               }
                             }),
                     ),
+                  if (widget.footerBuilder case final footer?)
+                    footer(_found),
                 ],
               ),
             ),

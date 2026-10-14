@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -82,6 +83,8 @@ class AiAssistantPage extends StatefulWidget {
     this.documents,
     this.maxPromptLength,
     this.onNewIncognito,
+    this.incognito = false,
+    this.onLeaveIncognito,
   }) : assert(
          runtime != null || onSend != null,
          'give the page a runtime to drive the agent, or an onSend that '
@@ -147,6 +150,17 @@ class AiAssistantPage extends StatefulWidget {
   /// rather than a third icon in the bar. No entry drawn when null -- a host
   /// with nothing ephemeral to offer gets no dead row.
   final VoidCallback? onNewIncognito;
+
+  /// This thread is never kept: nothing is saved to the [store], no earlier
+  /// thread is resumed, and the page says so with a frame round its edge and
+  /// a chip over the composer. The host mounts it for a chat started from
+  /// [onNewIncognito]; the turns still live in memory while the page does.
+  final bool incognito;
+
+  /// The incognito chip's dismiss, which leaves (and so discards) the chat.
+  /// The host owns the route, so it also owns the "are you sure". No dismiss
+  /// is drawn when null.
+  final VoidCallback? onLeaveIncognito;
 
   /// Overrides [PortalAiRuntime.tools] for this page, for tools that have to
   /// be built per call site (e.g. closed over a Riverpod ref).
@@ -531,7 +545,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     final initial = widget.initialPrompt?.trim();
     final hasInitial = initial != null && initial.isNotEmpty;
     final sessionId = widget.initialSessionId;
-    if (sessionId != null) {
+    if (widget.incognito) {
+      // a fresh, unsaved thread: never open an earlier one
+    } else if (sessionId != null) {
       _adoptSession(sessionId);
     } else if (widget.resumeLastSession && !hasInitial) {
       _resumeLastSession();
@@ -560,7 +576,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
 
   Future<void> _persist() async {
     final store = widget.store;
-    if (store == null || _turns.isEmpty) return;
+    if (store == null || _turns.isEmpty || widget.incognito) return;
     final now = DateTime.now();
     final id = _sessionId ??= now.microsecondsSinceEpoch.toString();
     final existing = store.load(id);
@@ -1878,7 +1894,110 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => widget.incognito
+      ? Stack(
+          fit: widget.fill ? StackFit.expand : StackFit.loose,
+          children: [_buildPage(context), _incognitoFrame(context)],
+        )
+      : _buildPage(context);
+
+  /// A thin ring in the inverse-surface tone with a soft glow, round the
+  /// page's edge: charcoal in light, pale in dark, never the brand accent.
+  /// Pointer-transparent so it never steals a tap.
+  Widget _incognitoFrame(BuildContext context) {
+    final t = PortalUiTheme.of(context).tokens;
+    final tone = Theme.of(context).colorScheme.inverseSurface;
+    final radius = BorderRadius.circular(t.radii.lg);
+    // A blurred thick stroke reads as a glow at the edge; a blurred filled
+    // box would tint the whole page.
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: SafeArea(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ImageFiltered(
+                imageFilter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: tone.withValues(alpha: .25),
+                      width: 12,
+                    ),
+                    borderRadius: radius,
+                  ),
+                ),
+              ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: tone.withValues(alpha: .6),
+                    width: 2,
+                  ),
+                  borderRadius: radius,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Over the composer: says nothing here is kept; dismiss leaves.
+  Widget _incognitoChip() {
+    final t = PortalUiTheme.of(context).tokens;
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: EdgeInsets.only(bottom: t.spacing.xs),
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(t.radii.full),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: EdgeInsetsDirectional.only(
+                  start: t.spacing.md,
+                  end: widget.onLeaveIncognito == null ? t.spacing.md : 0,
+                ),
+                child: Semantics(
+                  container: true,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    spacing: t.spacing.sm,
+                    children: [
+                      Icon(
+                        Icons.masks_rounded,
+                        size: 18,
+                        color: cs.onSurfaceVariant,
+                      ),
+                      Text(
+                        widget.labels.incognitoChip,
+                        style: t.textStyles.body.copyWith(color: cs.onSurface),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (widget.onLeaveIncognito != null)
+                PortalButton.icon(
+                  icon: PortalIcons.close_rounded,
+                  tooltip: widget.labels.leaveIncognito,
+                  onPressed: widget.onLeaveIncognito,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPage(BuildContext context) {
     final theme = Theme.of(context);
     final canPickBackend = widget.runtime?.backendStore != null;
     final shown = _shownTurns;
@@ -2136,7 +2255,8 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                                 ),
                                 child: AiConsentCard(consent: consent),
                               )
-                            else if (widget.labels.empty.isNotEmpty) ...[
+                            else if (widget.incognito ||
+                widget.labels.empty.isNotEmpty) ...[
                               // The mark, once, above the greeting -- the one
                               // place in the app the assistant has a face large
                               // enough to be a face. It is not repeated down the
@@ -2162,7 +2282,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                                   bottom: _deckOnly ? 28 : 24,
                                 ),
                                 child: Text(
-                                  widget.labels.empty,
+                                  widget.incognito
+                                      ? widget.labels.incognitoEmpty
+                                      : widget.labels.empty,
                                   textAlign: TextAlign.center,
                                   // A greeting, not body copy: at the centre of
                                   // an otherwise empty screen bodyMedium reads as
@@ -2395,6 +2517,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
               ),
             ),
           if (_personas.isNotEmpty) _personaBar(),
+          if (widget.incognito) _incognitoChip(),
           AiPromptComposer(
             controller: _input,
             focusNode: _inputFocus,

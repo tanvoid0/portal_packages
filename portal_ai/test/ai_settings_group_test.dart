@@ -165,7 +165,7 @@ void main() {
       expect(find.text('586 MB'), findsOneWidget);
     });
 
-    testWidgets('tapping the models row opens the manager sheet', (
+    testWidgets('tapping the models row opens the models page', (
       tester,
     ) async {
       await pump(tester, localLlm: _FakeEngine());
@@ -173,10 +173,10 @@ void main() {
       await tester.tap(find.text(labels.modelsRow));
       await tester.pumpAndSettle();
 
-      expect(find.byType(AiModelManagerSheet), findsOneWidget);
+      expect(find.byType(AiModelsPage), findsOneWidget);
     });
 
-    testWidgets('onModels wins over the built-in sheet', (tester) async {
+    testWidgets('onModels wins over the built-in page', (tester) async {
       var calls = 0;
       await pump(tester, localLlm: _FakeEngine(), onModels: () => calls++);
 
@@ -184,7 +184,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(calls, 1);
-      expect(find.byType(AiModelManagerSheet), findsNothing);
+      expect(find.byType(AiModelsPage), findsNothing);
     });
 
     testWidgets('the provider sheet reuses the section, minus routing', (

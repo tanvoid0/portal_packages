@@ -1005,6 +1005,8 @@ void main() {
     );
     expect(find.widgetWithText(AiSuggestionCards, 'Add milk'), findsNothing);
   });
+
+  _incognitoTests();
 }
 
 /// A store that keeps threads in memory, so the page records turns without
@@ -1032,4 +1034,51 @@ class _MemoryStore implements AiChatStore {
 
   @override
   Future<void> delete(String id) async => _sessions.remove(id);
+}
+
+void _incognitoTests() {
+  Widget host(AiChatStore store, {bool incognito = true, VoidCallback? leave}) =>
+      MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
+        home: Scaffold(
+          body: AiAssistantPage(
+            runtime: PortalAiRuntime(
+              client: _ScriptedClient(['{"final":"Sure."}']),
+            ),
+            store: store,
+            incognito: incognito,
+            onLeaveIncognito: leave,
+          ),
+        ),
+      );
+
+  testWidgets('incognito never writes the thread to the store', (t) async {
+    final store = _MemoryStore();
+    await t.pumpWidget(host(store));
+    await t.enterText(find.byType(TextField), 'secret');
+    await t.testTextInput.receiveAction(TextInputAction.send);
+    await t.pumpAndSettle();
+    expect(find.text('Sure.'), findsOneWidget);
+    expect(store.listSummaries(), isEmpty);
+  });
+
+  testWidgets('a normal page still saves', (t) async {
+    final store = _MemoryStore();
+    await t.pumpWidget(host(store, incognito: false));
+    await t.enterText(find.byType(TextField), 'kept');
+    await t.testTextInput.receiveAction(TextInputAction.send);
+    await t.pumpAndSettle();
+    expect(store.listSummaries(), hasLength(1));
+    expect(find.text("Incognito: this chat isn't saved"), findsNothing);
+  });
+
+  testWidgets('incognito chip leaves and carries the note', (t) async {
+    var left = false;
+    await t.pumpWidget(host(_MemoryStore(), leave: () => left = true));
+    expect(find.text("Incognito: this chat isn't saved"), findsOneWidget);
+    expect(find.text('Not saved to history, and gone when you leave.'),
+        findsOneWidget);
+    await t.tap(find.byTooltip('Leave incognito'));
+    expect(left, isTrue);
+  });
 }
