@@ -247,6 +247,7 @@ class _AiDocumentImportSheetState extends State<AiDocumentImportSheet> {
               title: "Couldn't read ${name ?? 'that file'}",
               message: _error,
               onRetry: _read,
+              icon: PortalIcons.description_rounded,
               inCard: false,
             )
           else if (_stage == _Stage.empty)

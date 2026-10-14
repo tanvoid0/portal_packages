@@ -207,7 +207,15 @@ class _PortalServerPageState extends State<PortalServerPage> {
             ),
           ],
         ),
-        PortalSectionHeader(title: labels.serverLocal),
+        // A bare header has no gutter; the list sections above draw theirs.
+        Padding(
+          padding: EdgeInsets.only(
+            left: PortalUiTheme.of(context).tokens.layout.pageHorizontal,
+            right: PortalUiTheme.of(context).tokens.layout.pageHorizontal,
+            top: PortalUiTheme.of(context).tokens.spacing.lg,
+          ),
+          child: PortalSectionHeader(title: labels.serverLocal),
+        ),
         PortalFormStack(
           children: [
             PortalTextField(

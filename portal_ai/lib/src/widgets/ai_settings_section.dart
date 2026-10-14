@@ -290,7 +290,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
         if (widget.hasServer &&
             widget.showRouting &&
             widget.showModelConfig) ...[
-          PortalSectionHeader(title: labels.routingTitle),
+          _gutter(PortalSectionHeader(title: labels.routingTitle)),
           _RoutingModeControl(
             labels: labels,
             mode: widget.store.routingMode,
@@ -308,21 +308,32 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
             },
           ),
         ],
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: PortalButton(
-            label: labels.rescan,
-            size: PortalButtonSize.sm,
-            variant: PortalButtonVariant.ghost,
-            onPressed: () {
-              widget.onRescan?.call();
-              _scan();
-            },
+        _gutter(
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: PortalButton(
+              label: labels.rescan,
+              size: PortalButtonSize.sm,
+              variant: PortalButtonVariant.ghost,
+              onPressed: () {
+                widget.onRescan?.call();
+                _scan();
+              },
+            ),
           ),
         ),
       ],
     );
   }
+
+  /// A bare header or button has no page gutter of its own (the list sections
+  /// draw theirs); line it up with the form rows beneath it.
+  Widget _gutter(Widget child) => Padding(
+    padding: EdgeInsets.symmetric(
+      horizontal: PortalUiTheme.of(context).tokens.layout.pageHorizontal,
+    ),
+    child: child,
+  );
 
   PortalListItem _tile(AiBackendOption option) {
     final labels = widget.labels;
@@ -363,7 +374,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
         : const <Widget>[];
     if (trailing == null && config.isEmpty) return const [];
     return [
-      PortalSectionHeader(title: widget.labels.titleFor(option.kind)),
+      _gutter(PortalSectionHeader(title: widget.labels.titleFor(option.kind))),
       PortalFormStack(
         children: [
           if (trailing != null)
