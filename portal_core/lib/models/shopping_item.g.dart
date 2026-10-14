@@ -24,6 +24,9 @@ _$ShoppingItemImpl _$$ShoppingItemImplFromJson(Map<String, dynamic> json) =>
       unit: json['unit'] == null
           ? const ItemUnit()
           : ItemUnit.fromJson(json['unit'] as Map<String, dynamic>),
+      updatedAt: json['updated_at'] == null
+          ? null
+          : DateTime.parse(json['updated_at'] as String),
     );
 
 Map<String, dynamic> _$$ShoppingItemImplToJson(_$ShoppingItemImpl instance) =>
@@ -41,6 +44,7 @@ Map<String, dynamic> _$$ShoppingItemImplToJson(_$ShoppingItemImpl instance) =>
       'aisle': instance.aisle,
       'image_url': instance.imageUrl,
       'unit': instance.unit,
+      'updated_at': instance.updatedAt?.toIso8601String(),
     };
 
 const _$ShoppingStatusEnumMap = {

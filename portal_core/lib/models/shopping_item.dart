@@ -38,6 +38,9 @@ class ShoppingItem with _$ShoppingItem {
     @JsonKey(name: 'image_url') String? imageUrl,
     @Default(ItemUnit())
     ItemUnit unit,
+    // Server-stamped on every write, so for a bought item it is when it was
+    // bought unless someone edited it since (there is no purchased_at).
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
   }) = _ShoppingItem;
 
   factory ShoppingItem.fromJson(Map<String, dynamic> json) =>

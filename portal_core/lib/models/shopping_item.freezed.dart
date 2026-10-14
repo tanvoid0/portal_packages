@@ -23,8 +23,10 @@ mixin _$ShoppingItem {
   String get id => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
   String get category => throw _privateConstructorUsedError;
-  int get quantity => throw _privateConstructorUsedError;
-  int get priority => throw _privateConstructorUsedError; // 1-5
+  int get quantity =>
+      throw _privateConstructorUsedError; // 1-5. The direction is per app and stored as-is, with no migration:
+// portal_task reads 1 as urgent, portal_shopping reads 5 as urgent.
+  int get priority => throw _privateConstructorUsedError;
   ShoppingStatus get status => throw _privateConstructorUsedError;
   @JsonKey(name: 'linked_quest_id')
   String? get linkedQuestId => throw _privateConstructorUsedError;
@@ -36,7 +38,11 @@ mixin _$ShoppingItem {
   String get aisle => throw _privateConstructorUsedError;
   @JsonKey(name: 'image_url')
   String? get imageUrl => throw _privateConstructorUsedError;
-  ItemUnit get unit => throw _privateConstructorUsedError;
+  ItemUnit get unit =>
+      throw _privateConstructorUsedError; // Server-stamped on every write, so for a bought item it is when it was
+// bought unless someone edited it since (there is no purchased_at).
+  @JsonKey(name: 'updated_at')
+  DateTime? get updatedAt => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -63,7 +69,8 @@ abstract class $ShoppingItemCopyWith<$Res> {
       @JsonKey(name: 'source_id') String? sourceId,
       String aisle,
       @JsonKey(name: 'image_url') String? imageUrl,
-      ItemUnit unit});
+      ItemUnit unit,
+      @JsonKey(name: 'updated_at') DateTime? updatedAt});
 
   $ItemUnitCopyWith<$Res> get unit;
 }
@@ -94,6 +101,7 @@ class _$ShoppingItemCopyWithImpl<$Res, $Val extends ShoppingItem>
     Object? aisle = null,
     Object? imageUrl = freezed,
     Object? unit = null,
+    Object? updatedAt = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -148,6 +156,10 @@ class _$ShoppingItemCopyWithImpl<$Res, $Val extends ShoppingItem>
           ? _value.unit
           : unit // ignore: cast_nullable_to_non_nullable
               as ItemUnit,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
     ) as $Val);
   }
 
@@ -181,7 +193,8 @@ abstract class _$$ShoppingItemImplCopyWith<$Res>
       @JsonKey(name: 'source_id') String? sourceId,
       String aisle,
       @JsonKey(name: 'image_url') String? imageUrl,
-      ItemUnit unit});
+      ItemUnit unit,
+      @JsonKey(name: 'updated_at') DateTime? updatedAt});
 
   @override
   $ItemUnitCopyWith<$Res> get unit;
@@ -211,6 +224,7 @@ class __$$ShoppingItemImplCopyWithImpl<$Res>
     Object? aisle = null,
     Object? imageUrl = freezed,
     Object? unit = null,
+    Object? updatedAt = freezed,
   }) {
     return _then(_$ShoppingItemImpl(
       id: null == id
@@ -265,6 +279,10 @@ class __$$ShoppingItemImplCopyWithImpl<$Res>
           ? _value.unit
           : unit // ignore: cast_nullable_to_non_nullable
               as ItemUnit,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
     ));
   }
 }
@@ -285,7 +303,8 @@ class _$ShoppingItemImpl implements _ShoppingItem {
       @JsonKey(name: 'source_id') this.sourceId,
       this.aisle = '',
       @JsonKey(name: 'image_url') this.imageUrl,
-      this.unit = const ItemUnit()});
+      this.unit = const ItemUnit(),
+      @JsonKey(name: 'updated_at') this.updatedAt});
 
   factory _$ShoppingItemImpl.fromJson(Map<String, dynamic> json) =>
       _$$ShoppingItemImplFromJson(json);
@@ -300,10 +319,11 @@ class _$ShoppingItemImpl implements _ShoppingItem {
   @override
   @JsonKey()
   final int quantity;
+// 1-5. The direction is per app and stored as-is, with no migration:
+// portal_task reads 1 as urgent, portal_shopping reads 5 as urgent.
   @override
   @JsonKey()
   final int priority;
-// 1-5
   @override
   @JsonKey()
   final ShoppingStatus status;
@@ -328,10 +348,15 @@ class _$ShoppingItemImpl implements _ShoppingItem {
   @override
   @JsonKey()
   final ItemUnit unit;
+// Server-stamped on every write, so for a bought item it is when it was
+// bought unless someone edited it since (there is no purchased_at).
+  @override
+  @JsonKey(name: 'updated_at')
+  final DateTime? updatedAt;
 
   @override
   String toString() {
-    return 'ShoppingItem(id: $id, name: $name, category: $category, quantity: $quantity, priority: $priority, status: $status, linkedQuestId: $linkedQuestId, listId: $listId, source: $source, sourceId: $sourceId, aisle: $aisle, imageUrl: $imageUrl, unit: $unit)';
+    return 'ShoppingItem(id: $id, name: $name, category: $category, quantity: $quantity, priority: $priority, status: $status, linkedQuestId: $linkedQuestId, listId: $listId, source: $source, sourceId: $sourceId, aisle: $aisle, imageUrl: $imageUrl, unit: $unit, updatedAt: $updatedAt)';
   }
 
   @override
@@ -357,7 +382,9 @@ class _$ShoppingItemImpl implements _ShoppingItem {
             (identical(other.aisle, aisle) || other.aisle == aisle) &&
             (identical(other.imageUrl, imageUrl) ||
                 other.imageUrl == imageUrl) &&
-            (identical(other.unit, unit) || other.unit == unit));
+            (identical(other.unit, unit) || other.unit == unit) &&
+            (identical(other.updatedAt, updatedAt) ||
+                other.updatedAt == updatedAt));
   }
 
   @JsonKey(ignore: true)
@@ -376,7 +403,8 @@ class _$ShoppingItemImpl implements _ShoppingItem {
       sourceId,
       aisle,
       imageUrl,
-      unit);
+      unit,
+      updatedAt);
 
   @JsonKey(ignore: true)
   @override
@@ -394,19 +422,21 @@ class _$ShoppingItemImpl implements _ShoppingItem {
 
 abstract class _ShoppingItem implements ShoppingItem {
   const factory _ShoppingItem(
-      {required final String id,
-      required final String name,
-      final String category,
-      final int quantity,
-      final int priority,
-      final ShoppingStatus status,
-      @JsonKey(name: 'linked_quest_id') final String? linkedQuestId,
-      @JsonKey(name: 'list_id') final String? listId,
-      final String source,
-      @JsonKey(name: 'source_id') final String? sourceId,
-      final String aisle,
-      @JsonKey(name: 'image_url') final String? imageUrl,
-      final ItemUnit unit}) = _$ShoppingItemImpl;
+          {required final String id,
+          required final String name,
+          final String category,
+          final int quantity,
+          final int priority,
+          final ShoppingStatus status,
+          @JsonKey(name: 'linked_quest_id') final String? linkedQuestId,
+          @JsonKey(name: 'list_id') final String? listId,
+          final String source,
+          @JsonKey(name: 'source_id') final String? sourceId,
+          final String aisle,
+          @JsonKey(name: 'image_url') final String? imageUrl,
+          final ItemUnit unit,
+          @JsonKey(name: 'updated_at') final DateTime? updatedAt}) =
+      _$ShoppingItemImpl;
 
   factory _ShoppingItem.fromJson(Map<String, dynamic> json) =
       _$ShoppingItemImpl.fromJson;
@@ -419,9 +449,10 @@ abstract class _ShoppingItem implements ShoppingItem {
   String get category;
   @override
   int get quantity;
-  @override
+  @override // 1-5. The direction is per app and stored as-is, with no migration:
+// portal_task reads 1 as urgent, portal_shopping reads 5 as urgent.
   int get priority;
-  @override // 1-5
+  @override
   ShoppingStatus get status;
   @override
   @JsonKey(name: 'linked_quest_id')
@@ -441,6 +472,10 @@ abstract class _ShoppingItem implements ShoppingItem {
   String? get imageUrl;
   @override
   ItemUnit get unit;
+  @override // Server-stamped on every write, so for a bought item it is when it was
+// bought unless someone edited it since (there is no purchased_at).
+  @JsonKey(name: 'updated_at')
+  DateTime? get updatedAt;
   @override
   @JsonKey(ignore: true)
   _$$ShoppingItemImplCopyWith<_$ShoppingItemImpl> get copyWith =>
