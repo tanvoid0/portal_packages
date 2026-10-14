@@ -20,7 +20,18 @@ class AiVoicePage extends StatefulWidget {
     required this.labels,
     this.micDenied = false,
     this.onOpenSettings,
+    this.card,
+    this.cardHint,
   });
+
+  /// A change waiting for an answer (an [AiConfirmCard]), read aloud as the
+  /// reply. It takes the lower part of the page, the orb shrinks above it and
+  /// the caption becomes one line under it. The host supplies and answers it.
+  final Widget? card;
+
+  /// What can be said to a waiting [card] ("Say yes, no, or what to change"),
+  /// set under it with a mic.
+  final String? cardHint;
 
   final AiVoiceSession session;
   final AiChatLabels labels;
@@ -127,6 +138,8 @@ class _AiVoicePageState extends State<AiVoicePage> {
                   inCard: false,
                 ),
               )
+            : widget.card != null
+            ? SafeArea(child: _withCard(context, widget.card!, phaseLabel))
             : SafeArea(
                 child: Column(
                   children: [
@@ -157,7 +170,73 @@ class _AiVoicePageState extends State<AiVoicePage> {
       ),
     );
   }
+
+  /// The orb smaller above the card, which scrolls past [_cardShare] of the
+  /// screen; the caption is the one line being said or heard now.
+  Widget _withCard(BuildContext context, Widget card, String phaseLabel) {
+    final session = widget.session;
+    final t = PortalUiTheme.of(context).tokens;
+    final cs = Theme.of(context).colorScheme;
+    final line = session.phase == AiVoicePhase.speaking
+        ? session.reply
+        : session.heard;
+    return Column(
+      children: [
+        Expanded(
+          child: Center(
+            child: FittedBox(
+              child: AiVoiceOrb(
+                phase: session.phase,
+                level: session.level,
+                label: phaseLabel,
+                size: _cardOrbSize,
+              ),
+            ),
+          ),
+        ),
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * _cardShare,
+          ),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              t.spacing.lg,
+              0,
+              t.spacing.lg,
+              t.spacing.xxl,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              spacing: t.spacing.lg,
+              children: [
+                card,
+                if (widget.cardHint case final hint?)
+                  PortalPrompt(
+                    message: hint,
+                    size: PortalPromptSize.inline,
+                    icon: PortalIcons.mic_rounded,
+                  ),
+                if (_captions && line.isNotEmpty)
+                  Text(
+                    line,
+                    textAlign: TextAlign.center,
+                    style: t.textStyles.body.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
+
+/// The orb's box while a card is up, and the most of the screen the card and
+/// its caption take.
+const double _cardOrbSize = 280;
+const double _cardShare = .62;
 
 /// The orb's painted box. The orb itself is 0.38 of it, so this lands it near
 /// the kit's 160 dp presence orb with the halo inside the box.

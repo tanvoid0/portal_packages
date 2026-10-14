@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:portal_ui_core/portal_ui_core.dart';
 
+import '../chat/ai_card.dart';
 import '../tools/ai_tool.dart';
+import 'ai_app_card.dart';
+import 'ai_step_tile.dart';
 
 /// The cover photo a call carries, if it named one.
 ///
@@ -61,11 +64,21 @@ class AiConfirmCard extends StatelessWidget {
     super.key,
     required this.toolName,
     required this.args,
-    required this.onAccept,
-    required this.onDecline,
+    this.onAccept,
+    this.onDecline,
     this.onEdit,
     this.previewTitle,
     this.coverImageUrl,
+    this.eyebrow,
+    this.mark,
+    this.onOpen,
+    this.openLabel,
+    this.rows = const [],
+    this.onOpenRow,
+    this.receipt,
+    this.failure,
+    this.destructive,
+    this.retryLabel = 'Retry',
     this.declineLabel = 'Decline',
     this.editLabel = 'Edit',
     this.acceptLabel = 'Accept',
@@ -75,8 +88,11 @@ class AiConfirmCard extends StatelessWidget {
   /// remove, turns Accept into the destructive button.
   final String toolName;
   final Map<String, dynamic> args;
-  final VoidCallback onAccept;
-  final VoidCallback onDecline;
+
+  /// A null answer leaves its button disabled: the card is shown, but nothing
+  /// is wired to take the answer.
+  final VoidCallback? onAccept;
+  final VoidCallback? onDecline;
 
   /// No Edit button when null.
   final VoidCallback? onEdit;
@@ -89,6 +105,31 @@ class AiConfirmCard extends StatelessWidget {
   /// the argument rows -- the photo is shown, so its URL is not worth a row.
   final String? coverImageUrl;
 
+  /// Heads the card with the owning app: [mark] and this caption, and Open
+  /// ([onOpen], named by [openLabel]) when there is somewhere to go. Replaces
+  /// the tool-title caption over [previewTitle].
+  final String? eyebrow;
+  final Widget? mark;
+  final VoidCallback? onOpen;
+  final String? openLabel;
+
+  /// What the change is made of, as list rows under the arguments.
+  final List<AiCardRow> rows;
+  final ValueChanged<AiCardRow>? onOpenRow;
+
+  /// The change went through: the answers give way to what was done, and
+  /// where to see it. Never set for a save that failed.
+  final AiCardReceipt? receipt;
+
+  /// The save failed: this is said over the answers, and [retryLabel] takes
+  /// Accept's solid slot.
+  final String? failure;
+
+  /// Accept in the error fill. Null derives it from [toolName] naming a
+  /// delete or remove.
+  final bool? destructive;
+  final String retryLabel;
+
   final String declineLabel;
   final String editLabel;
   final String acceptLabel;
@@ -100,12 +141,15 @@ class AiConfirmCard extends StatelessWidget {
     final spacing = tokens.spacing;
     final styles = tokens.textStyles;
     final cover = coverImageUrl ?? aiPreviewImage(args);
-    final rows = [
+    final argRows = [
       for (final arg in args.entries)
         if (cover == null || arg.value != cover) arg,
     ];
     final name = toolName.toLowerCase();
-    final destructive = name.contains('delete') || name.contains('remove');
+    final destructive =
+        this.destructive ??
+        (name.contains('delete') || name.contains('remove'));
+    final headed = eyebrow != null || mark != null;
 
     return PortalCard(
       variant: PortalCardVariant.outlined,
@@ -124,12 +168,27 @@ class AiConfirmCard extends StatelessWidget {
                 errorBuilder: (_, _, _) => const SizedBox.shrink(),
               ),
             ),
+          if (headed)
+            AiCardHead(
+              mark: mark,
+              eyebrow:
+                  eyebrow ??
+                  (previewTitle == null ? '' : aiToolTitle(toolName)),
+              openLabel: openLabel,
+              onOpen: onOpen,
+            ),
           Padding(
-            padding: EdgeInsets.all(spacing.lg),
+            padding: EdgeInsets.fromLTRB(
+              spacing.lg,
+              headed ? 0 : spacing.lg,
+              spacing.lg,
+              // The answers (or the receipt) pad their own top.
+              0,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (previewTitle != null)
+                if (previewTitle != null && !headed)
                   Text(
                     aiToolTitle(toolName),
                     style: styles.caption.copyWith(
@@ -140,7 +199,7 @@ class AiConfirmCard extends StatelessWidget {
                   previewTitle ?? aiToolTitle(toolName),
                   style: styles.subtitle.copyWith(color: portal.onSurface),
                 ),
-                if (rows.isNotEmpty) ...[
+                if (argRows.isNotEmpty) ...[
                   SizedBox(height: spacing.md),
                   Table(
                     // Labels size to their text but never past two fifths of
@@ -154,7 +213,7 @@ class AiConfirmCard extends StatelessWidget {
                       1: FlexColumnWidth(),
                     },
                     children: [
-                      for (final arg in rows)
+                      for (final arg in argRows)
                         TableRow(
                           children: [
                             Padding(
@@ -183,41 +242,77 @@ class AiConfirmCard extends StatelessWidget {
                     ],
                   ),
                 ],
-                SizedBox(height: spacing.md),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Wrap(
-                    alignment: WrapAlignment.end,
-                    spacing: spacing.sm,
-                    runSpacing: spacing.xs,
-                    children: [
-                      PortalButton(
-                        label: declineLabel,
-                        variant: PortalButtonVariant.ghost,
-                        size: PortalButtonSize.sm,
-                        onPressed: onDecline,
-                      ),
-                      if (onEdit != null)
-                        PortalButton(
-                          label: editLabel,
-                          variant: PortalButtonVariant.secondary,
-                          size: PortalButtonSize.sm,
-                          onPressed: onEdit,
-                        ),
-                      PortalButton(
-                        label: acceptLabel,
-                        variant: destructive
-                            ? PortalButtonVariant.destructive
-                            : PortalButtonVariant.primary,
-                        size: PortalButtonSize.sm,
-                        onPressed: onAccept,
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
+          if (rows.isNotEmpty) AiCardRows(rows: rows, onOpenRow: onOpenRow),
+          if (receipt == null)
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                spacing.lg,
+                spacing.md,
+                spacing.lg,
+                spacing.lg,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (failure != null) ...[
+                    PortalPrompt(
+                      message: failure!,
+                      size: PortalPromptSize.inline,
+                      sentiment: PortalSentiment.negative,
+                    ),
+                    SizedBox(height: spacing.md),
+                  ],
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: spacing.sm,
+                      runSpacing: spacing.xs,
+                      children: [
+                        PortalButton(
+                          label: declineLabel,
+                          variant: PortalButtonVariant.ghost,
+                          size: PortalButtonSize.sm,
+                          onPressed: onDecline,
+                        ),
+                        if (onEdit != null)
+                          PortalButton(
+                            label: editLabel,
+                            variant: PortalButtonVariant.secondary,
+                            size: PortalButtonSize.sm,
+                            onPressed: onEdit,
+                          ),
+                        PortalButton(
+                          label: failure != null ? retryLabel : acceptLabel,
+                          variant: destructive && failure == null
+                              ? PortalButtonVariant.destructive
+                              : PortalButtonVariant.primary,
+                          size: PortalButtonSize.sm,
+                          onPressed: onAccept,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (receipt case final done?)
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                spacing.lg,
+                spacing.sm,
+                spacing.lg,
+                spacing.lg,
+              ),
+              child: AiReceipt(
+                label: done.label,
+                openLabel: done.openLabel,
+                onOpen: done.openLabel == null ? null : onOpen,
+              ),
+            ),
         ],
       ),
     );

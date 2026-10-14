@@ -53,10 +53,22 @@ class AiStepLine extends StatelessWidget {
 /// The line under a finished turn that says what it did ("Saved to your
 /// recipes"): a tick, or the error glyph when the step [failed], above a rule.
 class AiReceipt extends StatelessWidget {
-  const AiReceipt({super.key, required this.label, this.failed = false});
+  const AiReceipt({
+    super.key,
+    required this.label,
+    this.failed = false,
+    this.onOpen,
+    this.openLabel,
+  });
 
   final String label;
   final bool failed;
+
+  /// Draws an Open button at the end, where the change can be seen.
+  final VoidCallback? onOpen;
+
+  /// What a screen reader hears for Open ("Open Shopping"); defaults to "Open".
+  final String? openLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +80,9 @@ class AiReceipt extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.only(top: tokens.spacing.sm),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: onOpen == null
+              ? CrossAxisAlignment.start
+              : CrossAxisAlignment.center,
           children: [
             Icon(
               failed
@@ -86,6 +100,18 @@ class AiReceipt extends StatelessWidget {
                 ),
               ),
             ),
+            if (onOpen != null)
+              Semantics(
+                label: openLabel,
+                button: true,
+                excludeSemantics: openLabel != null,
+                child: PortalButton(
+                  label: 'Open',
+                  variant: PortalButtonVariant.secondary,
+                  size: PortalButtonSize.sm,
+                  onPressed: onOpen,
+                ),
+              ),
           ],
         ),
       ),

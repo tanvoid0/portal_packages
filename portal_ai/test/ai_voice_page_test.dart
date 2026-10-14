@@ -25,6 +25,28 @@ void main() {
     expect(opened, isTrue);
   });
 
+  testWidgets('a card takes the page, with its hint and one caption line', (
+    tester,
+  ) async {
+    final session = AiVoiceSession(ask: (_) async => null)
+      ..heard = 'Move it to Friday';
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
+        home: AiVoicePage(
+          session: session,
+          labels: const AiChatLabels(),
+          card: const Text('The card'),
+          cardHint: 'Say yes, no, or what to change',
+        ),
+      ),
+    );
+
+    expect(find.text('The card'), findsOneWidget);
+    expect(find.text('Say yes, no, or what to change'), findsOneWidget);
+    expect(find.text('Move it to Friday'), findsOneWidget);
+  });
+
   testWidgets('a session error is its own state, not a caption', (
     tester,
   ) async {

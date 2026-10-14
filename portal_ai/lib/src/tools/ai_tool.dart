@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../chat/ai_card.dart';
+
 /// One action the assistant can take inside an app.
 ///
 /// [parameters] maps an argument name to a short description shown to the
@@ -202,6 +204,25 @@ class AiBlock {
     },
     actions: actions,
   );
+
+  /// Drawn by the assistant itself like [itemsKind]: a tile from another app
+  /// (see [AiCard]). Its mark and Open come from the host page.
+  static const cardKind = 'card';
+
+  /// A change to the user's data, asked or answered in the thread (see
+  /// [AiAsk]). The host answers it through the page's `onAsk`.
+  static const askKind = 'ask';
+
+  factory AiBlock.card(AiCard card, {List<AiAction> actions = const []}) =>
+      AiBlock(kind: cardKind, data: card.toJson(), actions: actions);
+
+  factory AiBlock.ask(AiAsk ask) => AiBlock(kind: askKind, data: ask.toJson());
+
+  /// The [AiCard] of a [cardKind] block.
+  AiCard get card => AiCard.fromJson(data);
+
+  /// The [AiAsk] of an [askKind] block.
+  AiAsk get ask => AiAsk.fromJson(data);
 
   /// What [items] are, for an [AiBlock.items] block. Empty when unset.
   String get entity => data['entity'] as String? ?? '';

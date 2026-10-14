@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:portal_ui_core/portal_ui_core.dart';
 
 import '../chat/ai_attachment.dart';
+import '../chat/ai_card.dart';
 import '../chat/ai_chat_export.dart';
 import '../chat/ai_chat_session.dart';
 import '../chat/ai_error_message.dart';
@@ -20,6 +21,7 @@ import '../platform/portal_ai_voice.dart';
 import '../runtime/portal_ai_runtime.dart';
 import '../tools/ai_agent.dart';
 import '../tools/ai_tool.dart';
+import 'ai_app_card.dart';
 import 'ai_chat_history_list.dart';
 import 'ai_chat_labels.dart';
 import 'ai_confirm_card.dart';
@@ -85,6 +87,10 @@ class AiAssistantPage extends StatefulWidget {
     this.onNewIncognito,
     this.incognito = false,
     this.onLeaveIncognito,
+    this.appMark,
+    this.onOpenApp,
+    this.onOpenCardRow,
+    this.onAsk,
   }) : assert(
          runtime != null || onSend != null,
          'give the page a runtime to drive the agent, or an onSend that '
@@ -161,6 +167,25 @@ class AiAssistantPage extends StatefulWidget {
   /// The host owns the route, so it also owns the "are you sure". No dismiss
   /// is drawn when null.
   final VoidCallback? onLeaveIncognito;
+
+  /// The glyph of the app named by an [AiCard.app] / [AiAsk.app], or by a
+  /// tool's namespace on the confirm card. A generic mark is drawn when this
+  /// is null or answers null.
+  final Widget? Function(String app)? appMark;
+
+  /// Open on an app card, an ask's head or a receipt, with the app's name.
+  /// No Open is drawn when null.
+  final void Function(String app)? onOpenApp;
+
+  /// An [AiCardRow] with an `openLabel` was tapped. Those rows are inert when
+  /// null.
+  final void Function(String app, AiCardRow row)? onOpenCardRow;
+
+  /// The user answered an [AiAsk] block in the thread. The host owns what
+  /// accepting means and pushes the ask back as saved or failed; a failed
+  /// ask's Retry answers [AiAskAnswer.accept]. The ask's buttons are
+  /// disabled when null.
+  final void Function(AiAsk ask, AiAskAnswer answer)? onAsk;
 
   /// Overrides [PortalAiRuntime.tools] for this page, for tools that have to
   /// be built per call site (e.g. closed over a Riverpod ref).
@@ -1444,6 +1469,20 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   Widget _blockBody(AiBlock block, ThemeData theme) {
     final custom = widget.renderers[block.kind];
     if (custom != null) return custom(block);
+    if (block.kind == AiBlock.cardKind) {
+      final card = block.card;
+      return AiAppCard(
+        card: card,
+        mark: widget.appMark?.call(card.app),
+        onOpen: widget.onOpenApp == null
+            ? null
+            : () => widget.onOpenApp!(card.app),
+        onOpenRow: widget.onOpenCardRow == null
+            ? null
+            : (row) => widget.onOpenCardRow!(card.app, row),
+      );
+    }
+    if (block.kind == AiBlock.askKind) return _askView(block.ask);
     if (block.kind == AiBlock.itemsKind) {
       final open = widget.onItemTap;
       // A block with no entity is rows the host cannot open -- an aggregate,
@@ -1456,6 +1495,49 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       );
     }
     return Text(block.kind, style: theme.textTheme.bodySmall);
+  }
+
+  /// An [AiAsk] in the thread: the confirm card in its asked, kept or failed
+  /// state, answered through [AiAssistantPage.onAsk].
+  Widget _askView(AiAsk ask) {
+    final answer = widget.onAsk;
+    final labels = widget.labels;
+    void reply(AiAskAnswer a) => answer?.call(ask, a);
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: ask.label ?? ask.title,
+      child: AiConfirmCard(
+        toolName: ask.title,
+        args: ask.args,
+        previewTitle: ask.title,
+        coverImageUrl: ask.imageUrl,
+        eyebrow: ask.eyebrow,
+        mark: widget.appMark?.call(ask.app),
+        onOpen: widget.onOpenApp == null
+            ? null
+            : () => widget.onOpenApp!(ask.app),
+        rows: ask.rows,
+        onOpenRow: widget.onOpenCardRow == null
+            ? null
+            : (row) => widget.onOpenCardRow!(ask.app, row),
+        receipt: switch (ask.state) {
+          AiAskState.saved => ask.receipt ?? const AiCardReceipt('Saved'),
+          _ => null,
+        },
+        failure: switch (ask.state) {
+          AiAskState.failed => ask.failure ?? "Couldn't save.",
+          _ => null,
+        },
+        destructive: ask.destructive,
+        onAccept: answer == null ? null : () => reply(AiAskAnswer.accept),
+        onDecline: answer == null ? null : () => reply(AiAskAnswer.decline),
+        onEdit: answer == null ? null : () => reply(AiAskAnswer.edit),
+        declineLabel: labels.decline,
+        editLabel: labels.edit,
+        acceptLabel: ask.acceptLabel ?? labels.accept,
+      ),
+    );
   }
 
   Widget _blockView(AiBlock block, ThemeData theme) => Column(
@@ -2421,6 +2503,11 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                                   pending.call.args,
                                 ),
                                 previewTitle: pending.preview?.title,
+                                mark: pending.tool.namespace == null
+                                    ? null
+                                    : widget.appMark?.call(
+                                        pending.tool.namespace!,
+                                      ),
                                 onAccept: () => _answerConfirm(true),
                                 onDecline: () => _answerConfirm(false),
                                 onEdit: _canEdit(pending.call)

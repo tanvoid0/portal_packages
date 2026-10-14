@@ -1,5 +1,25 @@
 ## Unreleased
 
+- Chat extras from the kit, additive: **app cards** (`AiBlock.card(AiCard)`,
+  drawn by `AiAppCard`: the owning app's mark and eyebrow with Open, an optional
+  summary figure, rows with thumbnail / figure / open-the-record, and a receipt
+  with Open) and an **ask in the thread** (`AiBlock.ask(AiAsk)`: head, cover,
+  arguments, rows, then Decline / Edit / Accept; once kept, its receipt; on a
+  failed save, the reason and Retry in Accept's slot; `destructive` for a
+  removal). New `AiAssistantPage.appMark`, `onOpenApp`, `onOpenCardRow`,
+  `onAsk` (ask buttons are disabled without it). `AiConfirmCard` takes
+  `eyebrow`, `mark`, `onOpen`/`openLabel`, `rows`, `receipt`, `failure`,
+  `destructive`, `retryLabel`, and its answers are now nullable; a tool
+  confirm shows its tool namespace's `appMark`. `AiReceipt` takes
+  `onOpen`/`openLabel`. All optional; nothing changes for hosts that set none.
+
+## Unreleased
+
+- `AiVoicePage.card` / `cardHint`: a confirm card (e.g. `AiConfirmCard`) takes
+  the lower part of the voice page, the orb shrinks above it, a mic-marked
+  line says what can be answered by voice, and the caption becomes one line
+  under it. Both optional; default unchanged. `AiConfirmCard` is now exported
+  so a host can build that card.
 - **Breaking:** `AiModelManagerSheet` is removed. `AiModelsPage` (a dedicated
   page, `AiModelsPage.open(context, manager:)` returns true when anything
   changed) replaces it, and `AiSettingsSection` / `AiSettingsGroup` open it from
