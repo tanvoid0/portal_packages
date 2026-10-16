@@ -186,6 +186,10 @@ abstract class SyncableRepository<T> implements Syncable {
   /// Not applied to single-entity reads or writes, which are addressed by id.
   Map<String, String>? get listQueryParams => null;
 
+  /// True in a device-local session (see [ApiClient.isLocalOnly]): reads and
+  /// writes stay on the on-device cache and never touch the server or queue.
+  bool get _localOnly => api.isLocalOnly;
+
   /// Effective cache key including the signed-in user id when available.
   String get scopedCacheKey => UserStorageScope.scopeKey(cacheKey);
 
@@ -208,6 +212,11 @@ abstract class SyncableRepository<T> implements Syncable {
   ///   and returns the server list.
   /// * **Offline / error:** returns whatever is in the local cache.
   Future<List<T>> getAll() async {
+    // Local-only session: the cache *is* the store.
+    if (_localOnly) {
+      _lastReadError = null;
+      return readCache();
+    }
     if (connectivity.isOnline) {
       try {
         final data = await api.get(apiBasePath, queryParams: listQueryParams);
@@ -255,7 +264,7 @@ abstract class SyncableRepository<T> implements Syncable {
   /// Tries the server first (if online), then falls back to the local
   /// cache.  Returns `null` if the entity is not found anywhere.
   Future<T?> getById(String id) async {
-    if (connectivity.isOnline) {
+    if (!_localOnly && connectivity.isOnline) {
       try {
         final data = await api.get('$apiBasePath/$id');
         return fromJson(Map<String, dynamic>.from(data));
@@ -291,6 +300,9 @@ abstract class SyncableRepository<T> implements Syncable {
     } else {
       all[idx] = entity;
     }
+
+    // Local-only session: nothing to push, so nothing to queue.
+    if (_localOnly) return writeCache(all);
 
     // Cache and queue in one commit, *before* the push. Writing the cache
     // first and queueing only on failure left a window -- a crash, a kill --
@@ -340,6 +352,7 @@ abstract class SyncableRepository<T> implements Syncable {
   Future<void> delete(String id) async {
     final all = await readCache();
     all.removeWhere((e) => getId(e) == id);
+    if (_localOnly) return writeCache(all);
 
     final queuedId = await syncQueue.enqueueWith(
       SyncOperation(
@@ -397,7 +410,7 @@ abstract class SyncableRepository<T> implements Syncable {
   /// No-ops silently when the device is offline.
   @override
   Future<void> sync() async {
-    if (!connectivity.isOnline) return;
+    if (_localOnly || !connectivity.isOnline) return;
 
     await _pushPending();
     await _pullFromServer();

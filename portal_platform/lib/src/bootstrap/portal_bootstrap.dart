@@ -3,7 +3,11 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 
+import '../auth/device_security/device_security_binding.dart';
+import '../auth/device_security/device_security_controller.dart';
+import '../auth/device_security/portal_device_security_strings.dart';
 import '../config/app_config.dart';
 import '../auth/local_user_auth.dart';
 import '../observability/portal_error_handlers.dart';
@@ -38,6 +42,11 @@ class PortalBootstrap {
     return _isLoggedIn ? config.routeLoggedIn : config.routeLoggedOut;
   }
 
+  static Future<GetStorage> _defaultPrefs() async {
+    await GetStorage.init();
+    return GetStorage();
+  }
+
   /// Loads `.env`, initializes [ApiClient], [DeepLinkService], [SessionController],
   /// and stores [config]. Returns whether the user has a valid session.
   static Future<bool> init({
@@ -46,6 +55,8 @@ class PortalBootstrap {
     bool registerNotifications = false,
     String sourceName = 'portal-app',
     bool checkForUpdatesOnLaunch = true,
+    GetStorage? deviceSecurityPrefs,
+    PortalDeviceSecurityStrings? deviceSecurityStrings,
   }) async {
     WidgetsFlutterBinding.ensureInitialized();
     if (!dotenv.isInitialized) {
@@ -84,6 +95,17 @@ class PortalBootstrap {
     if (!isLoggedIn && config.autoLocalAuth) {
       isLoggedIn = await LocalUserAuth.ensureRegistered();
     }
+    // The app lock, same for every app: the local-only login needs it (the
+    // phone lock is that session's only credential) and PortalAppRoot gates
+    // on it. An app passes its own wording and prefs box; a cold start locks
+    // only when there is a session to protect.
+    if (!Get.isRegistered<DeviceSecurityController>()) {
+      DeviceSecurityBinding(
+        prefs: deviceSecurityPrefs ?? await _defaultPrefs(),
+        strings: deviceSecurityStrings,
+      ).dependencies();
+    }
+    await Get.find<DeviceSecurityController>().init(lockOnStart: isLoggedIn);
     if (isLoggedIn && Get.isRegistered<SessionController>()) {
       await Get.find<SessionController>().reloadFromStorage();
     }

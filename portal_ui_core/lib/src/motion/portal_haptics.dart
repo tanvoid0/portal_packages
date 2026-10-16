@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 
 /// The haptic a control asks for, by name rather than by method so a widget
@@ -54,7 +55,7 @@ abstract final class PortalHaptics {
       };
 
   static Future<void> _fire(Future<void> Function() haptic) {
-    if (!enabled) return Future.value();
+    if (!enabled || kIsWeb) return Future.value();
     if (intensity == PortalHapticIntensity.light) {
       return HapticFeedback.selectionClick();
     }
@@ -66,7 +67,7 @@ abstract final class PortalHaptics {
   /// step quietly — the point of "light" is less buzzing, not the same buzz
   /// pattern turned down.
   static Future<void> _sequence(List<Future<void> Function()> steps) async {
-    if (!enabled) return;
+    if (!enabled || kIsWeb) return;
     if (intensity == PortalHapticIntensity.light) {
       await HapticFeedback.selectionClick();
       return;

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:portal_ui_core/portal_ui_core.dart';
@@ -19,10 +21,22 @@ Future<void> showPortalPasswordReset(BuildContext context, {String? email}) {
 /// Backed by `/auth/password-reset/request` and `/auth/password-reset/complete`
 /// — the server mails the one-time code.
 class PortalPasswordResetView extends StatefulWidget {
-  const PortalPasswordResetView({super.key, this.email});
+  const PortalPasswordResetView({
+    super.key,
+    this.email,
+    this.resendAfter = const Duration(seconds: 60),
+    this.startOnCodeStep = false,
+  });
 
   /// Prefills the email field (e.g. whatever was typed on the login form).
   final String? email;
+
+  /// How long Resend stays asleep after a code is sent.
+  final Duration resendAfter;
+
+  /// Opens on the code step, as if the code had just been sent (the countdown
+  /// starts too). For a deep link from the reset email, and the design kit.
+  final bool startOnCodeStep;
 
   @override
   State<PortalPasswordResetView> createState() =>
@@ -38,12 +52,30 @@ class _PortalPasswordResetViewState extends State<PortalPasswordResetView> {
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  bool _codeSent = false;
+  late bool _codeSent = widget.startOnCodeStep;
   bool _isLoading = false;
   String _errorMessage = '';
 
+  Timer? _ticker;
+  late int _resendWait = widget.startOnCodeStep ? _startCountdown() : 0;
+
+  /// Counts [_resendWait] down once a second; returns its starting value.
+  int _startCountdown() {
+    _ticker?.cancel();
+    if (widget.resendAfter.inSeconds <= 0) return 0;
+    _ticker = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted || _resendWait <= 1) t.cancel();
+      if (mounted) setState(() => _resendWait--);
+    });
+    return widget.resendAfter.inSeconds;
+  }
+
+  String get _resendIn =>
+      '${_resendWait ~/ 60}:${(_resendWait % 60).toString().padLeft(2, '0')}';
+
   @override
   void dispose() {
+    _ticker?.cancel();
     _emailController.dispose();
     _codeController.dispose();
     _newPasswordController.dispose();
@@ -77,8 +109,8 @@ class _PortalPasswordResetViewState extends State<PortalPasswordResetView> {
     return null;
   }
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _submit({bool resend = false}) async {
+    if (!resend && !_formKey.currentState!.validate()) return;
     setState(() {
       _isLoading = true;
       _errorMessage = '';
@@ -86,9 +118,12 @@ class _PortalPasswordResetViewState extends State<PortalPasswordResetView> {
 
     try {
       final api = Get.find<ApiClient>();
-      if (!_codeSent) {
+      if (!_codeSent || resend) {
         await api.requestPasswordReset(email: _emailController.text.trim());
-        setState(() => _codeSent = true);
+        setState(() {
+          _codeSent = true;
+          _resendWait = _startCountdown();
+        });
         Get.snackbar(
           'Check your email',
           'If an account exists, a reset code was sent to your inbox.',
@@ -161,6 +196,27 @@ class _PortalPasswordResetViewState extends State<PortalPasswordResetView> {
                         label: 'Verification code',
                         prefix: const Icon(Icons.pin_outlined),
                       ),
+                      // The countdown is information, so muted text rather
+                      // than a disabled button's label.
+                      if (_resendWait > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            'You can resend in $_resendIn',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        )
+                      else
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: TextButton(
+                            onPressed:
+                                _isLoading ? null : () => _submit(resend: true),
+                            child: const Text('Resend code'),
+                          ),
+                        ),
                       const SizedBox(height: 16),
                       PortalTextField(
                         controller: _newPasswordController,

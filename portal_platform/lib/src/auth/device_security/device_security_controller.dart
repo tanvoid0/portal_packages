@@ -35,6 +35,9 @@ class DeviceSecurityController extends GetxService with WidgetsBindingObserver {
 
   final webPinError = RxnString();
 
+  /// Last biometric / screen-lock check failed; cleared on the next try.
+  final unlockError = RxnString();
+
   bool _shouldGuard = false;
   bool _retainLockOnUnguarded = false;
   bool _pausedForBackground = false;
@@ -72,6 +75,10 @@ class DeviceSecurityController extends GetxService with WidgetsBindingObserver {
     await _refreshSupport();
     if (enabled.value && lockOnStart) lock();
   }
+
+  /// Re-reads whether the device has a screen lock — [init] only checks once,
+  /// so a lock set up while the app is open is otherwise not noticed.
+  Future<void> refreshSupport() => _refreshSupport();
 
   Future<void> _refreshSupport() async {
     if (kIsWeb) {
@@ -212,11 +219,16 @@ class DeviceSecurityController extends GetxService with WidgetsBindingObserver {
     if (!isLocked.value || isBusy.value) return;
     if (kIsWeb) return;
     isBusy.value = true;
+    unlockError.value = null;
     try {
       final ok = await _service.authenticate(
         reason: strings.authenticateReason,
       );
-      if (ok) unlock();
+      if (ok) {
+        unlock();
+      } else {
+        unlockError.value = "Didn't recognise you. Try again.";
+      }
     } finally {
       isBusy.value = false;
     }

@@ -1,29 +1,60 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import 'device_security_controller.dart';
+import 'portal_pin_code_field.dart';
+
+/// Matches the `TextField`s' old `LengthLimitingTextInputFormatter(8)` — the
+/// box count the segmented PIN field shows.
+const _kPinMaxLength = 8;
 
 /// Full-screen unlock UI shown when the app is locked.
 class PortalDeviceSecurityLockView extends GetView<DeviceSecurityController> {
-  const PortalDeviceSecurityLockView({super.key});
+  const PortalDeviceSecurityLockView({
+    super.key,
+    this.pinMode,
+    this.noScreenLock = false,
+    this.onOpenSettings,
+    this.onForgotPin,
+  });
+
+  /// PIN form instead of the biometric prompt; defaults to [kIsWeb]. Lets the
+  /// design kit stage either on any target.
+  final bool? pinMode;
+
+  /// The phone has no screen lock: the message says what to set up and the
+  /// button calls [onOpenSettings] instead of unlocking.
+  final bool noScreenLock;
+  final VoidCallback? onOpenSettings;
+
+  /// Shows Forgot PIN? under the PIN field (the host signs out to reset it).
+  final VoidCallback? onForgotPin;
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb) {
+    if (pinMode ?? kIsWeb) {
       return Obx(
         () => controller.needsWebPinSetup.value
             ? const _WebPinSetupView()
-            : const _WebPinUnlockView(),
+            : _WebPinUnlockView(onForgotPin: onForgotPin),
       );
     }
-    return const _BiometricUnlockView();
+    return _BiometricUnlockView(
+      noScreenLock: noScreenLock,
+      onOpenSettings: onOpenSettings,
+    );
   }
 }
 
 class _BiometricUnlockView extends GetView<DeviceSecurityController> {
-  const _BiometricUnlockView();
+  const _BiometricUnlockView({
+    required this.noScreenLock,
+    required this.onOpenSettings,
+  });
+
+  final bool noScreenLock;
+  final VoidCallback? onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -56,14 +87,43 @@ class _BiometricUnlockView extends GetView<DeviceSecurityController> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    controller.strings.unlockSubtitle,
+                    noScreenLock
+                        ? controller.strings.noScreenLockSubtitle
+                        : controller.strings.unlockSubtitle,
                     style: theme.textTheme.bodyLarge?.copyWith(
                       color: cs.onSurfaceVariant,
                       height: 1.4,
                     ),
                     textAlign: TextAlign.center,
                   ),
+                  Obx(() {
+                    final err = controller.unlockError.value;
+                    if (err == null) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(
+                        err,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: cs.error,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    );
+                  }),
                   const SizedBox(height: 32),
+                  if (noScreenLock)
+                    FilledButton.icon(
+                      onPressed: onOpenSettings,
+                      icon: const Icon(Icons.settings_outlined),
+                      label: Text(controller.strings.openSettingsButton),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    )
+                  else
                   Obx(
                     () => FilledButton.icon(
                       onPressed: controller.isBusy.value
@@ -99,7 +159,9 @@ class _BiometricUnlockView extends GetView<DeviceSecurityController> {
 }
 
 class _WebPinUnlockView extends StatefulWidget {
-  const _WebPinUnlockView();
+  const _WebPinUnlockView({this.onForgotPin});
+
+  final VoidCallback? onForgotPin;
 
   @override
   State<_WebPinUnlockView> createState() => _WebPinUnlockViewState();
@@ -153,18 +215,10 @@ class _WebPinUnlockViewState extends State<_WebPinUnlockView> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
-                  TextField(
+                  PortalPinCodeField(
                     controller: _pinController,
-                    obscureText: true,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(8),
-                    ],
-                    decoration: const InputDecoration(
-                      labelText: 'PIN',
-                      border: OutlineInputBorder(),
-                    ),
+                    maxLength: _kPinMaxLength,
+                    autofocus: true,
                     onSubmitted: (_) => _submit(),
                   ),
                   Obx(() {
@@ -181,6 +235,14 @@ class _WebPinUnlockViewState extends State<_WebPinUnlockView> {
                       ),
                     );
                   }),
+                  if (widget.onForgotPin != null)
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton(
+                        onPressed: widget.onForgotPin,
+                        child: Text(_controller.strings.forgotPinButton),
+                      ),
+                    ),
                   const SizedBox(height: 24),
                   Obx(
                     () => FilledButton(
@@ -269,32 +331,29 @@ class _WebPinSetupViewState extends State<_WebPinSetupView> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
-                  TextField(
-                    controller: _pinController,
-                    obscureText: true,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(8),
-                    ],
-                    decoration: const InputDecoration(
-                      labelText: 'PIN',
-                      border: OutlineInputBorder(),
+                  Text(
+                    'PIN',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: cs.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _confirmController,
-                    obscureText: true,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(8),
-                    ],
-                    decoration: const InputDecoration(
-                      labelText: 'Confirm PIN',
-                      border: OutlineInputBorder(),
+                  const SizedBox(height: 8),
+                  PortalPinCodeField(
+                    controller: _pinController,
+                    maxLength: _kPinMaxLength,
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Confirm PIN',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: cs.onSurfaceVariant,
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  PortalPinCodeField(
+                    controller: _confirmController,
+                    maxLength: _kPinMaxLength,
                     onSubmitted: (_) => _submit(),
                   ),
                   Obx(() {

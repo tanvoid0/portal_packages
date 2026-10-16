@@ -4,8 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:portal_ui_core/portal_ui_core.dart';
 
+import '../auth/device_security/device_security_controller.dart';
 import '../auth/device_security/portal_device_security_gate.dart';
 import '../settings/portal_theme_controller.dart';
+import '../config/app_config.dart';
+import '../session/session_controller.dart';
 import 'portal_bootstrap.dart';
 
 /// The themed [GetMaterialApp] root every standalone Portal app builds the
@@ -27,6 +30,7 @@ class PortalAppRoot extends StatefulWidget {
     this.debugShowCheckedModeBanner = false,
     this.builder,
     this.shouldGuardRoute,
+    this.unguardedRoutes = const {},
   });
 
   final String title;
@@ -43,12 +47,18 @@ class PortalAppRoot extends StatefulWidget {
   /// [portalDefaultAppBuilder]'s result rather than reimplementing it.
   final Widget Function(BuildContext, Widget?)? builder;
 
-  /// Non-null turns on the shared app lock: [PortalDeviceSecurityGate] wraps
+  /// Which routes the app lock covers: [PortalDeviceSecurityGate] wraps
   /// [builder]'s (or the default builder's) output and is guarded whenever
-  /// this returns true for the current route name. Requires a
-  /// `DeviceSecurityController` already registered when the root builds —
-  /// the caller sets that up in its own startup step, same as it does today.
+  /// this returns true for the current route name. Defaults to
+  /// [portalDefaultShouldGuardRoute] (everything but the login page) when a
+  /// `DeviceSecurityController` is registered — [PortalBootstrap.init] does
+  /// that — so every app locks the same way; pass one only for extra
+  /// exempt routes.
   final bool Function(String route)? shouldGuardRoute;
+
+  /// Routes the default lock rule leaves open besides login (a password-reset
+  /// or unlock page). Ignored when [shouldGuardRoute] is given.
+  final Set<String> unguardedRoutes;
 
   @override
   State<PortalAppRoot> createState() => _PortalAppRootState();
@@ -62,13 +72,22 @@ class _PortalAppRootState extends State<PortalAppRoot> {
   @override
   void initState() {
     super.initState();
-    final shouldGuardRoute = widget.shouldGuardRoute;
+    final shouldGuardRoute = _shouldGuardRoute;
     if (shouldGuardRoute == null) return;
     _guarding = RxBool(shouldGuardRoute(PortalBootstrap.startRoute));
   }
 
+  bool Function(String route)? get _shouldGuardRoute =>
+      widget.shouldGuardRoute ??
+      (Get.isRegistered<DeviceSecurityController>()
+          ? (route) => portalDefaultShouldGuardRoute(
+              route,
+              unguarded: widget.unguardedRoutes,
+            )
+          : null);
+
   void _onRouting(Routing? routing) {
-    final guard = widget.shouldGuardRoute!(routing?.current ?? '');
+    final guard = _shouldGuardRoute!(routing?.current ?? '');
     // The first route's didPush fires from inside the Navigator's own build
     // (the persistentCallbacks phase), and this Rx sits above the Navigator,
     // so a synchronous write there marks an ancestor dirty mid-build. A
@@ -145,4 +164,17 @@ Widget portalDefaultAppBuilder(BuildContext context, Widget? child) {
       ),
     ),
   );
+}
+
+/// The fleet's app-lock rule: every route except the login page. An unnamed
+/// route (the password-reset page, which GetX reports as '') is exempt only
+/// while signed out, so an unnamed push after login still locks.
+bool portalDefaultShouldGuardRoute(
+  String route, {
+  Set<String> unguarded = const {},
+}) {
+  final path = route.split('?').first;
+  if (path.isEmpty) return Get.find<SessionController>().user.value != null;
+  return path != Get.find<AppConfig>().routeLoggedOut &&
+      !unguarded.contains(path);
 }

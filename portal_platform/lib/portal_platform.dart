@@ -98,6 +98,7 @@
 library portal_platform;
 
 // ─── Auth ──────────────────────────────────────────────────────────
+export 'src/auth/local_only_session.dart';
 export 'src/auth/local_user_auth.dart';
 export 'src/auth/local_user_identity.dart';
 export 'src/auth/portal_google_sign_in.dart';
@@ -146,6 +147,7 @@ export 'src/update/portal_update_tile.dart';
 export 'src/settings/portal_server_page.dart';
 export 'src/settings/portal_change_password_page.dart';
 export 'src/settings/portal_settings_page.dart';
+export 'src/settings/portal_settings_sub_page.dart';
 export 'src/settings/portal_settings_labels.dart';
 export 'src/settings/portal_status_tile.dart';
 export 'src/settings/portal_apps_section.dart';
@@ -175,6 +177,8 @@ export 'src/services/api_client.dart';
 export 'src/services/portal_xp.dart';
 export 'src/services/token_storage.dart';
 export 'src/session/session_controller.dart';
+export 'src/storage/local_vault_dek_store.dart';
+export 'src/storage/payload_codec.dart';
 export 'src/storage/portal_database.dart';
 export 'src/storage/user_storage_scope.dart';
 

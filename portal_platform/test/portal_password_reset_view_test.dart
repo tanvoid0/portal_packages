@@ -43,4 +43,26 @@ void main() {
     expect(find.byType(PortalButton), findsOneWidget);
     expect(find.byType(FilledButton), findsNothing);
   });
+  testWidgets('code step counts the resend down, then offers it', (
+    tester,
+  ) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: buildPortalTheme(brightness: Brightness.light),
+      home: const PortalPasswordResetView(
+        email: 'user@example.com',
+        startOnCodeStep: true,
+        resendAfter: Duration(seconds: 65),
+      ),
+    ));
+
+    expect(find.text('You can resend in 1:05'), findsOneWidget);
+    expect(find.text('Resend code'), findsNothing);
+
+    await tester.pump(const Duration(seconds: 6));
+    expect(find.text('You can resend in 0:59'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 59));
+    expect(find.textContaining('You can resend'), findsNothing);
+    expect(find.text('Resend code'), findsOneWidget);
+  });
 }

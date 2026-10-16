@@ -6,7 +6,6 @@ import '../theme/portal_ui_theme.dart';
 import 'portal_card.dart';
 import 'portal_icon_tile.dart';
 import 'portal_skeleton.dart';
-import 'portal_text.dart';
 
 /// One metric: glyph, value, label, optional footer.
 ///
@@ -150,10 +149,18 @@ class PortalStatCard extends StatelessWidget {
                     color: valueColor ?? skin.valueColor ?? portal.onSurface),
           ),
           SizedBox(height: tokens.spacing.xs),
-          PortalText(
-            label,
-            style: tokens.textStyles.overline
-                .copyWith(color: skin.labelColor ?? portal.onSurfaceVariant),
+          // FittedBox, not PortalText: a stat card sits in PortalStatRow's
+          // IntrinsicHeight, and AutoSizeText's LayoutBuilder cannot answer it.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(
+              label,
+              maxLines: 1,
+              softWrap: false,
+              style: tokens.textStyles.overline
+                  .copyWith(color: skin.labelColor ?? portal.onSurfaceVariant),
+            ),
           ),
           if (delta != null) ...[
             SizedBox(height: tokens.spacing.xs),
@@ -256,9 +263,15 @@ class PortalStatCard extends StatelessWidget {
             ),
           ),
           SizedBox(height: t.spacing.xs),
-          PortalText(
-            label,
-            style: t.textStyles.subtitle.copyWith(color: portal.onSurface),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(
+              label,
+              maxLines: 1,
+              softWrap: false,
+              style: t.textStyles.subtitle.copyWith(color: portal.onSurface),
+            ),
           ),
           if (note != null)
             Text(

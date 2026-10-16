@@ -1,9 +1,12 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 import '../services/api_client.dart';
+import 'device_security/device_security_controller.dart';
 import 'google_glyph_colors.dart';
 import 'portal_auth_config.dart';
 import 'portal_auth_controller.dart';
@@ -135,6 +138,8 @@ class PortalAuthView extends GetView<PortalAuthController> {
       TextFormField(
         controller: controller.emailController,
         validator: controller.validateEmail,
+        forceErrorText: controller.emailError.value,
+        onChanged: (_) => controller.emailError.value = null,
         keyboardType: TextInputType.emailAddress,
         textInputAction: TextInputAction.next,
         decoration: const InputDecoration(hintText: 'Email'),
@@ -143,6 +148,8 @@ class PortalAuthView extends GetView<PortalAuthController> {
       TextFormField(
         controller: controller.passwordController,
         validator: controller.validatePassword,
+        forceErrorText: controller.passwordError.value,
+        onChanged: (_) => controller.passwordError.value = null,
         obscureText: controller.obscurePassword.value,
         textInputAction:
             signingIn ? TextInputAction.done : TextInputAction.next,
@@ -253,6 +260,19 @@ class PortalAuthView extends GetView<PortalAuthController> {
             ),
             const SizedBox(height: 10),
           ],
+          if (config.allowLocalOnlyLogin &&
+              !kIsWeb &&
+              Get.isRegistered<DeviceSecurityController>()) ...[
+            OutlinedButton.icon(
+              onPressed: busy
+                  ? null
+                  : () => controller
+                      .continueWithoutAccount(config.onLocalOnlySessionStarted),
+              icon: const Icon(Icons.phonelink_lock_outlined),
+              label: const Text('Continue without an account'),
+            ),
+            const SizedBox(height: 10),
+          ],
           FilledButton(
             onPressed: busy ? null : controller.submit,
             child: busy
@@ -273,6 +293,17 @@ class PortalAuthView extends GetView<PortalAuthController> {
                 signingIn
                     ? 'Don\'t have an account? Sign up'
                     : 'Already have an account? Sign in',
+              ),
+            ),
+          if (config.showTestServer && config.testServerUrl != null)
+            PortalListItem(
+              title: 'Use test server',
+              subtitle: 'Debug build only',
+              leading: PortalListLeading.icon(PortalIcons.developer_mode_rounded),
+              trailing: PortalListAccessory.switchControl(
+                checked: controller.usingTestServer.value,
+                onChanged: (on) =>
+                    controller.setTestServer(config.testServerUrl!, on),
               ),
             ),
           if (config.showTestServer)

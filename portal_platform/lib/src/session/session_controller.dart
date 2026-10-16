@@ -40,6 +40,13 @@ class SessionController extends GetxController {
   Future<void> updateName(String name) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return;
+    final current = user.value;
+    if (current?['local_only'] == true) {
+      final updated = {...current!, 'name': trimmed};
+      await _api.startLocalOnlySession(updated);
+      user.value = updated;
+      return;
+    }
     await _api.put('/auth/me', body: {'name': trimmed});
     await _api.syncProfileFromServer();
     await reloadFromStorage();

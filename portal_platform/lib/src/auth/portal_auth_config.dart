@@ -17,8 +17,11 @@ class PortalAuthConfig {
     this.appIconImage,
     this.appSubtitle = 'Sign in to continue',
     this.showTestServer = false,
+    this.testServerUrl,
     this.onForgotPassword,
     this.allowRegistration = true,
+    this.allowLocalOnlyLogin = true,
+    this.onLocalOnlySessionStarted,
   });
 
   /// Whether the sign-up half of the form is reachable. Off for an app whose
@@ -44,10 +47,27 @@ class PortalAuthConfig {
   /// Typically `true` during development for apps that need it.
   final bool showTestServer;
 
+  /// With [showTestServer], adds a "Use test server" switch that points the
+  /// app at this URL (and back at the build's own server when off). Null, no
+  /// switch.
+  final String? testServerUrl;
+
   /// Overrides the "Forgot password?" action, which otherwise opens the
   /// shared [PortalPasswordResetView]. Set it when the app has its own reset
   /// route (e.g. Portal Task).
   final VoidCallback? onForgotPassword;
+
+  /// Whether "Continue without an account" is offered. On by default; turn it
+  /// off for an app with no on-device data (Finance). Needs a
+  /// [DeviceSecurityController], which [PortalBootstrap.init] registers (the phone lock is
+  /// this session's only credential). Hidden on web regardless.
+  final bool allowLocalOnlyLogin;
+
+  /// Called once, right after a local-only session is started successfully,
+  /// with the user's one-time encryption choice — before navigating away.
+  /// The seam for an app's own entity-persistence setup to react to the
+  /// choice, the same way [onForgotPassword] is for its own reset route.
+  final void Function(bool encrypted)? onLocalOnlySessionStarted;
 
   /// Builds a config from a shared [PortalAppIdentity] so an app doesn't
   /// restate its icon/name/tagline a second time for the auth screen.
@@ -55,20 +75,29 @@ class PortalAuthConfig {
   /// [PortalAppIdentity.logo] is an [ImageProvider], but [appIconImage] here
   /// is an asset path (`Image.asset` in [PortalAuthView]) — the two aren't
   /// the same type, so a logo on the identity is not forwarded; [appIcon]
-  /// is used instead. Pass [appIconImage] on the plain constructor directly
-  /// if an app needs its logo asset on the auth screen.
+  /// is used instead. Pass [appIconImage] (an asset path) for an app whose
+  /// auth screen shows its logo image; [appSubtitle] overrides the tagline.
   factory PortalAuthConfig.of(
     PortalAppIdentity identity, {
+    String? appIconImage,
+    String? appSubtitle,
     bool showTestServer = false,
+    String? testServerUrl,
     VoidCallback? onForgotPassword,
     bool allowRegistration = true,
+    bool allowLocalOnlyLogin = true,
+    void Function(bool encrypted)? onLocalOnlySessionStarted,
   }) => PortalAuthConfig(
     appIcon: identity.icon,
+    appIconImage: appIconImage,
     appTitle: identity.name,
-    appSubtitle: identity.tagline,
+    appSubtitle: appSubtitle ?? identity.tagline,
     showTestServer: showTestServer,
+    testServerUrl: testServerUrl,
     onForgotPassword: onForgotPassword,
     allowRegistration: allowRegistration,
+    allowLocalOnlyLogin: allowLocalOnlyLogin,
+    onLocalOnlySessionStarted: onLocalOnlySessionStarted,
   );
 }
 
@@ -80,18 +109,32 @@ class PortalAuthConfig {
 GetPage portalLoginPage({
   required String name,
   required PortalAppIdentity identity,
+  String? appIconImage,
+  String? appSubtitle,
   bool showTestServer = false,
+  String? testServerUrl,
   VoidCallback? onForgotPassword,
   bool allowRegistration = true,
+  bool allowLocalOnlyLogin = true,
+  void Function(bool encrypted)? onLocalOnlySessionStarted,
+  List<GetMiddleware>? middlewares,
+  bool participatesInRootNavigator = false,
 }) => GetPage(
   name: name,
   page: () => PortalAuthView(
     config: PortalAuthConfig.of(
       identity,
+      appIconImage: appIconImage,
+      appSubtitle: appSubtitle,
       showTestServer: showTestServer,
+      testServerUrl: testServerUrl,
       onForgotPassword: onForgotPassword,
       allowRegistration: allowRegistration,
+      allowLocalOnlyLogin: allowLocalOnlyLogin,
+      onLocalOnlySessionStarted: onLocalOnlySessionStarted,
     ),
   ),
   binding: PortalAuthBinding(),
+  middlewares: middlewares,
+  participatesInRootNavigator: participatesInRootNavigator,
 );

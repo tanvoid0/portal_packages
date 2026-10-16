@@ -61,6 +61,17 @@ class ApiClient extends GetxService {
   /// Set while a refresh is running so concurrent 401s await the same call.
   Future<bool>? _refreshInFlight;
 
+  /// True once [startLocalOnlySession] has run (and stays true across a cold
+  /// start — seeded from the cached user in [init]). A local-only session
+  /// writes no token, so without this guard every authenticated request
+  /// still goes out, 401s, and [_failSessionExpired] signs the device-local
+  /// user out from under them on their very first list read.
+  bool _localOnly = false;
+
+  /// Whether this is a device-local session. Repositories read it to serve
+  /// from the on-device cache instead of the server (see [SyncableRepository]).
+  bool get isLocalOnly => _localOnly;
+
   /// Refresh must not hang: with single-flight, one stuck call blocks every
   /// waiter.
   static const Duration _refreshTimeout = Duration(seconds: 15);
@@ -101,6 +112,7 @@ class ApiClient extends GetxService {
     }
     _baseUrl = await PortalServerPrefs.read() ?? _defaultBaseUrl;
     await _tokenStorage.init();
+    _localOnly = (await _tokenStorage.getUser())?['local_only'] == true;
     return this;
   }
 
@@ -118,6 +130,7 @@ class ApiClient extends GetxService {
     await _tokenStorage.clearTokens();
     _handlingSessionExpiry = false;
     _refreshInFlight = null;
+    _localOnly = false;
     _baseUrl = url ?? _defaultBaseUrl;
     await PortalServerPrefs.write(url);
   }
@@ -355,6 +368,7 @@ class ApiClient extends GetxService {
     );
     await _tokenStorage.saveUser(data['user']);
     _handlingSessionExpiry = false;
+    _localOnly = false;
   }
 
   /// Clears stored credentials and returns the user to login when refresh fails.
@@ -393,6 +407,14 @@ class ApiClient extends GetxService {
     String traceId,
     Future<http.Response> Function(Map<String, String> headers) request,
   ) async {
+    if (_localOnly) {
+      throw ApiException(
+        'Sign in to use this.',
+        401,
+        traceId: traceId,
+        code: 'LOCAL_ONLY_SESSION',
+      );
+    }
     var headers = await _getHeaders(traceId: traceId);
     var response = await request(headers).timeout(_requestTimeout);
 
@@ -578,10 +600,18 @@ class ApiClient extends GetxService {
   /// and replaying the request would bill the user twice for one question.
   /// A 401 still refreshes once, before anything has been streamed.
   Stream<String> postStream(String endpoint, {dynamic body}) async* {
+    final traceId = _newTraceId();
+    if (_localOnly) {
+      throw ApiException(
+        'Sign in to use this.',
+        401,
+        traceId: traceId,
+        code: 'LOCAL_ONLY_SESSION',
+      );
+    }
     final uri = endpoint.startsWith('http')
         ? resolveServerAssetUri(endpoint)
         : Uri.parse('$baseUrl$endpoint').collapseSlashes();
-    final traceId = _newTraceId();
     final client = http.Client();
     try {
       var response = await _sendStream(client, uri, body, traceId);
@@ -1006,6 +1036,7 @@ class ApiClient extends GetxService {
   /// Logout user
   Future<void> logout() async {
     await _tokenStorage.clearTokens();
+    _localOnly = false;
   }
 
   /// Request a password-reset OTP (always returns ok if email format valid).
@@ -1044,9 +1075,21 @@ class ApiClient extends GetxService {
     return Map<String, dynamic>.from(data as Map);
   }
 
+  /// Starts a device-local session with no server credentials. Stamps
+  /// 'local_only': true regardless of what's passed in [profile]. Writes no
+  /// access/refresh token, so every request this client makes afterward goes
+  /// out unauthenticated — callers must not route cloud-only features through
+  /// a local-only session.
+  Future<void> startLocalOnlySession(Map<String, dynamic> profile) async {
+    await _tokenStorage.saveUser({...profile, 'local_only': true});
+    _localOnly = true;
+  }
+
   /// Check if user is logged in
   Future<bool> isLoggedIn() async {
-    return await _tokenStorage.hasValidToken();
+    if (await _tokenStorage.hasValidToken()) return true;
+    final cached = await _tokenStorage.getUser();
+    return cached?['local_only'] == true;
   }
 
   /// Get current user
@@ -1058,6 +1101,9 @@ class ApiClient extends GetxService {
   /// profile cache. Call before wardrobe (and similar) loads so stale JWTs
   /// after `seed --fresh` trigger refresh / re-auth instead of silent empty data.
   Future<void> syncProfileFromServer() async {
+    // A local session has no server profile; overwriting the stored user
+    // would also drop its `local_only` flag.
+    if (_localOnly) return;
     final raw = await get('/auth/me');
     if (raw is! Map) return;
     final m = Map<String, dynamic>.from(raw);
@@ -1136,6 +1182,7 @@ String portalErrorMessage(Object error, {String? offlineHint}) {
       const base = "You're offline.";
       return offlineHint == null ? base : '$base $offlineHint';
     }
+    if (error.code == 'LOCAL_ONLY_SESSION') return error.message;
     if (error.statusCode == 401 || error.statusCode == 403) {
       return 'Your session expired. Sign in again to continue.';
     }

@@ -92,7 +92,21 @@ void main() {
     expect(find.byType(PortalDeviceSecurityLockView), findsNothing);
   });
 
-  testWidgets('null shouldGuardRoute mounts no gate at all', (tester) async {
+  testWidgets('null shouldGuardRoute defaults to guarding all but login', (
+    tester,
+  ) async {
+    await tester.pumpWidget(buildRoot());
+    await tester.pumpAndSettle();
+    expect(find.byType(PortalDeviceSecurityGate), findsOneWidget);
+    expect(find.byType(PortalDeviceSecurityLockView), findsNothing);
+
+    Get.toNamed('/home');
+    await tester.pumpAndSettle();
+    expect(find.byType(PortalDeviceSecurityLockView), findsOneWidget);
+  });
+
+  testWidgets('no controller registered mounts no gate at all', (tester) async {
+    Get.delete<DeviceSecurityController>(force: true);
     await tester.pumpWidget(buildRoot());
     await tester.pumpAndSettle();
 

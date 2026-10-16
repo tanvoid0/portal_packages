@@ -1,22 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 import 'device_security_controller.dart';
 
-/// Reusable settings row with a switch for device security.
+/// Reusable settings row with a switch for device security — a
+/// [PortalListItem], not a bare [SwitchListTile], so it matches the rest of
+/// [PortalSettingsPage]'s coalesced row style (lime icon tile, same
+/// title/subtitle treatment) instead of standing out as a separate card.
 class PortalDeviceSecuritySettingsTile extends StatelessWidget {
-  const PortalDeviceSecuritySettingsTile({
-    super.key,
-    this.contentPadding = const EdgeInsets.symmetric(horizontal: 16),
-  });
-
-  final EdgeInsetsGeometry contentPadding;
+  const PortalDeviceSecuritySettingsTile({super.key});
 
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<DeviceSecurityController>();
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
 
     return Obx(() {
       final supported = controller.isSupported.value;
@@ -24,23 +21,17 @@ class PortalDeviceSecuritySettingsTile extends StatelessWidget {
           ? controller.strings.settingsSubtitle
           : controller.strings.unavailableSubtitle;
 
-      return SwitchListTile(
-        contentPadding: contentPadding,
-        title: Text(
-          controller.strings.settingsTitle,
-          style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+      return PortalListItem(
+        leading: PortalListLeading.tile(Icons.lock_outline_rounded),
+        title: controller.strings.settingsTitle,
+        subtitle: subtitle,
+        titleMaxLines: 2,
+        enabled: supported && !controller.isBusy.value,
+        // PortalListItem already nulls this when `enabled` above is false.
+        trailing: PortalListAccessory.switchControl(
+          checked: controller.enabled.value,
+          onChanged: controller.setEnabled,
         ),
-        subtitle: Text(
-          subtitle,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: cs.onSurfaceVariant,
-            height: 1.35,
-          ),
-        ),
-        value: controller.enabled.value,
-        onChanged: supported && !controller.isBusy.value
-            ? controller.setEnabled
-            : null,
       );
     });
   }

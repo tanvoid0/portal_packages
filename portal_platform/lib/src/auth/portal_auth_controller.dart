@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 import '../config/app_config.dart';
+import 'local_only_session.dart';
 import 'portal_google_sign_in.dart';
 import 'portal_google_sign_in_registry.dart';
 import '../routing/deep_link_service.dart';
@@ -32,6 +34,17 @@ class PortalAuthController extends GetxController {
   final obscureConfirmPassword = true.obs;
   final errorMessage = ''.obs;
 
+  /// Errors that belong to one field, set from the server's answer: a wrong
+  /// password is the password's own error, a taken email the email's. The view
+  /// shows them on the field and clears each as it is edited; [errorMessage]
+  /// stays for what no field owns (no connection).
+  final emailError = RxnString();
+  final passwordError = RxnString();
+
+  /// Whether this install talks to the config's `testServerUrl` rather than
+  /// the build's own server.
+  final usingTestServer = false.obs;
+
   final formKey = GlobalKey<FormState>();
 
   bool get canUseDemoLogin =>
@@ -54,6 +67,19 @@ class PortalAuthController extends GetxController {
   }
 
   @override
+  void onInit() {
+    super.onInit();
+    usingTestServer.value = _apiClient.isOverridden;
+  }
+
+  /// Points the app at [url] (the test server) or back at the build default.
+  /// [ApiClient.switchServer] clears tokens, which is right on a sign-in screen.
+  Future<void> setTestServer(String url, bool on) async {
+    await _apiClient.switchServer(on ? url : null);
+    usingTestServer.value = on;
+  }
+
+  @override
   void onClose() {
     emailController.dispose();
     passwordController.dispose();
@@ -65,6 +91,7 @@ class PortalAuthController extends GetxController {
   void toggleMode() {
     isLogin.value = !isLogin.value;
     errorMessage.value = '';
+    emailError.value = passwordError.value = null;
     emailController.clear();
     passwordController.clear();
     nameController.clear();
@@ -108,6 +135,7 @@ class PortalAuthController extends GetxController {
     if (!formKey.currentState!.validate()) return;
     isLoading.value = true;
     errorMessage.value = '';
+    emailError.value = passwordError.value = null;
 
     // The session is stored by login()/register() itself, so a failure after
     // that point is not a failure to sign in -- saying "check your internet"
@@ -132,7 +160,14 @@ class PortalAuthController extends GetxController {
       final fallback = Get.find<AppConfig>().routeLoggedIn;
       await Get.find<DeepLinkService>().navigatePostAuth(fallback: fallback);
     } on ApiException catch (e) {
-      errorMessage.value = e.message;
+      // A refused sign-in or a taken email belongs to its field.
+      if (isLogin.value && e.statusCode == 401) {
+        passwordError.value = e.message;
+      } else if (!isLogin.value && e.statusCode == 409) {
+        emailError.value = e.message;
+      } else {
+        errorMessage.value = e.message;
+      }
     } catch (e, st) {
       developer.log(
         'Auth request failed',
@@ -222,6 +257,63 @@ class PortalAuthController extends GetxController {
     emailController.text = _appConfig.demoEmail.trim();
     passwordController.text = _appConfig.demoPassword;
     await submit();
+  }
+
+  /// Starts a device-local, no-server-account session: a consent prompt, an
+  /// optional one-time encryption choice, then the device lock
+  /// ([LocalOnlySession.start] — the only credential this session has).
+  /// Declining the encryption prompt doesn't abort the flow; only declining
+  /// the first consent, or the device lock failing/being declined, does.
+  Future<void> continueWithoutAccount(
+    void Function(bool encrypted)? onLocalOnlySessionStarted,
+  ) async {
+    if (isLoading.value) return;
+    final context = Get.context;
+    if (context == null) return;
+    errorMessage.value = '';
+
+    final proceed = await portalConfirm(
+      context,
+      title: 'Continue without an account?',
+      message: 'Your data stays on this device only. You will be asked to '
+          'set up a screen lock to protect it. You can sign in to sync to '
+          'the cloud later.',
+      confirmLabel: 'Continue',
+    );
+    if (!proceed) return;
+
+    // Only an app with its own entity-persistence seam reads this choice
+    // (see onLocalOnlySessionStarted's doc) — asking it elsewhere offers a
+    // promise nothing honours.
+    final encrypt = onLocalOnlySessionStarted == null
+        ? false
+        : await portalConfirm(
+            context,
+            title: 'Encrypt your data on this device?',
+            message: 'There is no copy on a server. If you lose this device '
+                'or clear app data, encrypted data cannot be recovered.',
+            confirmLabel: 'Encrypt',
+            cancelLabel: 'Not now',
+          );
+
+    isLoading.value = true;
+    try {
+      final outcome = await LocalOnlySession.start(encrypted: encrypt);
+      switch (outcome) {
+        case LocalOnlySessionOutcome.unavailable:
+          errorMessage.value = 'Local-only mode is not available in this app.';
+        case LocalOnlySessionOutcome.deviceLockDeclined:
+          errorMessage.value = 'Local-only mode needs a screen lock. Set up a '
+              'fingerprint, Face ID, or PIN on this device, then try again.';
+        case LocalOnlySessionOutcome.started:
+          onLocalOnlySessionStarted?.call(encrypt);
+          await Get.find<SessionController>().reloadFromStorage();
+          final fallback = Get.find<AppConfig>().routeLoggedIn;
+          await Get.find<DeepLinkService>().navigatePostAuth(fallback: fallback);
+      }
+    } finally {
+      isLoading.value = false;
+    }
   }
 
   Future<bool> checkAuthStatus() async {

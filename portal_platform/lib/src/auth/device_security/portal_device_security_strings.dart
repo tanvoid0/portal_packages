@@ -11,6 +11,9 @@ class PortalDeviceSecurityStrings {
     required this.enableReason,
     required this.notAvailableMessage,
     required this.enableFailedMessage,
+    this.noScreenLockSubtitle = 'Set a screen lock on this phone first.',
+    this.openSettingsButton = 'Open phone settings',
+    this.forgotPinButton = 'Forgot PIN?',
   });
 
   final String settingsTitle;
@@ -23,4 +26,9 @@ class PortalDeviceSecurityStrings {
   final String enableReason;
   final String notAvailableMessage;
   final String enableFailedMessage;
+
+  /// Lead when the phone has no screen lock: what to set up first.
+  final String noScreenLockSubtitle;
+  final String openSettingsButton;
+  final String forgotPinButton;
 }

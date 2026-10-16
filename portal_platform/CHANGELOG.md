@@ -1,5 +1,17 @@
 ## Unreleased
 
+- `PortalAuthView`: a refused sign-in (401) is the password field's own error
+  and a taken email on sign-up (409) is the email field's, via the new
+  `PortalAuthController.passwordError` / `emailError` (cleared as the field is
+  edited); `errorMessage` stays the banner for what no field owns. New
+  `PortalAuthConfig.testServerUrl` (optional, also on `.of` and
+  `portalLoginPage`): with `showTestServer`, a "Use test server" switch points
+  the app at that URL and back (`PortalAuthController.setTestServer`,
+  `usingTestServer`).
+- `PortalPasswordResetView`: after a code is sent, "You can resend in 0:42"
+  counts down (`resendAfter`, default 60s), then becomes a "Resend code"
+  button. New `startOnCodeStep` opens on the code step, countdown running.
+
 - `PortalImagePickerSheet.photoBuilder` (new, optional): draws each search
   result's picture itself instead of the cached network image, so the design
   kit and tests can render the sheet with no network.
@@ -75,6 +87,14 @@
 - `portalInstallAndReport`: the install-and-snackbar tail of `showPortalUpdateDialog`, shared with the Install / Update sheet.
 - `portalCanInstallApps` reads Flutter's `defaultTargetPlatform` rather than `Platform.isAndroid`, so a widget test can render the app list.
 - `PortalSettingsLabels`: `account`, `signIn`, `signInSubtitle`, `editName`, `theme`, `accentColour`, `mode`, `modeCloud`, `modeOnDevice`, `cloudUnreachable`, `checkForUpdates`, `upToDate`, `updateCheckFailed`, `more`, `retry`, `whatsNew`, `later`. The sign out and delete account confirmations carry the new copy.
+
+- `PortalDeviceSecurityLockView` gains optional `pinMode` (force the PIN form
+  off web, for the design kit), `noScreenLock` + `onOpenSettings` (lead with
+  "set a screen lock" and open the phone's settings) and `onForgotPin`
+  (Forgot PIN? under the PIN field). `DeviceSecurityController.unlockError`
+  carries a failed biometric check, shown under the message;
+  `PortalDeviceSecurityStrings` gets optional `noScreenLockSubtitle`,
+  `openSettingsButton`, `forgotPinButton`.
 
 ## 0.1.1
 

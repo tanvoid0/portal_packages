@@ -26,7 +26,8 @@ void main() {
     await t.pumpWidget(host(
       const PortalStatCard(value: '9', label: 'A'),
       skin: const [
-        PortalStatCardTheme(backgroundColor: Colors.teal, valueColor: Colors.red),
+        PortalStatCardTheme(
+            backgroundColor: Colors.teal, valueColor: Colors.red),
       ],
     ));
     await t.pumpAndSettle();
@@ -41,12 +42,55 @@ void main() {
         backgroundColor: Colors.amber,
       ),
       skin: const [
-        PortalStatCardTheme(backgroundColor: Colors.teal, valueColor: Colors.red),
+        PortalStatCardTheme(
+            backgroundColor: Colors.teal, valueColor: Colors.red),
       ],
     ));
     await t.pumpAndSettle();
     expect(fill(t), Colors.amber);
     expect(t.widget<Text>(find.text('9')).style!.color, Colors.green);
     expect(plain, isNot(Colors.amber));
+  });
+
+  // PortalStatRow measures its cells with IntrinsicHeight; a cell holding
+  // PortalText (AutoSizeText -> LayoutBuilder) throws on the intrinsic query.
+  testWidgets('a row of filled tiles lays out under IntrinsicHeight',
+      (t) async {
+    await t.pumpWidget(host(const PortalStatRow(stats: [
+      PortalStatCard.tile(icon: Icons.bedtime, value: '7.5 h', label: 'Sleep'),
+      PortalStatCard.tile(
+          icon: Icons.directions_walk,
+          value: '8,200',
+          label: 'Steps',
+          note: '+4%'),
+      PortalStatCard.tile(icon: Icons.water_drop, value: '2 L', label: 'Water'),
+    ])));
+    expect(t.takeException(), isNull);
+    expect(find.text('Sleep'), findsOneWidget);
+    expect(find.text('Steps'), findsOneWidget);
+  });
+
+  testWidgets('a row of plain cards lays out under IntrinsicHeight', (t) async {
+    await t.pumpWidget(host(const PortalStatRow(stats: [
+      PortalStatCard(value: '9', label: 'Done', delta: '+2'),
+      PortalStatCard(value: '3', label: 'Open'),
+      PortalStatCard(value: '1', label: 'Late'),
+    ])));
+    expect(t.takeException(), isNull);
+    expect(find.text('Open'), findsOneWidget);
+  });
+
+  testWidgets('a long tile label shrinks to fit instead of overflowing',
+      (t) async {
+    await t.pumpWidget(host(const SizedBox(
+      width: 300,
+      child: PortalStatRow(stats: [
+        PortalStatCard.tile(
+            icon: Icons.bedtime, value: '1', label: 'Average weekly sleep'),
+        PortalStatCard.tile(icon: Icons.bedtime, value: '2', label: 'B'),
+      ]),
+    )));
+    expect(t.takeException(), isNull);
+    expect(find.text('Average weekly sleep'), findsOneWidget);
   });
 }

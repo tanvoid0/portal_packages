@@ -25,6 +25,9 @@ abstract final class LocalUserIdentity {
     return 'user';
   }
 
+  /// Stable per-install device id, independent of HOSTNAME/COMPUTERNAME.
+  static Future<String> stableDeviceId() => _stableDeviceId();
+
   /// Machine hostname, or a stable per-install device id when unavailable.
   static Future<String> resolveHostname() async {
     if (kIsWeb) return 'browser';
