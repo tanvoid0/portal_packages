@@ -65,5 +65,6 @@ export 'src/widgets/ai_prompt_composer.dart';
 export 'src/widgets/ai_thinking_tile.dart';
 export 'src/widgets/ai_chat_history_list.dart';
 export 'src/widgets/ai_chat_labels.dart';
+export 'src/widgets/ai_history_panel.dart';
 export 'src/widgets/ai_consent.dart';
 export 'src/widgets/ai_suggestion_cards.dart';

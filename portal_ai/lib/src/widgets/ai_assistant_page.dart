@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -24,6 +23,7 @@ import '../tools/ai_tool.dart';
 import 'ai_app_card.dart';
 import 'ai_chat_history_list.dart';
 import 'ai_chat_labels.dart';
+import 'ai_history_panel.dart';
 import 'ai_confirm_card.dart';
 import 'ai_consent.dart';
 import 'ai_suggestion_cards.dart';
@@ -85,6 +85,7 @@ class AiAssistantPage extends StatefulWidget {
     this.documents,
     this.maxPromptLength,
     this.onNewIncognito,
+    this.quickAccess = const [],
     this.incognito = false,
     this.onLeaveIncognito,
     this.appMark,
@@ -156,6 +157,12 @@ class AiAssistantPage extends StatefulWidget {
   /// rather than a third icon in the bar. No entry drawn when null -- a host
   /// with nothing ephemeral to offer gets no dead row.
   final VoidCallback? onNewIncognito;
+
+  /// Extra destinations for the thread panel's quick-access row (New incognito
+  /// chat, Scheduler, Plugins...). The host owns them because their routes are
+  /// the host's; they render as the icon row above the thread list, the same
+  /// row the Start screen's panel shows, so both open one sidebar.
+  final List<AiChatQuickAccess> quickAccess;
 
   /// This thread is never kept: nothing is saved to the [store], no earlier
   /// thread is resumed, and the page says so with a frame round its edge and
@@ -803,12 +810,64 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   Future<void> _showHistory() async {
     final store = widget.store;
     if (store == null) return;
-    // Deleting keeps the sheet open, so it rebuilds from the store rather
-    // than from the list this page captured when it opened.
-    Widget body(BuildContext dialogContext, {required bool fullHeight}) =>
-        StatefulBuilder(
+
+    // On a full page the threads ARE the navigation, so they get the shape
+    // navigation has: the shared leading-edge panel, floor to ceiling -- the
+    // same one the Start screen opens, so the whole app has one sidebar.
+    // Incognito and the host's own destinations ride the quick-access row;
+    // settings sits in the footer, the way it does in every app with a drawer.
+    if (widget.fill) {
+      await showAiHistoryPanel(
+        context: context,
+        sessions: _sessions,
+        selectedId: _sessionId,
+        labels: widget.labels,
+        subtitleFor: (s) => '${s.turnCount} ${widget.labels.messages}',
+        quickAccess: (close) => [
+          for (final q in widget.quickAccess)
+            AiChatQuickAccess(
+              icon: q.icon,
+              label: q.label,
+              onTap: () {
+                close();
+                q.onTap();
+              },
+            ),
+        ],
+        footer: widget.onSettings == null
+            ? null
+            : (close) => SafeArea(
+                top: false,
+                child: PortalListItem(
+                  leading: PortalListLeading.icon(Icons.tune_rounded),
+                  title: widget.labels.aiSettings,
+                  onTap: () {
+                    // Close first: settings pushes a route, and leaving the
+                    // panel open behind it means coming back to a drawer
+                    // nobody asked to reopen.
+                    close();
+                    widget.onSettings!();
+                  },
+                ),
+              ),
+        onSelect: (id) => id == null ? _newChat() : _loadSession(id),
+        onRename: _renameSession,
+        onSetPinned: _setPinned,
+        onDelete: _deleteSession,
+      );
+      return;
+    }
+
+    // Embedded in another app's page: a centred dialog, not a drawer. The page
+    // behind it belongs to that app, so a panel covering its leading edge would
+    // read as that app's own drawer -- and this page does not own the Scaffold
+    // to hang a real Drawer on anyway.
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        child: StatefulBuilder(
           builder: (dialogContext, setDialogState) => SizedBox(
-            height: fullHeight ? double.infinity : 420,
+            height: 420,
             child: AiChatHistoryList(
               sessions: _sessions,
               selectedId: _sessionId,
@@ -828,117 +887,13 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
               },
               onDelete: (id) async {
                 await _deleteSession(id);
-                if (_sessions.isEmpty) {
-                  if (dialogContext.mounted) {
-                    Navigator.of(dialogContext).pop();
-                  }
-                  return;
-                }
                 if (dialogContext.mounted) setDialogState(() {});
               },
             ),
           ),
-        );
-
-    // On a full page the threads ARE the navigation, so they get the shape
-    // navigation has: a panel off the leading edge, floor to ceiling. The
-    // centred 420pt dialog is right in the embedded sheet -- there the page
-    // behind it belongs to another app and a panel covering its edge would
-    // read as that app's own drawer.
-    //
-    // A Drawer would be the obvious widget and is the wrong one: this page
-    // does not own the Scaffold, its host does, and a page cannot put a
-    // drawer on someone else's.
-    final chosen = widget.fill
-        ? await showGeneralDialog<String>(
-            context: context,
-            barrierDismissible: true,
-            barrierLabel: MaterialLocalizations.of(
-              context,
-            ).modalBarrierDismissLabel,
-            barrierColor: Theme.of(
-              context,
-            ).colorScheme.scrim.withValues(alpha: 0.5),
-            transitionDuration: const Duration(milliseconds: 220),
-            pageBuilder: (dialogContext, _, _) => Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: Material(
-                color: Theme.of(dialogContext).colorScheme.surfaceContainer,
-                child: SafeArea(
-                  child: SizedBox(
-                    // Never the whole width: the sliver of conversation still
-                    // showing is what says this is a panel over the chat and
-                    // not a screen you navigated to.
-                    width: math.min(
-                      340,
-                      MediaQuery.sizeOf(dialogContext).width * 0.86,
-                    ),
-                    child: Column(
-                      children: [
-                        Expanded(child: body(dialogContext, fullHeight: true)),
-                        // Configuration lives at the foot of the navigation,
-                        // the way it does in every app that has a drawer --
-                        // not as a third icon competing with "new chat".
-                        if (widget.onNewIncognito case final newIncognito?) ...[
-                          const Divider(height: 1),
-                          SafeArea(
-                            top: false,
-                            bottom: widget.onSettings == null,
-                            child: PortalListItem(
-                              leading: PortalListLeading.icon(
-                                Icons.visibility_off_rounded,
-                              ),
-                              title: 'New incognito chat',
-                              onTap: () {
-                                Navigator.of(dialogContext).pop();
-                                newIncognito();
-                              },
-                            ),
-                          ),
-                        ],
-                        if (widget.onSettings case final openSettings?) ...[
-                          const Divider(height: 1),
-                          SafeArea(
-                            top: false,
-                            child: PortalListItem(
-                              leading: PortalListLeading.icon(
-                                Icons.tune_rounded,
-                              ),
-                              title: widget.labels.aiSettings,
-                              onTap: () {
-                                // Close the panel first: settings pushes a
-                                // route, and leaving the panel open behind it
-                                // means coming back to a drawer nobody asked
-                                // to reopen.
-                                Navigator.of(dialogContext).pop();
-                                openSettings();
-                              },
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            transitionBuilder: (context, animation, _, child) =>
-                SlideTransition(
-                  position: Tween(begin: const Offset(-1, 0), end: Offset.zero)
-                      .animate(
-                        CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOutCubic,
-                        ),
-                      ),
-                  child: child,
-                ),
-          )
-        : await showDialog<String>(
-            context: context,
-            builder: (dialogContext) =>
-                Dialog(child: body(dialogContext, fullHeight: false)),
-          );
+        ),
+      ),
+    );
     if (chosen == null) return;
     if (chosen.isEmpty) {
       _newChat();
