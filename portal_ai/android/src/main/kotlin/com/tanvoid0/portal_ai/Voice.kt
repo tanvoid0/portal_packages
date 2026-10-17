@@ -3,6 +3,7 @@ package com.tanvoid0.portal_ai
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -39,8 +40,18 @@ class Voice(private val context: Context) {
             SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
 
     /** `{stt: Boolean, tts: Boolean}` for the Dart side. */
-    suspend fun describe(): Map<String, Any?> =
-        mapOf("stt" to canListen, "tts" to initTts())
+    suspend fun describe(): Map<String, Any?> {
+        val stt = canListen
+        val tts = initTts()
+        // DEBUG(voice): why the mic is or isn't drawn on this device.
+        Log.d(
+            "PortalVoice",
+            "describe stt=$stt (sdk=${Build.VERSION.SDK_INT} " +
+                "onDevice=${SpeechRecognizer.isOnDeviceRecognitionAvailable(context)}) " +
+                "tts=$tts",
+        )
+        return mapOf("stt" to stt, "tts" to tts)
+    }
 
     private suspend fun initTts(): Boolean {
         ttsReady?.let { return it }
@@ -95,6 +106,13 @@ class Voice(private val context: Context) {
             !it.isNetworkConnectionRequired &&
                 !it.features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)
         }
+        // DEBUG(voice): what the default engine offers and whether any matches.
+        Log.d(
+            "PortalVoice",
+            "pickOfflineVoice wanted=$wanted voices=${voices.size} " +
+                "offline=${offline.size} " +
+                "offlineLocales=${offline.map { it.locale }.distinct().take(20)}",
+        )
         val voice = offline.firstOrNull { it.locale == wanted }
             ?: offline.firstOrNull { it.locale.language == wanted.language }
             ?: return false
