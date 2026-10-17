@@ -76,6 +76,8 @@ export 'src/components/portal_list_item.dart';
 export 'src/components/portal_media_tile.dart';
 export 'src/components/portal_nav_rail.dart';
 export 'src/components/portal_network_image.dart';
+export 'src/components/portal_nutrition_day_ring.dart';
+export 'src/components/portal_food_log_tile.dart';
 export 'src/components/portal_option.dart';
 export 'src/components/portal_shelf.dart';
 export 'src/components/portal_list_skeleton.dart';

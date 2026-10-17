@@ -12,6 +12,7 @@ export 'src/clients/system_ai_completion_client.dart';
 export 'src/config/gemini_model_catalog.dart';
 export 'src/documents/ai_document_client.dart';
 export 'src/documents/ai_document_import.dart';
+export 'src/documents/nutrition_vision_client.dart';
 export 'src/discovery/ai_backend_discovery.dart';
 export 'src/discovery/ollama_lan_scan.dart';
 export 'src/discovery/system_ai_probe.dart';
