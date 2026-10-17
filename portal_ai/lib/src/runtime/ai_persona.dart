@@ -22,6 +22,7 @@ class AiPersona {
     this.tools = const [],
     this.keywords = const [],
     this.suggestions = const [],
+    this.icon,
   });
 
   /// Stable identifier the router returns and a thread pins. snake_case.
@@ -44,6 +45,11 @@ class AiPersona {
 
   /// Starter chips to show when this persona is the active one. Optional.
   final List<AiSuggestion> suggestions;
+
+  /// A monochrome SVG string drawn as the persona's mark on its selector chip.
+  /// Recoloured to the chip ink via [PortalGlyph], so the drawing's own fills
+  /// are irrelevant. Null means no mark (label only).
+  final String? icon;
 
   /// `- Label (id=shopping): description`, the one-line form the router prompt
   /// lists a persona as. Mirrors how the reference planner renders its roster.

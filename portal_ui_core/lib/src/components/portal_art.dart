@@ -75,3 +75,44 @@ class PortalArt extends StatelessWidget {
         : Semantics(label: semanticLabel, image: true, child: picture);
   }
 }
+
+/// A small monochrome glyph from an inline SVG string, recoloured to [color]
+/// (default: the ambient [IconTheme] colour) with `srcIn` — so the drawing's
+/// own fills and strokes do not matter, only its shape. Use for the persona /
+/// role marks on chips and badges, where the glyph must follow the selection
+/// ink the way a themed [Icon] would.
+class PortalGlyph extends StatelessWidget {
+  const PortalGlyph(
+    this.svg, {
+    super.key,
+    this.size = 18,
+    this.color,
+    this.semanticLabel,
+  });
+
+  final String svg;
+  final double size;
+
+  /// Overrides the ambient icon colour when the surrounding widget cannot set
+  /// an [IconTheme] (a chip tints its own label, not a leading widget).
+  final Color? color;
+
+  /// Decorative unless set — a chip's label already names the role.
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = color ??
+        IconTheme.of(context).color ??
+        Theme.of(context).colorScheme.onSurface;
+    final picture = SvgPicture.string(
+      svg,
+      width: size,
+      height: size,
+      colorFilter: ColorFilter.mode(tint, BlendMode.srcIn),
+    );
+    return semanticLabel == null
+        ? ExcludeSemantics(child: picture)
+        : Semantics(label: semanticLabel, image: true, child: picture);
+  }
+}

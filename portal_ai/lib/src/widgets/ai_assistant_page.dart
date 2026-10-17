@@ -2640,6 +2640,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   /// One mutually-exclusive group, so a screen reader hears it as a choice.
   Widget _personaBar() {
     final selectedId = _activePersona?.id;
+    final portal = PortalUiTheme.of(context);
     return PortalFilterChipRow(
       semanticLabel: widget.labels.assistantRole,
       children: [
@@ -2654,6 +2655,17 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
             label: persona.label,
             selected: selectedId == persona.id,
             exclusive: true,
+            // Tint the mark to the chip's own ink so it flips with selection
+            // like a themed Icon would.
+            leading: persona.icon == null
+                ? null
+                : PortalGlyph(
+                    persona.icon!,
+                    size: 18,
+                    color: selectedId == persona.id
+                        ? portal.onPrimary
+                        : portal.onSurfaceVariant,
+                  ),
             onTap: () => _pickPersona(persona),
           ),
       ],
