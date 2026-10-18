@@ -231,10 +231,14 @@ abstract class SyncableRepository<T> implements Syncable {
         _lastReadError = null;
         return merged;
       } on ApiException catch (e) {
-        debugPrint('[$entityType] API fetch failed, using cache: $e');
+        if (kDebugMode) {
+          debugPrint('[$entityType] API fetch failed, using cache: $e');
+        }
         _lastReadError = e;
       } catch (e) {
-        debugPrint('[$entityType] API fetch failed, using cache: $e');
+        if (kDebugMode) {
+          debugPrint('[$entityType] API fetch failed, using cache: $e');
+        }
         _lastReadError = ApiException('$e', -1);
       }
     } else {

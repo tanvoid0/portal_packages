@@ -22,7 +22,7 @@ class PortalFeatureCard extends StatelessWidget {
     this.sideLabel,
     this.onSide,
     this.leading,
-    this.hue,
+    this.accentColor,
     this.demoted = false,
   });
 
@@ -39,14 +39,14 @@ class PortalFeatureCard extends StatelessWidget {
 
   /// A mark at the card's start.
   final Widget? leading;
-  final Color? hue;
+  final Color? accentColor;
   final bool demoted;
 
   @override
   Widget build(BuildContext context) {
     final t = PortalUiTheme.of(context).tokens;
     final cs = Theme.of(context).colorScheme;
-    final accent = hue ?? cs.primary;
+    final accent = accentColor ?? cs.primary;
     return PortalCard(
       gutter: true,
       backgroundColor: demoted ? null : _wash(cs, accent),

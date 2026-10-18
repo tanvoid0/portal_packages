@@ -2617,7 +2617,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                 : PortalGlyph(
                     persona.icon!,
                     size: 18,
-                    color: selectedId == persona.id
+                    tintColor: selectedId == persona.id
                         ? portal.onPrimary
                         : portal.onSurfaceVariant,
                   ),

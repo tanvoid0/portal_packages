@@ -86,7 +86,7 @@ class PortalGlyph extends StatelessWidget {
     this.svg, {
     super.key,
     this.size = 18,
-    this.color,
+    this.tintColor,
     this.semanticLabel,
   });
 
@@ -95,14 +95,14 @@ class PortalGlyph extends StatelessWidget {
 
   /// Overrides the ambient icon colour when the surrounding widget cannot set
   /// an [IconTheme] (a chip tints its own label, not a leading widget).
-  final Color? color;
+  final Color? tintColor;
 
   /// Decorative unless set — a chip's label already names the role.
   final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
-    final tint = color ??
+    final tint = tintColor ??
         IconTheme.of(context).color ??
         Theme.of(context).colorScheme.onSurface;
     final picture = SvgPicture.string(
