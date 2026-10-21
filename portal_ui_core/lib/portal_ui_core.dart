@@ -104,6 +104,7 @@ export 'src/components/portal_stepper.dart';
 export 'src/components/portal_decimal_stepper.dart';
 export 'src/components/portal_text.dart';
 export 'src/components/portal_text_field.dart';
+export 'src/components/portal_timeline.dart';
 export 'src/components/portal_app_identity.dart';
 export 'src/components/portal_onboarding_page.dart';
 export 'src/components/portal_startup_gate.dart';
