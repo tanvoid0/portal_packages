@@ -143,8 +143,11 @@ class PortalTextField extends StatefulWidget {
         inputFormatters = signed ? _signedFormatters : _amountFormatters,
         maxLines = 1,
         minLines = null,
-        prefix = null,
-        prefixText = currencySymbol,
+        // A prefix WIDGET (not prefixText) so the currency symbol shows even
+        // when the field is empty and unfocused — Material hides prefixText
+        // until focus. Tightened in the decoration via _selectAllOnFocus.
+        prefix = currencySymbol == null ? null : _AmountSymbol(currencySymbol),
+        prefixText = null,
         autofillHints = null,
         textCapitalization = TextCapitalization.none,
         _selectAllOnFocus = true,
@@ -325,6 +328,11 @@ class _PortalTextFieldState extends State<PortalTextField> {
               ),
               child: widget.prefix,
             ),
+      // The amount field's symbol hugs the number; icon prefixes keep the
+      // default 48 box.
+      prefixIconConstraints: widget._selectAllOnFocus && widget.prefix != null
+          ? const BoxConstraints(minWidth: 0, minHeight: 0)
+          : null,
       suffixText: widget.unit,
       suffixStyle: muted,
       suffixIcon: widget.suffix ??
@@ -423,6 +431,24 @@ class _PortalTextFieldState extends State<PortalTextField> {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// The currency symbol drawn at the start of a `PortalTextField.amount`. A
+/// widget (not `prefixText`) so it stays visible on an empty, unfocused field.
+class _AmountSymbol extends StatelessWidget {
+  const _AmountSymbol(this.symbol);
+
+  final String symbol;
+
+  @override
+  Widget build(BuildContext context) {
+    final portal = PortalUiTheme.of(context);
+    return Text(
+      symbol,
+      style: portal.tokens.textStyles.body
+          .copyWith(color: portal.mutedForeground),
     );
   }
 }
