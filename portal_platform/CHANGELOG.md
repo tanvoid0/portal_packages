@@ -1,5 +1,9 @@
-## Unreleased
+## 0.4.0
 
+- `portalAppIconFor`: `portal_travel` now maps to `Icons.luggage_outlined`
+  instead of the generic app fallback.
+- Raised the `portal_ui_core` constraint to `^0.4.0` (the published 0.3.0 the
+  old `>=0.3.0 <0.4.0` pointed at never shipped; pub.dev is now at 0.4.0).
 - `PortalAuthView`: a refused sign-in (401) is the password field's own error
   and a taken email on sign-up (409) is the email field's, via the new
   `PortalAuthController.passwordError` / `emailError` (cleared as the field is
