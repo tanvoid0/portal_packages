@@ -804,6 +804,7 @@ IconData portalAppIconFor(String slug) => switch (slug) {
       'portal-launcher' => Icons.home_outlined,
       'portal-journey' => Icons.auto_stories_outlined,
       'portal-assistant' => Icons.smart_toy_outlined,
+      'portal-travel' => Icons.luggage_outlined,
       _ => Icons.apps_outlined,
     };
 
