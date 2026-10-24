@@ -100,6 +100,15 @@ void main() {
         data: {'name': 'local'},
       ));
 
+  Future<void> queueDelete(String id, {DateTime? at}) =>
+      queue.enqueue(SyncOperation(
+        id: 'op-del-$id',
+        type: SyncOperationType.delete,
+        entityType: 'item',
+        entityId: id,
+        createdAt: at,
+      ));
+
   Map<String, dynamic> server(String id, DateTime stamp) =>
       {'id': id, 'name': 'server', 'updatedAt': stamp.toIso8601String()};
 
@@ -165,15 +174,39 @@ void main() {
     expect(await queue.getByEntityType('item'), hasLength(1));
   });
 
-  test('a pending delete does not resurrect from the server list', () async {
+  test('pending delete beats an older server copy: stays deleted, op kept',
+      () async {
     final repo = _Repo(api, queue);
     await repo.writeCache([]);
-    await queue.enqueue(SyncOperation(
-      id: 'op-del',
-      type: SyncOperationType.delete,
-      entityType: 'item',
-      entityId: 'a',
-    ));
+    await queueDelete('a', at: DateTime.now());
+    api.response = [
+      server('a', DateTime.now().subtract(const Duration(hours: 1))),
+    ];
+
+    final got = await repo.getAll();
+
+    expect(got, isEmpty);
+    expect(await queue.getByEntityType('item'), hasLength(1));
+  });
+
+  test('pending delete loses to a newer server edit: resurrects, op dropped',
+      () async {
+    final repo = _Repo(api, queue);
+    await repo.writeCache([]);
+    await queueDelete('a', at: DateTime.now());
+    api.response = [server('a', DateTime.now().add(const Duration(hours: 1)))];
+
+    final got = await repo.getAll();
+
+    expect(got.single.name, 'server');
+    expect(await queue.getByEntityType('item'), isEmpty);
+    expect((await repo.readCache()).single.name, 'server');
+  });
+
+  test('pending delete with no server stamp stays deleted, op kept', () async {
+    final repo = _Repo(api, queue, stamped: false);
+    await repo.writeCache([]);
+    await queueDelete('a', at: DateTime.now());
     api.response = [server('a', DateTime.now().add(const Duration(hours: 1)))];
 
     final got = await repo.getAll();
