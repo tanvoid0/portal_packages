@@ -13,6 +13,12 @@ class SessionController extends GetxController {
 
   final Rxn<Map<String, dynamic>> user = Rxn<Map<String, dynamic>>();
 
+  /// True for a "Continue without an account" local-only profile: there is no
+  /// server account, so being offline is the normal state and an empty local
+  /// store means "nothing saved yet" (an empty state) rather than a failed
+  /// load (an error state).
+  bool get isLocalOnly => user.value?['local_only'] == true;
+
   @override
   void onInit() {
     super.onInit();
