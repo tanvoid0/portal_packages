@@ -394,6 +394,72 @@ void main() {
     expect(picked, 2);
   });
 
+  group('segmented tabs selected state', () {
+    Future<(Color?, Color?, Color?)> look(
+        WidgetTester t, PortalSegmentedTabsStyle style) async {
+      await t.pumpWidget(_host(PortalSegmentedTabs(
+        labels: const ['One', 'Two'],
+        index: 0,
+        style: style,
+        onChanged: (_) {},
+      )));
+      final portal = PortalUiTheme.of(t.element(find.text('One')));
+      final box = t.widget<AnimatedContainer>(find
+          .ancestor(
+              of: find.text('One'), matching: find.byType(AnimatedContainer))
+          .first);
+      final ink = t.widget<Text>(find.text('One'));
+      final fill = (box.decoration! as BoxDecoration).color;
+      return (fill, ink.style?.color, portal.primary);
+    }
+
+    testWidgets('solid is the default: primary fill, on-primary ink, outline',
+        (t) async {
+      final (fill, ink, primary) =
+          await look(t, PortalSegmentedTabsStyle.solid);
+      expect(fill, primary);
+      expect(ink, isNot(primary));
+      final box = t.widget<AnimatedContainer>(find
+          .ancestor(
+              of: find.text('Two'), matching: find.byType(AnimatedContainer))
+          .first);
+      expect((box.foregroundDecoration! as BoxDecoration).border, isNotNull);
+    });
+
+    testWidgets('tinted keeps the soft fill and accent ink', (t) async {
+      final (fill, ink, primary) =
+          await look(t, PortalSegmentedTabsStyle.tinted);
+      expect(fill, primary!.withValues(alpha: 0.15));
+      expect(ink, primary);
+    });
+
+    testWidgets('the chip theme re-skins the solid selected state', (t) async {
+      final base = buildPortalTheme(brightness: Brightness.light);
+      await t.pumpWidget(MaterialApp(
+        theme: base.copyWith(extensions: [
+          ...base.extensions.values,
+          const PortalFilterChipTheme(
+            selectedColor: Colors.amber,
+            onSelectedColor: Colors.black,
+          ),
+        ]),
+        home: Scaffold(
+          body: PortalSegmentedTabs(
+            labels: const ['One', 'Two'],
+            index: 0,
+            onChanged: (_) {},
+          ),
+        ),
+      ));
+      final box = t.widget<AnimatedContainer>(find
+          .ancestor(
+              of: find.text('One'), matching: find.byType(AnimatedContainer))
+          .first);
+      expect((box.decoration! as BoxDecoration).color, Colors.amber);
+      expect(t.widget<Text>(find.text('One')).style?.color, Colors.black);
+    });
+  });
+
   testWidgets('scrollable segmented tabs hold six segments and scroll to one',
       (t) async {
     int? picked;

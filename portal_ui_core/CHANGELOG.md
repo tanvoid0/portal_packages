@@ -1,5 +1,11 @@
 ## Unreleased
 
+- `PortalSegmentedTabs`: new `style` (`PortalSegmentedTabsStyle.solid`, the
+  default, or `.tinted`). Solid marks the selected segment with a solid fill and
+  on-colour text and outlines the rest -- the selected state of
+  `PortalFilterChip`, and re-skinned by the same `PortalFilterChipTheme`, so an
+  app sets its selected colour once for chips and segmented controls alike.
+  **Visual change:** the old soft-tint look is now `style: .tinted`.
 - `PortalFilterChipRow`: fades whichever end of the strip still has chips past
   it (nothing while they all fit), so a chip clipped by the viewport reads as
   scrollable instead of as the last one.
