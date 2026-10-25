@@ -56,4 +56,50 @@ void main() {
     expect(find.text('2/4', findRichText: true), findsOneWidget);
     expect(find.textContaining('pcs', findRichText: true), findsNothing);
   });
+
+  testWidgets('a slot narrower than its text shrinks the text, not overflows',
+      (t) async {
+    // 136 dp: the two 48 dp targets leave a sliver for the label.
+    await t.pumpWidget(host(SizedBox(
+      width: 136,
+      child: PortalStepper(
+        value: 2,
+        onChanged: (_) {},
+        label: 'A rather long quantity label',
+        decreaseTooltip: 'Remove one',
+        increaseTooltip: 'Add one',
+      ),
+    )));
+    expect(t.takeException(), isNull);
+    expect(find.text('A rather long quantity label', findRichText: true),
+        findsOneWidget);
+    expect(t.getSize(find.byType(PortalStepper)).width, lessThanOrEqualTo(136));
+
+    // The same stepper with room keeps the text at full size.
+    await t.pumpWidget(host(PortalStepper(
+      value: 2,
+      onChanged: (_) {},
+      label: 'A rather long quantity label',
+      decreaseTooltip: 'Remove one',
+      increaseTooltip: 'Add one',
+    )));
+    final natural = t.getSize(find.byType(PortalStepper)).width;
+    expect(natural, greaterThan(136));
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('in a horizontal scroller it still takes its natural width',
+      (t) async {
+    await t.pumpWidget(host(SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: PortalStepper(
+        value: 12,
+        onChanged: (_) {},
+        unit: 'servings',
+        decreaseTooltip: 'Remove one',
+        increaseTooltip: 'Add one',
+      ),
+    )));
+    expect(t.takeException(), isNull);
+  });
 }

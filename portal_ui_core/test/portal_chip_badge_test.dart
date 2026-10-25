@@ -209,4 +209,28 @@ void main() {
       expect(t.widget<Text>(find.text('A')).style?.color, Colors.black);
     });
   });
+
+  testWidgets('a filter chip in a narrow slot ellipsizes its label',
+      (t) async {
+    const label = 'A filter label far wider than the slot it is given';
+    await t.pumpWidget(host(const SizedBox(
+      width: 120,
+      child: PortalFilterChip(label: label, selected: true),
+    )));
+    expect(t.takeException(), isNull);
+    expect(t.getSize(find.byType(PortalFilterChip)).width, lessThanOrEqualTo(120));
+    final text = t.widget<Text>(find.text(label));
+    expect(text.overflow, TextOverflow.ellipsis);
+    expect(text.maxLines, 1);
+  });
+
+  testWidgets('a filter chip in a scroller keeps its whole label', (t) async {
+    const label = 'A filter label far wider than the slot it is given';
+    await t.pumpWidget(host(const SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: PortalFilterChip(label: label, selected: true),
+    )));
+    expect(t.takeException(), isNull);
+    expect(t.getSize(find.byType(PortalFilterChip)).width, greaterThan(300));
+  });
 }

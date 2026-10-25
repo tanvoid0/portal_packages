@@ -109,16 +109,21 @@ class PortalStepper extends StatelessWidget {
         : null;
     String say(int v) => unit == null ? figure(v) : '${figure(v)} $unit';
 
-    final text = Text.rich(
-      TextSpan(children: [
-        TextSpan(text: shown, style: style),
-        if (label == null && unit != null)
-          TextSpan(
-            text: ' $unit',
-            style:
-                tokens.textStyles.caption.copyWith(color: cs.onSurfaceVariant),
-          ),
-      ]),
+    // Shrinks to the room between the buttons rather than overflowing a narrow
+    // slot: the figure stays whole, which an ellipsis would not keep.
+    final text = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text.rich(
+        TextSpan(children: [
+          TextSpan(text: shown, style: style),
+          if (label == null && unit != null)
+            TextSpan(
+              text: ' $unit',
+              style: tokens.textStyles.caption
+                  .copyWith(color: cs.onSurfaceVariant),
+            ),
+        ]),
+      ),
     );
 
     final row = Row(
@@ -133,23 +138,25 @@ class PortalStepper extends StatelessWidget {
           onPressed: down,
         ),
         SizedBox(width: tokens.spacing.xs),
-        semanticLabel == null
-            ? Semantics(liveRegion: true, child: text)
-            : Semantics(
-                label: semanticLabel,
-                value: label ?? say(value),
-                // With [label] in the number's place there is no figure to
-                // say the next value with: the platform reads it as it lands.
-                increasedValue: up == null || label != null
-                    ? null
-                    : say((value + step).clamp(min, max)),
-                decreasedValue: down == null || label != null
-                    ? null
-                    : say((value - step).clamp(min, max)),
-                onIncrease: up,
-                onDecrease: down,
-                child: ExcludeSemantics(child: text),
-              ),
+        Flexible(
+          child: semanticLabel == null
+              ? Semantics(liveRegion: true, child: text)
+              : Semantics(
+                  label: semanticLabel,
+                  value: label ?? say(value),
+                  // With [label] in the number's place there is no figure to
+                  // say the next value with: the platform reads it as it lands.
+                  increasedValue: up == null || label != null
+                      ? null
+                      : say((value + step).clamp(min, max)),
+                  decreasedValue: down == null || label != null
+                      ? null
+                      : say((value - step).clamp(min, max)),
+                  onIncrease: up,
+                  onDecrease: down,
+                  child: ExcludeSemantics(child: text),
+                ),
+        ),
         SizedBox(width: tokens.spacing.xs),
         PortalButton.icon(
           icon: PortalIcons.add_rounded,

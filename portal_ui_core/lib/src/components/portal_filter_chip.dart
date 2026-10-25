@@ -239,12 +239,19 @@ class PortalFilterChip extends StatelessWidget {
                   ),
                   SizedBox(width: tokens.spacing.xs),
                 ],
-                // With a status the label above already says the text.
-                ExcludeSemantics(
-                  excluding: status != null,
-                  child: Text(
-                    label,
-                    style: tokens.textStyles.caption.copyWith(color: ink),
+                // With a status the label above already says the text. Flexible
+                // so a chip in a row narrower than its label ellipsizes instead
+                // of overflowing; in a scroller it still takes its full width.
+                Flexible(
+                  child: ExcludeSemantics(
+                    excluding: status != null,
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.ellipsis,
+                      style: tokens.textStyles.caption.copyWith(color: ink),
+                    ),
                   ),
                 ),
                 if (menu) ...[

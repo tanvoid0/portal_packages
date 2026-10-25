@@ -42,7 +42,9 @@ class PortalMediaTile extends StatelessWidget {
   /// A panel below the photo, outside the scrim, in the page's own ink (a
   /// title plus a meta row too long to live in [overlay]). When set, the
   /// photo+scrim stage fills the remaining space, so the tile needs a
-  /// bounded height from its parent (a shelf item, a grid cell).
+  /// bounded height from its parent (a shelf item, a grid cell). A footer
+  /// taller than three quarters of the tile is clipped there, so the photo
+  /// keeps a quarter of the height instead of being squeezed to nothing.
   final Widget? footer;
 
   /// Paints behind [photo] — a category's brand gradient showing past an
@@ -97,10 +99,24 @@ class PortalMediaTile extends StatelessWidget {
       borderRadius: borderRadius,
       child: footer == null
           ? stage
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [Expanded(child: stage), footer!],
+          : LayoutBuilder(
+              builder: (context, c) => Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: stage),
+                  // The scroll view lays the footer out at its natural height
+                  // and clips it to the cap (no gesture: it never scrolls),
+                  // so a footer's own Column cannot overflow a short tile.
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: c.maxHeight * 3 / 4),
+                    child: SingleChildScrollView(
+                      physics: const NeverScrollableScrollPhysics(),
+                      child: footer!,
+                    ),
+                  ),
+                ],
+              ),
             ),
     );
   }
