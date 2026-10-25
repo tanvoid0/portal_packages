@@ -4,6 +4,7 @@ import '../../contrast_gate.dart';
 import '../theme/portal_component_extensions.dart';
 import '../theme/portal_semantic_colors.dart';
 import '../theme/portal_ui_theme.dart';
+import '../theme/portal_theme_helpers.dart';
 
 /// Which colour a [PortalBadge] speaks in.
 enum PortalBadgeTone {
@@ -182,7 +183,7 @@ class PortalBadge extends StatelessWidget {
     final bg = backgroundColor ??
         container?.$1 ??
         (tone == PortalBadgeTone.neutral && foregroundColor == null
-            ? (onWash ? cs.surface.withValues(alpha: 0.7) : portal.muted)
+            ? (onWash ? cs.surface.withValues(alpha: 0.7) : portalOffPage(context, portal.muted))
             : fg.withValues(alpha: skin.tintAlpha ?? (dark ? 0.22 : 0.14)));
 
     final glyph =

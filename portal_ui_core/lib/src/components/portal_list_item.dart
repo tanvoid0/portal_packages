@@ -1447,6 +1447,8 @@ class PortalListItem extends StatelessWidget {
         // full contrast; so does a step, whose detail may run to many lines.
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          // A row shorter than its minimum height centres its content.
+          mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(

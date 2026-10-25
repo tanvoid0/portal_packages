@@ -59,6 +59,10 @@ ThemeData applyPortalComponentThemes({
   final muted = cs.onSurfaceVariant;
   final border = cs.outline;
   final elevated = cs.surfaceContainerHigh;
+  // A button's textStyle replaces the label style outright, so it has to
+  // carry the app typeface itself (the family lives on [base]'s text theme).
+  final buttonLabel = (base.textTheme.labelLarge ?? const TextStyle())
+      .copyWith(fontWeight: FontWeight.w600, fontSize: 15);
   // Tonal: a card is a tone step off the page, not a bordered box.
   final cardSurface = options.cardColor ??
       (cs.brightness == Brightness.dark
@@ -216,11 +220,7 @@ ThemeData applyPortalComponentThemes({
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(r.full),
         ),
-        textStyle: const TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 15,
-          letterSpacing: 0.1,
-        ),
+        textStyle: buttonLabel.copyWith(letterSpacing: 0.1),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
@@ -234,7 +234,7 @@ ThemeData applyPortalComponentThemes({
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(r.full),
         ),
-        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+        textStyle: buttonLabel,
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -247,7 +247,7 @@ ThemeData applyPortalComponentThemes({
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(r.md),
         ),
-        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+        textStyle: buttonLabel,
       ),
     ),
     textButtonTheme: TextButtonThemeData(
@@ -258,7 +258,7 @@ ThemeData applyPortalComponentThemes({
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(r.sm),
         ),
-        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+        textStyle: buttonLabel,
       ),
     ),
     chipTheme: ChipThemeData(
@@ -383,12 +383,14 @@ ThemeData applyPortalComponentThemes({
         return muted;
       }),
       trackColor: WidgetStateProperty.resolveWith((states) {
+        // A disabled track is still a track (onSurface 12% shows on any page);
+        // a selected one is solid primary, never a washed-out tint.
         if (states.contains(WidgetState.disabled)) {
-          return cs.surfaceContainerLow;
+          return states.contains(WidgetState.selected)
+              ? cs.primary.withValues(alpha: 0.35)
+              : cs.onSurface.withValues(alpha: 0.12);
         }
-        if (states.contains(WidgetState.selected)) {
-          return cs.primary.withValues(alpha: 0.55);
-        }
+        if (states.contains(WidgetState.selected)) return cs.primary;
         return cs.outlineVariant;
       }),
       trackOutlineColor: WidgetStateProperty.all(Colors.transparent),

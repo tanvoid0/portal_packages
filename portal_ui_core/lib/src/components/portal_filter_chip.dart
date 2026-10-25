@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../motion/portal_haptics.dart';
 import '../theme/portal_component_extensions.dart';
 import '../theme/portal_icons.dart';
+import '../theme/portal_theme_helpers.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_pressable.dart';
 import 'portal_skeleton.dart';
@@ -143,7 +144,13 @@ class PortalFilterChip extends StatelessWidget {
         ? (selectedColor ?? skin.selectedColor ?? portal.primary)
         : (unselectedColor ?? skin.unselectedColor ?? portal.surfaceVariant);
     final ink = selected
-        ? (onSelectedColor ?? skin.onSelectedColor ?? portal.onPrimary)
+        ? (onSelectedColor ??
+            skin.onSelectedColor ??
+            // A fill the caller chose (a task's colour) was never paired with
+            // an on-colour, so check it rather than assume onPrimary holds.
+            (selectedColor != null
+                ? portalInkOn(fill, portal.onPrimary)
+                : portal.onPrimary))
         : (onUnselectedColor ??
             skin.onUnselectedColor ??
             portal.onSurfaceVariant);
@@ -162,6 +169,12 @@ class PortalFilterChip extends StatelessWidget {
       _ => null,
     };
     final lead = leading ?? mark;
+    // A selected chip says so with a check unless it has a glyph of its own;
+    // an action, menu or input chip is not a selection.
+    final glyph = icon ??
+        (selected && lead == null && !_action && !menu && onDeleted == null
+            ? PortalIcons.check_rounded
+            : null);
 
     // Selection has to reach a screen reader too: the pressable announces
     // the button, but the state the fill and border carry visually would
@@ -211,13 +224,13 @@ class PortalFilterChip extends StatelessWidget {
                 if (lead != null) ...[
                   lead,
                   SizedBox(width: tokens.spacing.xs),
-                ] else if (icon != null) ...[
+                ] else if (glyph != null) ...[
                   TweenAnimationBuilder<double>(
                     tween: Tween(end: selected ? 1 : 0),
                     duration: duration,
                     curve: tokens.motion.standard,
                     builder: (_, fillAxis, __) => Icon(
-                      icon,
+                      glyph,
                       fill: fillAxis.clamp(0.0, 1.0),
                       size: tokens.typeScale.md,
                       color: ink,

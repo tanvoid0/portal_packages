@@ -6,6 +6,7 @@ import '../theme/portal_form_field.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_prompt.dart';
 import 'portal_skeleton.dart';
+import '../theme/portal_theme_helpers.dart';
 
 /// The one text input: label above, hint, helper, warning, error, prefix,
 /// suffix, unit.
@@ -354,7 +355,9 @@ class _PortalTextFieldState extends State<PortalTextField> {
       constraints: BoxConstraints(minHeight: tokens.minTapTarget),
       // The theme's border carries error and focus; only a filled pill drops it.
       filled: widget.filled ? true : null,
-      fillColor: widget.filled ? (skin.filledColor ?? portal.input) : null,
+      fillColor: widget.filled
+          ? portalOffPage(context, skin.filledColor ?? portal.input)
+          : null,
       border: widget.filled ? pill : null,
       enabledBorder: widget.filled ? pill : null,
       contentPadding: widget.filled

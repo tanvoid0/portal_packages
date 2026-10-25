@@ -1,5 +1,26 @@
 ## Unreleased
 
+- Visual sweep fixes (docs/ui-kit/notes/visual-sweep-2026-10-25.md in the app repo):
+  - `portalOffPage(context, fill)` (new): a neutral fill within 1.05:1 of the page
+    behind it steps 6% toward `onSurface`. Applied to the secondary / icon
+    `PortalButton`, the grouped `PortalStepper`, the neutral `PortalPrompt`, the
+    default `PortalProgress` track, the neutral `PortalBadge`, `PortalTextField`,
+    `PortalSelect` and `PortalComposer`, so they no longer vanish on a grouped
+    light page or where a skin folds surface tones together.
+  - `portalInkOn(fill, preferred)` (new). `PortalFilterChip.selectedColor` /
+    `PortalSegmentedTabs.accentColor` with no on-colour now pick a readable ink.
+  - `PortalFilterChip`: a selected chip with no glyph of its own draws a check
+    (not action, menu or input chips). **Visual change**, selected chips get wider.
+  - `PortalButton`: `onPressed == null` (and not loading) dims like a disabled row;
+    `expand` no longer strands the icon from its label.
+  - Switch: selected track is solid primary (was 55% alpha, read as disabled); a
+    disabled track is onSurface 12%.
+  - Material filled / elevated / outlined / text button labels and `PortalPrompt`
+    actions carry the app typeface; `PortalSelect` value and hint too.
+  - `PortalFeatureCard` eyebrow kept readable on its wash; `PortalStartupSplash`
+    failure centres; `PortalChevronLink` ellipsizes; `PortalChoiceGrid` never
+    makes more columns than choices; `PortalStepper` value uses `onSurface`;
+    `PortalListItem` centres short rows' content.
 - `PortalSegmentedTabs`: new `style` (`PortalSegmentedTabsStyle.solid`, the
   default, or `.tinted`). Solid marks the selected segment with a solid fill and
   on-colour text and outlines the rest -- the selected state of

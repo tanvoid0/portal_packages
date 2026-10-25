@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/portal_ui_theme.dart';
+import '../theme/portal_theme_helpers.dart';
 
 /// The shape of a [PortalComposer]'s dock.
 enum PortalComposerVariant {
@@ -114,7 +115,8 @@ class PortalComposer extends StatelessWidget {
       decoration: InputDecoration(
         hintText: hintText,
         filled: !docked,
-        fillColor: docked ? null : scheme.surfaceContainerHigh,
+        fillColor:
+            docked ? null : portalOffPage(context, scheme.surfaceContainerHigh),
         border: docked
             ? InputBorder.none
             : OutlineInputBorder(

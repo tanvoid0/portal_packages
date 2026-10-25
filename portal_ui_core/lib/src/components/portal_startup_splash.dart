@@ -157,12 +157,17 @@ class _PortalStartupSplashState extends State<PortalStartupSplash>
               ],
               const Spacer(flex: 4),
               if (failed)
-                _Failure(
-                  error: widget.error!,
-                  traceId: widget.traceId,
-                  traceIdLabel: widget.traceIdLabel,
-                  onCopyTraceId: widget.onCopyTraceId,
-                  onRetry: widget.onRetry,
+                // Full width, so the column centres on the screen: the progress
+                // bar is what stretched it in the other branch.
+                SizedBox(
+                  width: double.infinity,
+                  child: _Failure(
+                    error: widget.error!,
+                    traceId: widget.traceId,
+                    traceIdLabel: widget.traceIdLabel,
+                    onCopyTraceId: widget.onCopyTraceId,
+                    onRetry: widget.onRetry,
+                  ),
                 )
               else
                 _Progress(

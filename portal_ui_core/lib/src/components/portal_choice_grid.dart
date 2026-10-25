@@ -106,7 +106,13 @@ class PortalChoiceGrid extends StatelessWidget {
       builder: (context, c) {
         var cell = tap;
         if (c.maxWidth.isFinite) {
-          final n = math.max(1, ((c.maxWidth + gap) / (tap + gap)).floor());
+          final n = math.max(
+            1,
+            math.min(
+              ((c.maxWidth + gap) / (tap + gap)).floor(),
+              choices.length,
+            ),
+          );
           // Floored to 1/100 so float error never wraps the last column.
           cell = math.max(
             tap,

@@ -180,4 +180,33 @@ void main() {
       expect(scroll.position.pixels, scroll.position.maxScrollExtent);
     });
   });
+
+  group('selected chip check', () {
+    testWidgets('a selected chip with no glyph of its own gets a check',
+        (t) async {
+      await t.pumpWidget(host(const PortalFilterChip(label: 'A', selected: true)));
+      expect(find.byIcon(PortalIcons.check_rounded), findsOneWidget);
+    });
+
+    testWidgets('unselected, action, menu and own-icon chips do not',
+        (t) async {
+      await t.pumpWidget(host(const Column(children: [
+        PortalFilterChip(label: 'A', selected: false),
+        PortalFilterChip.action(label: 'B'),
+        PortalFilterChip(label: 'C', selected: true, menu: true),
+        PortalFilterChip(label: 'D', selected: true, icon: Icons.star),
+      ])));
+      expect(find.byIcon(PortalIcons.check_rounded), findsNothing);
+      expect(find.byIcon(Icons.star), findsOneWidget);
+    });
+
+    testWidgets('a chosen selected colour gets a readable ink', (t) async {
+      await t.pumpWidget(host(const PortalFilterChip(
+        label: 'A',
+        selected: true,
+        selectedColor: Color(0xFFFFCA28),
+      )));
+      expect(t.widget<Text>(find.text('A')).style?.color, Colors.black);
+    });
+  });
 }

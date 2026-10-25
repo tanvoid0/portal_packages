@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/portal_icons.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_button.dart';
+import '../theme/portal_theme_helpers.dart';
 
 /// A quantity with a minus and a plus: `-  2 pcs  +`.
 ///
@@ -93,7 +94,9 @@ class PortalStepper extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = PortalUiTheme.of(context).tokens;
     final cs = Theme.of(context).colorScheme;
-    final style = (valueStyle ?? tokens.textStyles.body).copyWith(
+    // The body role is muted ink; a set value is not a hint.
+    final style = (valueStyle ?? tokens.textStyles.body.copyWith(color: cs.onSurface))
+        .copyWith(
       fontFeatures: const [FontFeature.tabularFigures()],
     );
     String figure(int v) => format?.call(v) ?? '$v';
@@ -161,7 +164,7 @@ class PortalStepper extends StatelessWidget {
     return grouped
         ? DecoratedBox(
             decoration: BoxDecoration(
-              color: cs.surfaceContainerHigh,
+              color: portalOffPage(context, cs.surfaceContainerHigh),
               borderRadius: BorderRadius.circular(tokens.radii.full),
             ),
             child: row,

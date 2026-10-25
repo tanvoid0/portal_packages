@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../motion/portal_haptics.dart';
 import '../theme/portal_component_extensions.dart';
+import '../theme/portal_theme_helpers.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_text.dart';
 
@@ -72,7 +73,9 @@ class PortalSegmentedTabs extends StatelessWidget {
     // tinted look keeps its own, softer, reading of the accent.
     final tint =
         accentColor ?? (solid ? skin.selectedColor : null) ?? portal.primary;
-    final onTint = (solid ? skin.onSelectedColor : null) ?? portal.onPrimary;
+    final onTint = accentColor != null
+        ? portalInkOn(tint, (solid ? skin.onSelectedColor : null) ?? portal.onPrimary)
+        : (solid ? skin.onSelectedColor : null) ?? portal.onPrimary;
     final restFill =
         (solid ? skin.unselectedColor : null) ?? portal.surfaceVariant;
     final restInk =
