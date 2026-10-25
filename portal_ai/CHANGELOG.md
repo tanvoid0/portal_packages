@@ -1,4 +1,4 @@
-## Unreleased
+## 0.4.0
 
 - Chat extras from the kit, additive: **app cards** (`AiBlock.card(AiCard)`,
   drawn by `AiAppCard`: the owning app's mark and eyebrow with Open, an optional
@@ -12,9 +12,6 @@
   `destructive`, `retryLabel`, and its answers are now nullable; a tool
   confirm shows its tool namespace's `appMark`. `AiReceipt` takes
   `onOpen`/`openLabel`. All optional; nothing changes for hosts that set none.
-
-## Unreleased
-
 - `AiVoicePage.card` / `cardHint`: a confirm card (e.g. `AiConfirmCard`) takes
   the lower part of the voice page, the orb shrinks above it, a mic-marked
   line says what can be answered by voice, and the caption becomes one line
@@ -31,8 +28,6 @@
   `downloadReadyBody`, `downloadingTitle`, `downloadReadyTitle`, `timeLeft`),
   all with English defaults.
 
-## Unreleased
-
 - `AiAssistantPage.incognito` (+ `onLeaveIncognito`): a thread that is never
   kept. Nothing is saved to the store and no earlier thread is resumed; the
   page draws the kit's frame (inverse-surface ring and glow), an "Incognito:
@@ -40,14 +35,9 @@
   empty-state note. New `AiChatLabels.incognitoChip`, `leaveIncognito`,
   `incognitoEmpty`. Additive; off by default.
 
-## Unreleased
-
 - `AiDocumentImportSheet`: optional `autoStart`, `intro`, `emptyTitle`,
   `emptyMessage`, `pickLabel` and `footerBuilder` (`show` takes the text ones).
   Defaults keep today's behaviour.
-
-## 0.4.0
-
 - **Breaking:** `AiAssistantPage.show` and `PortalAiAppKit.openAssistant`
   (deprecated in 0.3.0) are removed. Push the app's own named `/ai` route
   instead (see `PortalAiSegment.ai`) — every in-repo caller moved to this in
