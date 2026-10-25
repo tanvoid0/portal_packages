@@ -5,6 +5,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 
+import '../storage/portal_key_value_store.dart';
+import '../storage/get_storage_key_value_store.dart';
 import '../auth/device_security/device_security_binding.dart';
 import '../auth/device_security/device_security_controller.dart';
 import '../auth/device_security/portal_device_security_strings.dart';
@@ -42,9 +44,9 @@ class PortalBootstrap {
     return _isLoggedIn ? config.routeLoggedIn : config.routeLoggedOut;
   }
 
-  static Future<GetStorage> _defaultPrefs() async {
+  static Future<PortalKeyValueStore> _defaultPrefs() async {
     await GetStorage.init();
-    return GetStorage();
+    return GetStorageKeyValueStore(GetStorage());
   }
 
   /// Loads `.env`, initializes [ApiClient], [DeepLinkService], [SessionController],
@@ -55,7 +57,7 @@ class PortalBootstrap {
     bool registerNotifications = false,
     String sourceName = 'portal-app',
     bool checkForUpdatesOnLaunch = true,
-    GetStorage? deviceSecurityPrefs,
+    PortalKeyValueStore? deviceSecurityPrefs,
     PortalDeviceSecurityStrings? deviceSecurityStrings,
   }) async {
     WidgetsFlutterBinding.ensureInitialized();

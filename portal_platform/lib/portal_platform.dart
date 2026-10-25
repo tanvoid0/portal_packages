@@ -177,9 +177,11 @@ export 'src/services/api_client.dart';
 export 'src/services/portal_xp.dart';
 export 'src/services/token_storage.dart';
 export 'src/session/session_controller.dart';
+export 'src/storage/get_storage_key_value_store.dart';
 export 'src/storage/local_vault_dek_store.dart';
 export 'src/storage/payload_codec.dart';
 export 'src/storage/portal_database.dart';
+export 'src/storage/portal_key_value_store.dart';
 export 'src/storage/user_storage_scope.dart';
 
 // ─── Sync (offline-first) ──────────────────────────────────────────

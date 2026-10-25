@@ -48,7 +48,8 @@ void main() {
     Get.put(PortalThemeController());
     Get.put(
       DeviceSecurityController(
-        preferences: DeviceSecurityPreferences(GetStorage()),
+        preferences:
+            DeviceSecurityPreferences(GetStorageKeyValueStore(GetStorage())),
         service: _FakeDeviceSecurityService(),
       ),
     )
