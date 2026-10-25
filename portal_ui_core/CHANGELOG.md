@@ -1,5 +1,8 @@
 ## Unreleased
 
+- `PortalFilterChipRow`: fades whichever end of the strip still has chips past
+  it (nothing while they all fit), so a chip clipped by the viewport reads as
+  scrollable instead of as the last one.
 - `PortalOnboardingPage`: optional `busy` (default false) and `busyLabel`. When
   `busy` is true the sign-in button shows an in-button spinner and refuses taps
   (wired to `PortalButton.isLoading`/`busyLabel`), so a connect flow can guard a

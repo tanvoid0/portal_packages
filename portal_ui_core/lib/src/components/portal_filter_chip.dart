@@ -412,10 +412,79 @@ class PortalFilterChipRow extends StatelessWidget {
         ],
       );
     }
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: inset,
-      child: group,
+    return _EdgeFade(
+      width: tokens.spacing.xl,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: inset,
+        child: group,
+      ),
+    );
+  }
+}
+
+/// Fades whichever end of a horizontal scroller still has content past it, so
+/// a chip cut off by the viewport reads as "more this way" instead of as the
+/// last one. Nothing is added while everything fits.
+class _EdgeFade extends StatefulWidget {
+  const _EdgeFade({required this.width, required this.child});
+
+  final double width;
+  final Widget child;
+
+  @override
+  State<_EdgeFade> createState() => _EdgeFadeState();
+}
+
+class _EdgeFadeState extends State<_EdgeFade> {
+  // Keeps the scroller (and its offset) when the mask comes and goes.
+  final _scroller = GlobalKey();
+  bool _more = false; // content past the end edge
+  bool _scrolled = false; // content before the start edge
+
+  bool _update(ScrollMetrics m) {
+    final more = m.pixels < m.maxScrollExtent - 1;
+    final scrolled = m.pixels > m.minScrollExtent + 1;
+    if (more != _more || scrolled != _scrolled) {
+      setState(() {
+        _more = more;
+        _scrolled = scrolled;
+      });
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final child = NotificationListener<ScrollMetricsNotification>(
+      onNotification: (n) => _update(n.metrics),
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (n) => _update(n.metrics),
+        child: KeyedSubtree(key: _scroller, child: widget.child),
+      ),
+    );
+    if (!_more && !_scrolled) return child;
+
+    final dir = Directionality.of(context);
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (rect) {
+        final f = (widget.width / rect.width).clamp(0.0, 0.5);
+        const clear = Color(0x00000000);
+        const solid = Color(0xFF000000);
+        return LinearGradient(
+          begin: AlignmentDirectional.centerStart,
+          end: AlignmentDirectional.centerEnd,
+          colors: [
+            _scrolled ? clear : solid,
+            solid,
+            solid,
+            _more ? clear : solid
+          ],
+          stops: [0, f, 1 - f, 1],
+        ).createShader(rect, textDirection: dir);
+      },
+      child: child,
     );
   }
 }

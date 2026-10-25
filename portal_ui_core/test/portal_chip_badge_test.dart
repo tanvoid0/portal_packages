@@ -104,7 +104,8 @@ void main() {
     await t.tap(find.text('Vegan'));
     expect(taps, 1);
     expect(deletes, 1);
-    expect(t.getSemantics(find.byTooltip('Remove vegan')),
+    expect(
+        t.getSemantics(find.byTooltip('Remove vegan')),
         isSemantics(
             tooltip: 'Remove vegan', isButton: true, hasTapAction: true));
     h.dispose();
@@ -142,5 +143,41 @@ void main() {
     await t.tapAt(Offset(label.right - 2, label.center.dy));
     expect(deletes, 0);
     expect(taps, 1);
+  });
+
+  group('PortalFilterChipRow edge fade', () {
+    Widget row(int n) => host(SizedBox(
+          width: 300,
+          child: PortalFilterChipRow(
+            children: [
+              for (var i = 0; i < n; i++) PortalFilterChip(label: 'Chip $i', selected: false)
+            ],
+          ),
+        ));
+
+    testWidgets('nothing fades while every chip fits', (t) async {
+      await t.pumpWidget(row(2));
+      await t.pump();
+      expect(find.byType(ShaderMask), findsNothing);
+    });
+
+    testWidgets('fades once chips run past the edge, and keeps the offset',
+        (t) async {
+      await t.pumpWidget(row(12));
+      await t.pump();
+      expect(find.byType(ShaderMask), findsOneWidget);
+
+      await t.drag(find.byType(SingleChildScrollView), const Offset(-120, 0));
+      await t.pump();
+      expect(find.byType(ShaderMask), findsOneWidget);
+      final scroll = t.state<ScrollableState>(find.byType(Scrollable));
+      expect(scroll.position.pixels, greaterThan(0));
+
+      await t.drag(find.byType(SingleChildScrollView), const Offset(-5000, 0));
+      await t.pump();
+      // Scrolled to the end: the start edge fades now, not the end.
+      expect(find.byType(ShaderMask), findsOneWidget);
+      expect(scroll.position.pixels, scroll.position.maxScrollExtent);
+    });
   });
 }
