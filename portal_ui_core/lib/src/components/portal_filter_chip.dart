@@ -5,6 +5,7 @@ import '../theme/portal_component_extensions.dart';
 import '../theme/portal_icons.dart';
 import '../theme/portal_theme_helpers.dart';
 import '../theme/portal_ui_theme.dart';
+import 'portal_gutter_scope.dart';
 import 'portal_pressable.dart';
 import 'portal_skeleton.dart';
 
@@ -350,13 +351,11 @@ class PortalFilterChipRow extends StatelessWidget {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
     final gap = tokens.spacing.sm;
+    // On a page that already applied the gutter the row starts on it, like
+    // everything else there ([PortalGutterScope]); the edge fade marks the clip.
+    final side = PortalGutterScope.inset(context, tokens.layout.pageHorizontal);
     final inset = padding ??
-        EdgeInsets.fromLTRB(
-          tokens.layout.pageHorizontal,
-          0,
-          tokens.layout.pageHorizontal,
-          tokens.spacing.md,
-        );
+        EdgeInsets.fromLTRB(side, 0, side, tokens.spacing.md);
 
     if (_skeleton case final widths?) {
       final paint = _compact

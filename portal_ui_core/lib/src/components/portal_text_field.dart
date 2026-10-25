@@ -355,9 +355,14 @@ class _PortalTextFieldState extends State<PortalTextField> {
       constraints: BoxConstraints(minHeight: tokens.minTapTarget),
       // The theme's border carries error and focus; only a filled pill drops it.
       filled: widget.filled ? true : null,
+      // The themed field keeps its own fill, stepped off the page like the
+      // pill: on a grouped light page both were the page colour.
       fillColor: widget.filled
           ? portalOffPage(context, skin.filledColor ?? portal.input)
-          : null,
+          : switch (Theme.of(context).inputDecorationTheme.fillColor) {
+              final fill? => portalOffPage(context, fill),
+              null => null,
+            },
       border: widget.filled ? pill : null,
       enabledBorder: widget.filled ? pill : null,
       contentPadding: widget.filled

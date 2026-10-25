@@ -1,5 +1,16 @@
 ## Unreleased
 
+- **Gutter convention: the page gutter is applied once.** New `PortalGutterScope`,
+  published by `PortalScrollPage` when it pads its children (default `padding`).
+  Inside it, `PortalListSection` (inset) and its header, `PortalCard(gutter: true)`
+  (so `PortalFeatureCard`), `PortalStatRow`, `PortalFormStack`, `PortalDetailHero`
+  and `PortalFilterChipRow` add no inset of their own, so they share the page's
+  left edge instead of sitting 16dp inside it. Off a scroll page (a sheet, a custom
+  body, a page with its own `padding`) they keep their own gutter. **Visual
+  change**; apps that hand-padded bare content to line up with the old inset
+  list cards should drop that padding.
+- `PortalTextField`'s themed (non-pill) fill steps off the page too, so fields no
+  longer read as bare text on a grouped light page.
 - Visual sweep fixes (docs/ui-kit/notes/visual-sweep-2026-10-25.md in the app repo):
   - `portalOffPage(context, fill)` (new): a neutral fill within 1.05:1 of the page
     behind it steps 6% toward `onSurface`. Applied to the secondary / icon

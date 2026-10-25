@@ -5,6 +5,7 @@ import '../theme/portal_ui_theme.dart';
 import 'portal_app_bar.dart';
 import 'portal_button_dock.dart';
 import 'portal_refresh.dart';
+import 'portal_gutter_scope.dart';
 
 /// Standard scrolling page: sliver app bar, gutter-aligned content, bottom
 /// clearance for the floating nav, optional pull-to-refresh.
@@ -238,12 +239,16 @@ class PortalScrollPage extends StatelessWidget {
       ],
     );
 
+    // The default padding is the page gutter; say so, so what sits on it does
+    // not add a second one (see [PortalGutterScope]).
+    final guttered = PortalGutterScope(applied: padding == null, child: scroll);
+
     Widget page(Widget Function(Widget) track) => Scaffold(
           backgroundColor: pageColor ?? portal.surface,
           floatingActionButton: floatingActionButton,
           bottomNavigationBar: bottom ?? bottomNavigationBar,
           body: onRefresh == null
-              ? track(scroll)
+              ? track(guttered)
               : PortalRefresh(
                   onRefresh: onRefresh!,
                   // Under the bar, not over it. A custom [appBar] is assumed
@@ -252,7 +257,7 @@ class PortalScrollPage extends StatelessWidget {
                       ? 0
                       : PortalRefresh.belowBar(context,
                           large: appBar == null && header != null),
-                  child: track(scroll),
+                  child: track(guttered),
                 ),
         );
 

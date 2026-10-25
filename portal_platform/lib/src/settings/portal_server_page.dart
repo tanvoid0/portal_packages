@@ -161,7 +161,6 @@ class _PortalServerPageState extends State<PortalServerPage> {
       children: [
         PortalListSection(
           header: labels.serverCurrent,
-          style: PortalListStyle.fullBleed,
           children: [
             PortalListItem(
               title: _api.baseUrl,
@@ -185,7 +184,7 @@ class _PortalServerPageState extends State<PortalServerPage> {
         ),
         if (_health == _Health.unreachable && _problem != null)
           Padding(
-            padding: EdgeInsets.fromLTRB(t.spacing.lg, t.spacing.sm, t.spacing.lg, 0),
+            padding: EdgeInsets.only(top: t.spacing.sm),
             child: PortalPrompt(
               size: PortalPromptSize.compact,
               sentiment: PortalSentiment.negative,
@@ -207,71 +206,75 @@ class _PortalServerPageState extends State<PortalServerPage> {
             ),
           ],
         ),
-        // A bare header has no gutter; the list sections above draw theirs.
         Padding(
-          padding: EdgeInsets.only(
-            left: PortalUiTheme.of(context).tokens.layout.pageHorizontal,
-            right: PortalUiTheme.of(context).tokens.layout.pageHorizontal,
-            top: PortalUiTheme.of(context).tokens.spacing.lg,
-          ),
+          padding: EdgeInsets.only(top: t.spacing.lg),
           child: PortalSectionHeader(title: labels.serverLocal),
         ),
-        PortalFormStack(
-          children: [
-            PortalTextField(
-              label: labels.serverLocalHost,
-              controller: _hostCtrl,
-              keyboardType: TextInputType.url,
-              textInputAction: TextInputAction.go,
-              errorText: _hostError,
-              helper: labels.serverLocalHint,
-              onChanged: (_) => setState(() {
-                _test = _Test.idle;
-                _hostError = null;
-              }),
-              onSubmitted: (_) => _testCustom(),
-            ),
-            if (_test == _Test.ok && _testResult != null)
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Semantics(
-                  liveRegion: true,
-                  child: PortalBadge(
-                    label: _testResult!,
-                    icon: PortalIcons.check_circle_rounded,
+        // ponytail: PortalFormStack adds its own side gutter on top of the
+        // page's; this is it minus the sides. Back to PortalFormStack once
+        // ui_core's reads PortalGutterScope.
+        Padding(
+          padding: EdgeInsets.only(top: t.spacing.sm, bottom: t.spacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            spacing: t.spacing.lg,
+            children: [
+              PortalTextField(
+                label: labels.serverLocalHost,
+                controller: _hostCtrl,
+                keyboardType: TextInputType.url,
+                textInputAction: TextInputAction.go,
+                errorText: _hostError,
+                helper: labels.serverLocalHint,
+                onChanged: (_) => setState(() {
+                  _test = _Test.idle;
+                  _hostError = null;
+                }),
+                onSubmitted: (_) => _testCustom(),
+              ),
+              if (_test == _Test.ok && _testResult != null)
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Semantics(
+                    liveRegion: true,
+                    child: PortalBadge(
+                      label: _testResult!,
+                      icon: PortalIcons.check_circle_rounded,
+                    ),
                   ),
                 ),
-              ),
-            // Failed: the prompt's retry is the Check button.
-            if (_test == _Test.failed)
-              PortalPrompt(
-                size: PortalPromptSize.compact,
-                sentiment: PortalSentiment.negative,
-                message: _testResult ?? labels.serverUnreachable,
-                action: (label: labels.retry, onPressed: _testCustom),
-              )
-            else
-              Wrap(
-                spacing: t.spacing.sm,
-                children: [
-                  PortalButton(
-                    label: labels.serverCheck,
-                    size: PortalButtonSize.sm,
-                    variant: PortalButtonVariant.secondary,
-                    isLoading: _test == _Test.testing,
-                    busyLabel: labels.checking,
-                    onPressed: _testCustom,
-                  ),
-                  if (_test == _Test.ok)
+              // Failed: the prompt's retry is the Check button.
+              if (_test == _Test.failed)
+                PortalPrompt(
+                  size: PortalPromptSize.compact,
+                  sentiment: PortalSentiment.negative,
+                  message: _testResult ?? labels.serverUnreachable,
+                  action: (label: labels.retry, onPressed: _testCustom),
+                )
+              else
+                Wrap(
+                  spacing: t.spacing.sm,
+                  children: [
                     PortalButton(
-                      label: labels.serverSwitch,
+                      label: labels.serverCheck,
                       size: PortalButtonSize.sm,
                       variant: PortalButtonVariant.secondary,
-                      onPressed: () => _switchTo(_testedUrl),
+                      isLoading: _test == _Test.testing,
+                      busyLabel: labels.checking,
+                      onPressed: _testCustom,
                     ),
-                ],
-              ),
-          ],
+                    if (_test == _Test.ok)
+                      PortalButton(
+                        label: labels.serverSwitch,
+                        size: PortalButtonSize.sm,
+                        variant: PortalButtonVariant.secondary,
+                        onPressed: () => _switchTo(_testedUrl),
+                      ),
+                  ],
+                ),
+            ],
+          ),
         ),
       ],
     );

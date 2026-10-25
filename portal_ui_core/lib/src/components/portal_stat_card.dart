@@ -6,6 +6,7 @@ import '../theme/portal_ui_theme.dart';
 import 'portal_card.dart';
 import 'portal_icon_tile.dart';
 import 'portal_skeleton.dart';
+import 'portal_gutter_scope.dart';
 
 /// One metric: glyph, value, label, optional footer.
 ///
@@ -312,7 +313,13 @@ class PortalStatRow extends StatelessWidget {
     final sp = PortalUiTheme.of(context).tokens.spacing;
     final n = _cells ?? stats.length;
     return Padding(
-      padding: padding ?? EdgeInsets.fromLTRB(sp.lg, sp.sm, sp.lg, 0),
+      padding: padding ??
+          EdgeInsets.fromLTRB(
+            PortalGutterScope.inset(context, sp.lg),
+            sp.sm,
+            PortalGutterScope.inset(context, sp.lg),
+            0,
+          ),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
