@@ -223,6 +223,13 @@ class PortalLocalNotifications {
     );
   }
 
+  /// Exact alarms only when the OS already allows them; inexact otherwise.
+  ///
+  /// Never requests SCHEDULE_EXACT_ALARM here: that call opens a system
+  /// Settings screen, and this runs on every [schedule] (e.g. a trip
+  /// recompute), so the app jumped to Settings repeatedly. An app that truly
+  /// needs exact timing requests it behind an explicit user action via
+  /// [requestExactAlarmsPermission] — scheduling then picks it up for free.
   Future<AndroidScheduleMode> _resolveAndroidScheduleMode() async {
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
@@ -231,14 +238,21 @@ class PortalLocalNotifications {
     }
 
     final canExact = await android.canScheduleExactNotifications() ?? false;
-    if (canExact) {
-      return AndroidScheduleMode.exactAllowWhileIdle;
-    }
-
-    final granted = await android.requestExactAlarmsPermission() ?? false;
-    return granted
+    return canExact
         ? AndroidScheduleMode.exactAllowWhileIdle
         : AndroidScheduleMode.inexactAllowWhileIdle;
+  }
+
+  /// Requests the Android SCHEDULE_EXACT_ALARM permission, which opens a system
+  /// Settings screen. Call ONLY from an explicit user action (a toggle in an
+  /// alarm/scheduler app), never on a routine schedule — [schedule] falls back
+  /// to inexact timing when this is off. Returns false on iOS/desktop (no
+  /// Android plugin) or when the permission stays denied.
+  Future<bool> requestExactAlarmsPermission() async {
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) return false;
+    return (await android.requestExactAlarmsPermission()) ?? false;
   }
 
   Future<void> cancel(int notificationId) {

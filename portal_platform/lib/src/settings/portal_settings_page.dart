@@ -412,6 +412,15 @@ class _PortalSettingsPageState extends State<PortalSettingsPage> {
         : null;
     final buildSection = widget.sectionBuilder ?? _defaultSection;
 
+    // Under PortalTabShell's floating pill (extendBody: true), the Scaffold
+    // feeds the pill's height into the body's MediaQuery bottom padding; a
+    // fixed sp.xxl alone left the last section (Account/sign-out) under the
+    // pill. Adding it clears the pill when there is one and is ~0 standalone.
+    final listPadding = EdgeInsets.only(
+      top: sp.lg,
+      bottom: sp.xxl + MediaQuery.paddingOf(context).bottom,
+    );
+
     final children = <Widget>[];
     for (final group in widget.order) {
       if (!widget.include.contains(group)) continue;
@@ -479,7 +488,7 @@ class _PortalSettingsPageState extends State<PortalSettingsPage> {
 
     if (widget.header case final header?) {
       return ListView(
-        padding: EdgeInsets.only(top: sp.lg, bottom: sp.xxl),
+        padding: listPadding,
         children: [header, ...children],
       );
     }
@@ -495,7 +504,7 @@ class _PortalSettingsPageState extends State<PortalSettingsPage> {
         statusIcon: PortalIcons.cloud_off_rounded,
       ),
       body: ListView(
-        padding: EdgeInsets.only(top: sp.lg, bottom: sp.xxl),
+        padding: listPadding,
         children: children,
       ),
     );

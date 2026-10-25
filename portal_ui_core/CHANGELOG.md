@@ -1,5 +1,12 @@
-## Unreleased
+## 0.4.0
 
+- `PortalTimelineTile` (new): a pure layout tile (`isFirst`/`isLast`/`node`/
+  `child`) for a running event rail, promoted from portal_task's timeline on
+  its second consumer (portal_travel's trip itinerary).
+- `PortalCurrencyField`/`PortalMoneyField` (new) + `PortalCurrency`/
+  `PortalMoney` (new, in `format/portal_currency.dart`): a reusable searchable
+  currency picker and a paired amount+currency money field, with the formatting
+  model behind them. Shared by portal_travel and portal_finance.
 - `PortalListItem`: a text-valued accessory (`value`, `valueAndAction`,
   `navigate` with text) is now capped at 45% of the row and ellipsizes, so the
   title gives way last (the G1 spec; the old kit did this and ui_core did not,

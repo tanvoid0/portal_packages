@@ -543,8 +543,13 @@ abstract class SyncableRepository<T> implements Syncable {
   /// a write that has not synced yet.
   ///
   ///  * No pending operation → the server copy.
-  ///  * Pending delete → the entity is gone locally and stays gone; it does
-  ///    not resurrect from the server list while the delete waits.
+  ///  * Pending delete → a tombstone, judged by the same rule. It stays
+  ///    deleted **unless** [updatedAt] says the server copy was modified after
+  ///    this device deleted it, in which case the later remote edit wins: the
+  ///    entity resurrects and the queued delete is dropped. No stamp → it
+  ///    stays deleted. The "deleted at" instant is the delete op's own
+  ///    `createdAt`: the cache row is gone, but the queued op that removed it
+  ///    is still here and carries when.
   ///  * Pending create/update → the local copy, **unless** [updatedAt] says
   ///    the server copy was modified after this device wrote its own, in
   ///    which case the server copy wins and the queued operations for that
@@ -554,8 +559,8 @@ abstract class SyncableRepository<T> implements Syncable {
   ///    their create succeeds.
   ///
   /// Device clock against server clock is the comparison; the doc accepts
-  /// that. A pending delete is only ever kept, never dropped, because a
-  /// deleted row has no local stamp left to compare.
+  /// that — for deletes too, where the delete op's `createdAt` stands in for
+  /// the deleted row's lost stamp.
   Future<List<T>> _mergeWithPending(
     List<T> serverList,
     List<SyncOperation> pendingOps,
@@ -575,7 +580,34 @@ abstract class SyncableRepository<T> implements Syncable {
         merged.add(entry.value);
         continue;
       }
-      if (ops.any((o) => o.type == SyncOperationType.delete)) continue;
+      final deleteOps =
+          ops.where((o) => o.type == SyncOperationType.delete).toList();
+      if (deleteOps.isNotEmpty) {
+        // The delete is a tombstone, judged by the same newest-wins rule as an
+        // edit. Its "deleted at" stamp is the delete op's own createdAt — the
+        // cache row is gone, but the op that removed it is still queued and
+        // carries when. A server copy modified *after* that means another
+        // device edited the entity since this one deleted it, so the later
+        // edit wins: resurrect it and drop the delete. Otherwise the delete
+        // stands, as does the no-stamp case — the honest rule when there is
+        // nothing to compare. See docs/PORTAL_WEB_PORTING.md §8.2.
+        final serverStamp = updatedAt(entry.value);
+        final deletedAt = deleteOps
+            .map((o) => o.createdAt)
+            .reduce((a, b) => a.isAfter(b) ? a : b);
+        if (serverStamp != null &&
+            serverStamp.millisecondsSinceEpoch >
+                deletedAt.millisecondsSinceEpoch &&
+            await _stillQueuedAsSeen(deleteOps)) {
+          debugPrint('[$entityType] ${entry.key}: server edited after local '
+              'delete, resurrecting and dropping the queued delete');
+          for (final op in deleteOps) {
+            await syncQueue.remove(op.id);
+          }
+          merged.add(entry.value);
+        }
+        continue;
+      }
 
       final local = localCache.where((e) => getId(e) == entry.key);
       if (local.isEmpty) {
