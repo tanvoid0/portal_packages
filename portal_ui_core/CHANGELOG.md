@@ -1,3 +1,11 @@
+## Unreleased
+
+- `PortalOnboardingPage`: optional `busy` (default false) and `busyLabel`. When
+  `busy` is true the sign-in button shows an in-button spinner and refuses taps
+  (wired to `PortalButton.isLoading`/`busyLabel`), so a connect flow can guard a
+  double-tap / duplicate OAuth without faking it through the label. Default
+  false is unchanged, today's behaviour.
+
 ## 0.4.0
 
 - `PortalTimelineTile` (new): a pure layout tile (`isFirst`/`isLast`/`node`/
