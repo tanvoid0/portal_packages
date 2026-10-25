@@ -290,7 +290,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
         if (widget.hasServer &&
             widget.showRouting &&
             widget.showModelConfig) ...[
-          _gutter(PortalSectionHeader(title: labels.routingTitle)),
+          _header(labels.routingTitle),
           _RoutingModeControl(
             labels: labels,
             mode: widget.store.routingMode,
@@ -330,10 +330,19 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
   /// draw theirs); line it up with the form rows beneath it.
   Widget _gutter(Widget child) => Padding(
     padding: EdgeInsets.symmetric(
-      horizontal: PortalUiTheme.of(context).tokens.layout.pageHorizontal,
+      horizontal: PortalUiTheme.of(context).tokens.spacing.lg,
     ),
     child: child,
   );
+
+  /// A section header padded as [PortalListSection] draws its own.
+  Widget _header(String title) {
+    final sp = PortalUiTheme.of(context).tokens.spacing;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(sp.lg, sp.lg, sp.lg, sp.sm),
+      child: PortalSectionHeader(title: title),
+    );
+  }
 
   PortalListItem _tile(AiBackendOption option) {
     final labels = widget.labels;
@@ -374,7 +383,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
         : const <Widget>[];
     if (trailing == null && config.isEmpty) return const [];
     return [
-      _gutter(PortalSectionHeader(title: widget.labels.titleFor(option.kind))),
+      _header(widget.labels.titleFor(option.kind)),
       PortalFormStack(
         children: [
           if (trailing != null)

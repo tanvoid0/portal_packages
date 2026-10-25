@@ -220,9 +220,9 @@ class PortalSettingsPage extends StatefulWidget {
   /// first.
   final List<PortalPaletteOption> palettes;
 
-  /// The app's AI settings, e.g. `AiSettingsSection` from `portal_ai`. Shown
-  /// as an inline "Assistant" section where [PortalSettingsGroup.assistant]
-  /// falls. Null hides it entirely.
+  /// The app's AI settings, e.g. `AiSettingsGroup` from `portal_ai`. Shown
+  /// inline where [PortalSettingsGroup.assistant] falls, as given: it brings
+  /// its own header. Null hides it entirely.
   final Widget? assistantSection;
 
   /// Legacy form of [assistantSection]: same inline section.
@@ -448,8 +448,10 @@ class _PortalSettingsPageState extends State<PortalSettingsPage> {
           }
 
         case PortalSettingsGroup.assistant:
+          // No header of ours: the section (AiSettingsGroup / AiSettingsSection)
+          // draws its own, and a second one above it read as a stutter.
           if (widget.assistantSection ?? widget.aiSection case final section?) {
-            children.add(buildSection(_labels.assistant, [section]));
+            children.add(section);
           }
 
         case PortalSettingsGroup.status:

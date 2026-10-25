@@ -161,9 +161,13 @@ class _AiModelDownloadPageState extends State<AiModelDownloadPage> {
     final p = _progress;
     // ponytail: straight-line estimate from elapsed time; smooth it if a
     // backend's speed varies enough to make the figure jump.
-    final left = p == null || p < 0.05
+    // Held back for 3s (too little signal) and when under a second remains
+    // ("About 0s left" on the last tick).
+    final eta =
+        p == null || p < 0.05 || _clock.elapsed < const Duration(seconds: 3)
         ? null
         : _clock.elapsed * ((1 - p) / p);
+    final left = eta != null && eta >= const Duration(seconds: 1) ? eta : null;
     return PortalResultScreen(
       state: PortalResultState.pending,
       art: const Icon(Icons.download_rounded, size: 72),

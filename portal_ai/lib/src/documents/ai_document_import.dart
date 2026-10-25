@@ -239,10 +239,14 @@ class _AiDocumentImportSheetState extends State<AiDocumentImportSheet> {
     final reviewing = _stage == _Stage.review || applying;
     final name = _file?.name;
 
+    // Only the rows bring their own gutter; the rest of the sheet needs it.
+    Widget gutter(Widget child) => Padding(
+      padding: EdgeInsets.symmetric(horizontal: t.spacing.lg),
+      child: child,
+    );
+
     return Padding(
       padding: EdgeInsets.only(
-        left: t.spacing.lg,
-        right: t.spacing.lg,
         top: t.spacing.lg,
         bottom: MediaQuery.of(context).viewInsets.bottom + t.spacing.lg,
       ),
@@ -250,23 +254,32 @@ class _AiDocumentImportSheetState extends State<AiDocumentImportSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(child: Text(widget.title, style: t.textStyles.title)),
-              PortalButton.icon(
-                icon: PortalIcons.close_rounded,
-                tooltip: 'Close',
-                onPressed: reading || applying
-                    ? null
-                    : () => Navigator.of(context).pop(),
-              ),
-            ],
+          gutter(
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.title,
+                    style: t.textStyles.title.copyWith(color: cs.onSurface),
+                  ),
+                ),
+                PortalButton.icon(
+                  icon: PortalIcons.close_rounded,
+                  tooltip: 'Close',
+                  onPressed: reading || applying
+                      ? null
+                      : () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
           ),
           SizedBox(height: t.spacing.xs),
-          Text(
-            name ?? widget.hint,
-            style: t.textStyles.body.copyWith(color: cs.onSurfaceVariant),
-            overflow: TextOverflow.ellipsis,
+          gutter(
+            Text(
+              name ?? widget.hint,
+              style: t.textStyles.body.copyWith(color: cs.onSurfaceVariant),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           SizedBox(height: t.spacing.lg),
           if (reading)
@@ -280,35 +293,43 @@ class _AiDocumentImportSheetState extends State<AiDocumentImportSheet> {
               ),
             )
           else if (_stage == _Stage.failed)
-            PortalEmptyState.error(
-              title: "Couldn't read ${name ?? 'that file'}",
-              message: _error,
-              onRetry: _read,
-              icon: PortalIcons.description_rounded,
-              inCard: false,
+            gutter(
+              PortalEmptyState.error(
+                title: "Couldn't read ${name ?? 'that file'}",
+                message: _error,
+                onRetry: _read,
+                icon: PortalIcons.description_rounded,
+                inCard: false,
+              ),
             )
           else if (_stage == _Stage.empty)
-            PortalEmptyState(
-              icon: PortalIcons.search_off_rounded,
-              title: widget.emptyTitle,
-              message: widget.emptyMessage,
-              actionLabel: widget.pickLabel,
-              onAction: _choose,
-              inCard: false,
+            gutter(
+              PortalEmptyState(
+                icon: PortalIcons.search_off_rounded,
+                title: widget.emptyTitle,
+                message: widget.emptyMessage,
+                actionLabel: widget.pickLabel,
+                onAction: _choose,
+                inCard: false,
+              ),
             )
           else if (reviewing) ...[
             if (_error case final e?) ...[
-              PortalPrompt(
-                size: PortalPromptSize.compact,
-                sentiment: PortalSentiment.negative,
-                message: e,
+              gutter(
+                PortalPrompt(
+                  size: PortalPromptSize.compact,
+                  sentiment: PortalSentiment.negative,
+                  message: e,
+                ),
               ),
               SizedBox(height: t.spacing.sm),
             ],
             if (widget.intro case final intro?) ...[
-              Text(
-                intro(_found.length, name ?? ''),
-                style: t.textStyles.body.copyWith(color: cs.onSurfaceVariant),
+              gutter(
+                Text(
+                  intro(_found.length, name ?? ''),
+                  style: t.textStyles.body.copyWith(color: cs.onSurfaceVariant),
+                ),
               ),
               SizedBox(height: t.spacing.sm),
             ],
@@ -316,45 +337,52 @@ class _AiDocumentImportSheetState extends State<AiDocumentImportSheet> {
               child: ListView(
                 shrinkWrap: true,
                 children: [
+                  // A plain row: `.checklist(done:)` would strike a ticked
+                  // proposal through, and here ticked means "will be added".
                   for (final proposal in _found)
-                    PortalListItem.checklist(
+                    PortalListItem(
                       title: proposal.title,
                       subtitle: [
                         proposal.badge,
                         proposal.subtitle,
                       ].where((x) => x.isNotEmpty).join(' · ').nullIfEmpty,
-                      done: _selected.contains(proposal.id),
-                      checkbox: true,
-                      onChanged: applying
-                          ? null
-                          : (on) => setState(() {
-                              if (on) {
-                                _selected.add(proposal.id);
-                              } else {
-                                _selected.remove(proposal.id);
-                              }
-                            }),
+                      trailing: PortalListAccessory.checkbox(
+                        checked: _selected.contains(proposal.id),
+                        onChanged: applying
+                            ? null
+                            : (on) => setState(() {
+                                if (on) {
+                                  _selected.add(proposal.id);
+                                } else {
+                                  _selected.remove(proposal.id);
+                                }
+                              }),
+                      ),
                     ),
                   if (widget.footerBuilder case final footer?)
-                    footer(_found),
+                    gutter(footer(_found)),
                 ],
               ),
             ),
           ],
           SizedBox(height: t.spacing.lg),
           if (reviewing)
-            PortalButton(
-              label: '${widget.applyLabel} (${_selected.length})',
-              leading: const Icon(Icons.check),
-              isLoading: applying,
-              busyLabel: 'Saving...',
-              onPressed: _selected.isEmpty ? null : _apply,
+            gutter(
+              PortalButton(
+                label: '${widget.applyLabel} (${_selected.length})',
+                leading: const Icon(Icons.check),
+                isLoading: applying,
+                busyLabel: 'Saving...',
+                onPressed: _selected.isEmpty ? null : _apply,
+              ),
             )
           else if (_stage == _Stage.idle)
-            PortalButton(
-              label: 'Choose a file',
-              leading: const Icon(Icons.upload_file),
-              onPressed: _choose,
+            gutter(
+              PortalButton(
+                label: 'Choose a file',
+                leading: const Icon(Icons.upload_file),
+                onPressed: _choose,
+              ),
             ),
         ],
       ),

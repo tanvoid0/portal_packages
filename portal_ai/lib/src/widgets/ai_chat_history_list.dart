@@ -211,6 +211,7 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
                   child: Padding(
                     padding: EdgeInsetsDirectional.only(
                       start: t.spacing.lg,
+                      end: t.spacing.sm,
                       top: t.spacing.sm,
                       bottom: t.spacing.sm,
                     ),
@@ -236,7 +237,7 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
             ),
             if (widget.quickAccess.isNotEmpty)
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: t.spacing.sm),
+                padding: EdgeInsets.symmetric(horizontal: t.spacing.lg),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [

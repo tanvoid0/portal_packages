@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_platform/portal_platform.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 void main() {
-  Future<void> pumpPage(WidgetTester tester) =>
-      tester.pumpWidget(const MaterialApp(home: PortalChangePasswordPage()));
+  // PortalAppBar reads PortalUiTheme, so the page needs the Portal theme.
+  Future<void> pumpPage(WidgetTester tester) => tester.pumpWidget(
+    MaterialApp(
+      theme: buildPortalTheme(brightness: Brightness.light),
+      home: const PortalChangePasswordPage(),
+    ),
+  );
 
   Future<void> submit(WidgetTester tester) async {
     await tester.tap(find.widgetWithText(FilledButton, 'Update password'));
@@ -59,6 +65,7 @@ void main() {
     var calls = <List<String>>[];
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
         home: Scaffold(
           body: PortalChangePasswordPage(
             onSubmit: (current, next) async {

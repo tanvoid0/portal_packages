@@ -254,7 +254,9 @@ class _AiModelsPageState extends State<AiModelsPage> {
           spacing.lg,
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          // The field's label sits above its box: end-align so the button
+          // meets the box, at the row buttons' size (md, not sm).
+          crossAxisAlignment: CrossAxisAlignment.end,
           spacing: spacing.sm,
           children: [
             Expanded(
@@ -267,7 +269,6 @@ class _AiModelsPageState extends State<AiModelsPage> {
             ),
             PortalButton(
               label: labels.install,
-              size: PortalButtonSize.sm,
               variant: PortalButtonVariant.secondary,
               onPressed: () => _installCustom(_customController.text),
             ),
