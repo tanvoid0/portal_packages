@@ -1,9 +1,9 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
-import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/rendering.dart';
 
+import '../theme/portal_icons.dart';
 import '../theme/portal_surface_treatment.dart';
 import '../theme/portal_ui_theme.dart';
 
@@ -33,6 +33,22 @@ class PortalAction {
   /// Small dot on the icon: "something changed here".
   final bool badge;
 }
+
+/// The one assistant entry every Portal app puts in its app bar: the sparkle
+/// mark labelled "Assistant", opening that app's own assistant via [onOpen].
+///
+/// A [PortalAction] preset, so it drops straight into [PortalAppBar.actions] —
+/// an inline icon button while it fits, a labelled "Assistant" row once the
+/// bar overflows. Fixing the icon and label in one place is what keeps the
+/// fleet's assistant entry identical; before this each app hand-rolled it and
+/// drifted ("AI assistant", "AI", a tooltip-only button, a FAB). A null
+/// [onOpen] disables it.
+PortalAction portalAssistantAction({required VoidCallback? onOpen}) =>
+    PortalAction(
+      icon: PortalIcons.auto_awesome_rounded,
+      label: 'Assistant',
+      onPressed: onOpen,
+    );
 
 /// The fleet's title bar: title, optional one-line subtitle, back button when
 /// there is somewhere to go back to, and actions that overflow into a bottom
