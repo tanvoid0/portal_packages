@@ -48,11 +48,14 @@ class PortalFormField extends StatelessWidget {
             excluding: excludeLabelSemantics,
             child: Row(
               children: [
-                Text(
-                  label!,
-                  style: textTheme.labelLarge?.copyWith(
-                    color: portal.foreground,
-                    fontWeight: FontWeight.w500,
+                // Flexible: a long label wraps instead of overflowing.
+                Flexible(
+                  child: Text(
+                    label!,
+                    style: textTheme.labelLarge?.copyWith(
+                      color: portal.foreground,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
                 if (required)
