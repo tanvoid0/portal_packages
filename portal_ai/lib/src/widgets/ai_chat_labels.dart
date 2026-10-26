@@ -37,6 +37,7 @@ class AiChatLabels {
     this.yesterday = 'Yesterday',
     this.earlier = 'Earlier',
     this.noMatches = 'No chats match that.',
+    this.clearSearch = 'Clear search',
     this.pinned = 'Pinned',
     this.pin = 'Pin',
     this.unpin = 'Unpin',
@@ -169,6 +170,9 @@ class AiChatLabels {
 
   /// Shown when a search matches no thread.
   final String noMatches;
+
+  /// The no-results state's action: empties the search field.
+  final String clearSearch;
 
   /// History list: the pinned group, the row menu, the rename dialog and the
   /// snackbar that undoes a delete.

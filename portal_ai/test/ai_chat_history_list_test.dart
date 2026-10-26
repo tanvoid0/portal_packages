@@ -172,4 +172,32 @@ void main() {
     await _openMenu(tester, 'a');
     expect(find.text('Delete'), findsNothing);
   });
+
+  testWidgets('full-page form: fills width, no new-chat button, clearable '
+      'no-results', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
+        home: Scaffold(
+          body: AiChatHistoryList(
+            width: null,
+            showNewChat: false,
+            sessions: [_summary('a', title: 'Plan the trip')],
+            onSelect: (_) {},
+            onNewChat: () {},
+            noMatchesTitleFor: (q) => 'None for $q',
+          ),
+        ),
+      ),
+    );
+    expect(find.byTooltip('New chat'), findsNothing);
+
+    await tester.enterText(find.byType(TextField), 'zzz');
+    await tester.pumpAndSettle();
+    expect(find.text('None for zzz'), findsOneWidget);
+
+    await tester.tap(find.text('Clear search'));
+    await tester.pumpAndSettle();
+    expect(find.text('Plan the trip'), findsOneWidget);
+  });
 }

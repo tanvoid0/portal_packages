@@ -12,8 +12,7 @@ class _FakeManager implements AiModelManager {
     List<String> installed = const [],
     this.failInstall = false,
     this.hang = false,
-  })
-    : _installed = [...installed];
+  }) : _installed = [...installed];
 
   final List<String> _installed;
   final bool failInstall;
@@ -114,7 +113,7 @@ void main() {
       await tester.tap(find.text('Download').first);
       await tester.pumpAndSettle();
 
-      expect(find.text('Download failed'), findsOneWidget);
+      expect(find.text("Couldn't download Qwen 3 1.7B"), findsOneWidget);
       expect(find.text('disk full'), findsOneWidget);
 
       await tester.tap(find.text('Try again'));
@@ -146,7 +145,9 @@ void main() {
       final manager = _FakeManager(installed: const ['qwen3:1.7b']);
       await _open(tester, manager);
 
-      await tester.tap(find.byTooltip('Delete'));
+      await tester.tap(find.byTooltip('Options for qwen3:1.7b'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
@@ -159,7 +160,9 @@ void main() {
       final manager = _FakeManager(installed: const ['qwen3:1.7b']);
       await _open(tester, manager);
 
-      await tester.tap(find.byTooltip('Delete'));
+      await tester.tap(find.byTooltip('Options for qwen3:1.7b'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Delete').last);
       await tester.pumpAndSettle();
@@ -177,6 +180,66 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(manager.installs, ['deepseek-r1:1.5b']);
+    });
+
+    testWidgets('a host with an active model gets the badge and Use action', (
+      tester,
+    ) async {
+      final used = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildPortalTheme(brightness: Brightness.light),
+          home: AiModelsPage(
+            manager: _FakeManager(installed: const ['qwen3:1.7b']),
+            activeId: () => 'qwen3:1.7b',
+            onUse: (id) async => used.add(id),
+            allowCustom: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Active'), findsOneWidget);
+      expect(find.byType(TextField), findsNothing);
+
+      // The model in use has nothing to switch to.
+      await tester.tap(find.byTooltip('Options for qwen3:1.7b'));
+      await tester.pumpAndSettle();
+      expect(find.text('Use this model'), findsNothing);
+    });
+
+    testWidgets('a fixed catalogue starts at the empty state', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildPortalTheme(brightness: Brightness.light),
+          home: AiModelsPage(manager: _FakeManager(), allowCustom: false),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('No models yet'), findsOneWidget);
+      await tester.tap(find.text('Download a model'));
+      await tester.pumpAndSettle();
+      expect(find.text('Qwen 3 1.7B'), findsOneWidget);
+    });
+
+    testWidgets('a device that cannot run the backend says why', (
+      tester,
+    ) async {
+      final controller = AiModelsController(
+        _FakeManager(),
+        unsupportedReason: () async => 'Needs Android 14.',
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildPortalTheme(brightness: Brightness.light),
+          home: AiModelsPage(controller: controller),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Not available on this device'), findsOneWidget);
+      expect(find.text('Needs Android 14.'), findsOneWidget);
     });
   });
 }
