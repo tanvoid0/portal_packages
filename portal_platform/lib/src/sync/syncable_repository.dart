@@ -65,6 +65,12 @@ bool isPermanentSyncFailure(Object error) {
   return error.statusCode >= 400 && error.statusCode < 500;
 }
 
+/// True when the server answered but failed (5xx): the device is online and
+/// the change is fine, so it stays queued — but telling the user they are
+/// offline would be false. Drives [SyncQueue.serverFailing].
+bool isServerSyncFailure(Object error) =>
+    error is ApiException && error.statusCode >= 500;
+
 /// Abstract **offline-first** repository for **simple** entities stored in
 /// [PortalDatabase].
 ///
@@ -340,9 +346,11 @@ abstract class SyncableRepository<T> implements Syncable {
           );
         }
         await _dropQueued(queuedId);
+        syncQueue.serverFailing.value = false;
         return;
       } catch (e) {
         debugPrint('[$entityType] API save failed, queueing: $e');
+        if (_refusedNow(e)) return _rejectQueued(queuedId);
       }
     }
 
@@ -367,6 +375,10 @@ abstract class SyncableRepository<T> implements Syncable {
       alsoWrite: (txn) => _writeCacheIn(txn, all),
     );
 
+    // Null: the delete cancelled a create still in the queue, so the server
+    // never had the entity and there is nothing to send.
+    if (queuedId == null) return;
+
     if (connectivity.isOnline) {
       try {
         await api.delete('$apiBasePath/$id');
@@ -374,6 +386,11 @@ abstract class SyncableRepository<T> implements Syncable {
         return;
       } catch (e) {
         debugPrint('[$entityType] API delete failed, queueing: $e');
+        // Already gone server-side is what a delete wanted.
+        if (e is ApiException && e.statusCode == 404) {
+          return _dropQueued(queuedId);
+        }
+        if (_refusedNow(e)) return _rejectQueued(queuedId);
       }
     }
 
@@ -389,6 +406,20 @@ abstract class SyncableRepository<T> implements Syncable {
   Future<void> _dropQueued(String? queuedId) async {
     if (queuedId == null) return;
     await syncQueue.remove(queuedId);
+  }
+
+  /// Classifies a failed immediate push: records a 5xx on
+  /// [SyncQueue.serverFailing] and answers whether the server refused it.
+  bool _refusedNow(Object e) {
+    if (isServerSyncFailure(e)) syncQueue.serverFailing.value = true;
+    return isPermanentSyncFailure(e);
+  }
+
+  /// The server refused a write outright: queueing it would replay the same
+  /// refusal forever, so it is dropped and reported — never silently.
+  Future<void> _rejectQueued(String? queuedId) async {
+    await _dropQueued(queuedId);
+    _notify(() => SyncFeedback.onRejected?.call(entityType, 1), 'onRejected');
   }
 
   /// Notify [SyncFeedback.onQueued] that a write is waiting to be pushed.
@@ -454,9 +485,11 @@ abstract class SyncableRepository<T> implements Syncable {
         }
         await syncQueue.remove(op.id);
         pushed++;
+        syncQueue.serverFailing.value = false;
       } catch (e) {
         debugPrint('[$entityType] Failed to push ${op.type.name} '
             'for ${op.entityId}: $e');
+        if (isServerSyncFailure(e)) syncQueue.serverFailing.value = true;
         // Nothing reached the server, so the rest of the queue will fail the
         // same way. Stop instead of burning a 30s timeout per operation.
         if (e is ApiException && e.isOffline) break;

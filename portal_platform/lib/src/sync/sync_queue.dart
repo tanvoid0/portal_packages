@@ -84,6 +84,11 @@ class SyncQueue extends GetxService {
   /// Reactive count of operations still waiting to be pushed.
   final pendingCount = 0.obs;
 
+  /// True while the last push attempt got a server error (5xx). The device
+  /// is online and the changes are kept, so the UI must say "server error",
+  /// not "offline". Cleared by the next accepted push.
+  final serverFailing = false.obs;
+
   /// Serialises access so concurrent callers cannot interleave a
   /// load → modify → save cycle and drop each other's operations.
   ///

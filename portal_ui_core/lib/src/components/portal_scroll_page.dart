@@ -151,6 +151,22 @@ class PortalScrollPage extends StatelessWidget {
   /// [PortalScrollPage.custom]'s own-scroll body, in place of [children].
   final Widget? body;
 
+  /// A tab page inside a shell that extends its body under a floating nav
+  /// (`Scaffold.extendBody`, as [PortalTabShell] and the hand-built shells
+  /// do) sees MediaQuery padding grown by the nav's height, but Scaffold
+  /// places a FAB by viewPadding, which does not grow — so the FAB sat under
+  /// the pill. Lift it by the difference; a pushed page, a page with its own
+  /// nav, or one with the keyboard up gets zero.
+  Widget? _clearShellNav(BuildContext context, Widget? fab) {
+    if (fab == null || (bottom ?? bottomNavigationBar) != null) return fab;
+    final lift = MediaQuery.paddingOf(context).bottom -
+        MediaQuery.viewPaddingOf(context).bottom -
+        MediaQuery.viewInsetsOf(context).bottom;
+    return lift > 0
+        ? Padding(padding: EdgeInsets.only(bottom: lift), child: fab)
+        : fab;
+  }
+
   @override
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
@@ -164,6 +180,7 @@ class PortalScrollPage extends StatelessWidget {
             : null);
     final statusLine =
         [count, status].where((s) => s != null && s.isNotEmpty).join(' · ');
+    final fab = _clearShellNav(context, floatingActionButton);
 
     if (body case final body?) {
       // A regular (non-sliver) bar: [body] owns its own scroll, so there is
@@ -191,7 +208,7 @@ class PortalScrollPage extends StatelessWidget {
       Widget page(Widget Function(Widget) track) => Scaffold(
             backgroundColor: pageColor ?? portal.surface,
             appBar: customBar as PreferredSizeWidget?,
-            floatingActionButton: floatingActionButton,
+            floatingActionButton: fab,
             // Scaffold reserves the body's height above it automatically —
             // the same clearance [children]'s SliverPadding bakes in by hand.
             bottomNavigationBar: bottom ?? bottomNavigationBar,
@@ -245,7 +262,7 @@ class PortalScrollPage extends StatelessWidget {
 
     Widget page(Widget Function(Widget) track) => Scaffold(
           backgroundColor: pageColor ?? portal.surface,
-          floatingActionButton: floatingActionButton,
+          floatingActionButton: fab,
           bottomNavigationBar: bottom ?? bottomNavigationBar,
           body: onRefresh == null
               ? track(guttered)

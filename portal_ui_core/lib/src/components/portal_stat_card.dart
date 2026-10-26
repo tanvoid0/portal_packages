@@ -141,13 +141,21 @@ class PortalStatCard extends StatelessWidget {
             ),
             SizedBox(height: tokens.spacing.sm),
           ],
-          Text(
-            value,
-            style: tokens.textStyles
-                .numeric(
-                    hero ? tokens.textStyles.hero : tokens.textStyles.title)
-                .copyWith(
-                    color: valueColor ?? skin.valueColor ?? portal.onSurface),
+          // One line, shrunk to fit: a wrapped amount ("£2,500.0 / 0") reads as
+          // a different number. FittedBox for the same reason as the label.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: tokens.textStyles
+                  .numeric(
+                      hero ? tokens.textStyles.hero : tokens.textStyles.title)
+                  .copyWith(
+                      color:
+                          valueColor ?? skin.valueColor ?? portal.onSurface),
+            ),
           ),
           SizedBox(height: tokens.spacing.xs),
           // FittedBox, not PortalText: a stat card sits in PortalStatRow's

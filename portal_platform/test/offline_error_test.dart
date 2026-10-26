@@ -54,6 +54,25 @@ void main() {
     });
   });
 
+  group('isServerSyncFailure', () {
+    /// A 5xx means online but failing: kept queued, and never shown as
+    /// "you're offline".
+    test('only a server answer of 5xx counts', () {
+      expect(isServerSyncFailure(ApiException('boom', 500)), isTrue);
+      expect(isServerSyncFailure(ApiException('gateway', 503)), isTrue);
+      expect(isServerSyncFailure(ApiException.networkFailure()), isFalse);
+      expect(isServerSyncFailure(ApiException('bad field', 400)), isFalse);
+      expect(isServerSyncFailure(StateError('boom')), isFalse);
+    });
+
+    test('a 5xx is never permanent, a 4xx never a server failure', () {
+      for (final code in [400, 404, 422, 500, 502, 503]) {
+        final e = ApiException('x', code);
+        expect(isServerSyncFailure(e) && isPermanentSyncFailure(e), isFalse);
+      }
+    });
+  });
+
   group('portalErrorMessage', () {
     test('offline copy says what happened, and takes a caller hint', () {
       final offline = ApiException.networkFailure();
