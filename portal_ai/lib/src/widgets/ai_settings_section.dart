@@ -290,7 +290,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
         if (widget.hasServer &&
             widget.showRouting &&
             widget.showModelConfig) ...[
-          _gutter(PortalSectionHeader(title: labels.routingTitle)),
+          _header(labels.routingTitle),
           _RoutingModeControl(
             labels: labels,
             mode: widget.store.routingMode,
@@ -326,14 +326,24 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     );
   }
 
-  /// A bare header or button has no page gutter of its own (the list sections
-  /// draw theirs); line it up with the form rows beneath it.
-  Widget _gutter(Widget child) => Padding(
-    padding: EdgeInsets.symmetric(
-      horizontal: PortalUiTheme.of(context).tokens.layout.pageHorizontal,
-    ),
-    child: child,
+  /// The gutter a bare header, button or form takes: the list sections draw
+  /// theirs unless a [PortalScrollPage] already padded the page.
+  double get _side => PortalGutterScope.inset(
+    context,
+    PortalUiTheme.of(context).tokens.spacing.lg,
   );
+
+  Widget _gutter(Widget child) =>
+      Padding(padding: EdgeInsets.symmetric(horizontal: _side), child: child);
+
+  /// A section header padded as [PortalListSection] draws its own.
+  Widget _header(String title) {
+    final sp = PortalUiTheme.of(context).tokens.spacing;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(_side, sp.lg, _side, sp.sm),
+      child: PortalSectionHeader(title: title),
+    );
+  }
 
   PortalListItem _tile(AiBackendOption option) {
     final labels = widget.labels;
@@ -373,14 +383,26 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
         ? _configFor(option)
         : const <Widget>[];
     if (trailing == null && config.isEmpty) return const [];
+    final sp = PortalUiTheme.of(context).tokens.spacing;
     return [
-      _gutter(PortalSectionHeader(title: widget.labels.titleFor(option.kind))),
-      PortalFormStack(
-        children: [
-          if (trailing != null)
-            Align(alignment: AlignmentDirectional.centerStart, child: trailing),
-          ...config,
-        ],
+      _header(widget.labels.titleFor(option.kind)),
+      // ponytail: PortalFormStack's own gutter is fixed, so this mirrors it
+      // with the scope-aware one; use it again once ui_core's reads the scope.
+      Padding(
+        padding: EdgeInsets.fromLTRB(_side, sp.sm, _side, sp.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          spacing: sp.lg,
+          children: [
+            if (trailing != null)
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: trailing,
+              ),
+            ...config,
+          ],
+        ),
       ),
     ];
   }

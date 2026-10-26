@@ -1,5 +1,7 @@
+import 'package:get/get.dart';
 import 'package:portal_ui_core/portal_ui_core.dart';
 
+import 'connectivity_service.dart';
 import 'sync_queue.dart';
 import 'syncable_repository.dart';
 
@@ -9,9 +11,13 @@ import 'syncable_repository.dart';
 
 /// First queued write of an offline stretch. The banner carries every one
 /// after it, so editing ten things on a train is one toast, not ten.
-PortalToastData syncQueuedToast() => const PortalToastData(
+/// [offline] false means the device is online but the server failed: saying
+/// "you're offline" then is false, and sends the user to check their wifi.
+PortalToastData syncQueuedToast({bool offline = true}) => PortalToastData(
       title: 'Saved on this device',
-      description: "You're offline. It syncs as soon as you reconnect.",
+      description: offline
+          ? "You're offline. It syncs as soon as you reconnect."
+          : "The server couldn't take it just now. It retries automatically.",
     );
 
 /// [pushed] queued changes reached the server.
@@ -61,7 +67,9 @@ PortalToastData syncEvictedToast(int dropped, String reason) => PortalToastData(
 void portalInstallSyncFeedback({String? Function(String entityType)? entityLabel}) {
   SyncFeedback.onQueued = (_, pendingCount) {
     if (pendingCount != 1) return;
-    AppToast.present(syncQueuedToast());
+    final online = Get.isRegistered<ConnectivityService>() &&
+        Get.find<ConnectivityService>().isOnline;
+    AppToast.present(syncQueuedToast(offline: !online));
   };
 
   SyncFeedback.onPushed = (pushed) => AppToast.present(syncPushedToast(pushed));

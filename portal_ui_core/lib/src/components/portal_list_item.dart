@@ -16,6 +16,7 @@ import 'portal_prompt.dart';
 import 'portal_section_header.dart';
 import 'portal_skeleton.dart';
 import 'portal_typing_dots.dart';
+import 'portal_gutter_scope.dart';
 
 /// How a [PortalListItem.value] reads. Never the only signal: pair
 /// positive/negative/warning with a sign or an icon.
@@ -1447,6 +1448,8 @@ class PortalListItem extends StatelessWidget {
         // full contrast; so does a step, whose detail may run to many lines.
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          // A row shorter than its minimum height centres its content.
+          mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
@@ -1848,10 +1851,13 @@ class PortalListSection extends StatelessWidget {
           _sectionHeader(tokens, cs, header!, captionHeader, headerAction,
               value: headerValue,
               actionLabel: actionLabel,
-              onAction: onAction),
+              onAction: onAction,
+              gutter: inset ? PortalGutterScope.inset(context, sp.lg) : null),
         Padding(
-          padding:
-              inset ? EdgeInsets.symmetric(horizontal: sp.lg) : EdgeInsets.zero,
+          padding: inset
+              ? EdgeInsets.symmetric(
+                  horizontal: PortalGutterScope.inset(context, sp.lg))
+              : EdgeInsets.zero,
           child: Semantics(
             container: true,
             child: _selectable
@@ -1942,8 +1948,12 @@ double _textInset(Widget w) => w is PortalListItem ? w.textInset : 0;
 
 Widget _sectionHeader(DesignTokens tokens, ColorScheme cs, String header,
     bool caption, Widget? action,
-    {String? value, String? actionLabel, VoidCallback? onAction}) {
+    {String? value,
+    String? actionLabel,
+    VoidCallback? onAction,
+    double? gutter}) {
   final sp = tokens.spacing;
+  final side = gutter ?? sp.lg;
   final heading = caption
       ? Text(header,
           style: tokens.textStyles.caption.copyWith(color: cs.onSurfaceVariant))
@@ -1953,7 +1963,7 @@ Widget _sectionHeader(DesignTokens tokens, ColorScheme cs, String header,
           actionLabel: actionLabel,
           onAction: onAction);
   return Padding(
-    padding: EdgeInsets.fromLTRB(sp.lg, sp.lg, sp.lg, sp.sm),
+    padding: EdgeInsets.fromLTRB(side, sp.lg, side, sp.sm),
     child: value == null
         ? heading
         // The title and its value on one baseline, one header to a reader.
@@ -2073,11 +2083,16 @@ class PortalSliverListSection extends StatelessWidget {
       if (header != null)
         SliverToBoxAdapter(
           child: _sectionHeader(tokens, cs, header!, captionHeader, headerAction,
-              value: headerValue, actionLabel: actionLabel, onAction: onAction),
+              value: headerValue,
+              actionLabel: actionLabel,
+              onAction: onAction,
+              gutter: inset ? PortalGutterScope.inset(context, sp.lg) : null),
         ),
       inset
           ? SliverPadding(
-              padding: EdgeInsets.symmetric(horizontal: sp.lg), sliver: list)
+              padding: EdgeInsets.symmetric(
+                  horizontal: PortalGutterScope.inset(context, sp.lg)),
+              sliver: list)
           : list,
     ]);
   }

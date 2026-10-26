@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/portal_ui_theme.dart';
+import 'portal_gutter_scope.dart';
 
 /// A form's fields stacked and stretched, 16 apart, inset 8 16 12 (spacing
 /// sm / lg / md). Layout only; each field names itself. Ported from the
@@ -15,9 +16,9 @@ class PortalFormStack extends StatelessWidget {
     final t = PortalUiTheme.of(context).tokens;
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        t.spacing.lg,
+        PortalGutterScope.inset(context, t.spacing.lg),
         t.spacing.sm,
-        t.spacing.lg,
+        PortalGutterScope.inset(context, t.spacing.lg),
         t.spacing.md,
       ),
       child: Column(

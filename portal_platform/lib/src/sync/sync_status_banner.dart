@@ -14,7 +14,8 @@ import 'sync_queue.dart';
 ///
 /// Three states, in priority order:
 ///  * **offline** — cloud_off, plus the pending count when there is one.
-///  * **online with a queue** — syncing, tappable to retry now.
+///  * **online with a queue** — syncing, tappable to retry now. When the last
+///    push got a 5xx it says "server error" instead: online, but not syncing.
 ///  * **online and empty** — hidden.
 ///
 /// Mount it once, above the app's content and below any toast host — see
@@ -53,6 +54,7 @@ class SyncStatusBanner extends StatelessWidget {
         online: online,
         pending: pending,
         syncing: syncing,
+        serverFailing: queue.serverFailing.value,
         bottomInset: bottomInset,
       );
     });
@@ -64,12 +66,14 @@ class _Strip extends StatelessWidget {
     required this.online,
     required this.pending,
     required this.syncing,
+    this.serverFailing = false,
     required this.bottomInset,
   });
 
   final bool online;
   final int pending;
   final bool syncing;
+  final bool serverFailing;
   final double bottomInset;
 
   static String _changes(int n) => n == 1 ? '1 change' : '$n changes';
@@ -80,8 +84,9 @@ class _Strip extends StatelessWidget {
           ? "You're offline — showing saved data"
           : "You're offline — ${_changes(pending)} waiting to sync";
     }
-    return syncing
-        ? 'Syncing ${_changes(pending)}…'
+    if (syncing) return 'Syncing ${_changes(pending)}…';
+    return serverFailing
+        ? "Server error — ${_changes(pending)} not synced yet"
         : '${_changes(pending)} waiting to sync';
   }
 
@@ -94,8 +99,18 @@ class _Strip extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     // Offline is a state to be aware of, not an error — the app still works —
     // so it reads as neutral chrome rather than the error red a failure gets.
-    final background = online ? cs.secondaryContainer : cs.surfaceContainerHigh;
-    final foreground = online ? cs.onSecondaryContainer : cs.onSurfaceVariant;
+    // A server error is a failure, so it does get the error colours.
+    final failing = online && serverFailing && !syncing;
+    final background = failing
+        ? cs.errorContainer
+        : online
+            ? cs.secondaryContainer
+            : cs.surfaceContainerHigh;
+    final foreground = failing
+        ? cs.onErrorContainer
+        : online
+            ? cs.onSecondaryContainer
+            : cs.onSurfaceVariant;
 
     return Align(
       alignment: Alignment.bottomCenter,

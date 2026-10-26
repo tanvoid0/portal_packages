@@ -48,6 +48,8 @@ class PortalChevronLink extends StatelessWidget {
                   Flexible(
                     child: Text(
                       label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: t.textStyles.body.copyWith(
                         fontSize: 15,
                         fontWeight: FontWeight.w500,

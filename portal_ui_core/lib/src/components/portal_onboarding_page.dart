@@ -23,6 +23,8 @@ class PortalOnboardingPage extends StatelessWidget {
     this.hero,
     this.footnote,
     this.offline = false,
+    this.busy = false,
+    this.busyLabel,
     this.signInLabel = 'Sign in',
     this.backgroundColor,
     super.key,
@@ -43,6 +45,14 @@ class PortalOnboardingPage extends StatelessWidget {
   final String? footnote;
 
   final bool offline;
+
+  /// The sign-in action is in flight. true shows an in-button spinner and
+  /// refuses taps -- guarding a double-tap (a second OAuth) while a connect
+  /// runs -- and [busyLabel] is what it announces meanwhile. Default false is
+  /// the plain button, today's behaviour.
+  final bool busy;
+  final String? busyLabel;
+
   final String signInLabel;
   final Color? backgroundColor;
 
@@ -146,7 +156,9 @@ class PortalOnboardingPage extends StatelessWidget {
                     label: signInLabel,
                     size: PortalButtonSize.lg,
                     expand: true,
-                    onPressed: offline ? null : onSignIn,
+                    isLoading: busy,
+                    busyLabel: busyLabel,
+                    onPressed: offline || busy ? null : onSignIn,
                   ),
                 ),
               ],

@@ -238,6 +238,28 @@ class PortalAuthView extends GetView<PortalAuthController> {
   Widget _footer(BuildContext context, ThemeData theme, ColorScheme cs) {
     final signingIn = controller.isLogin.value;
     final busy = controller.isLoading.value;
+    // With the keyboard up the whole foot would sit above it and squeeze the
+    // fields into a sliver, so typing shows only the primary action.
+    final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final primary = FilledButton(
+      onPressed: busy ? null : controller.submit,
+      child: busy
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            )
+          : Text(signingIn ? 'Sign in' : 'Create account'),
+    );
+    if (typing) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+        child: primary,
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
@@ -273,19 +295,7 @@ class PortalAuthView extends GetView<PortalAuthController> {
             ),
             const SizedBox(height: 10),
           ],
-          FilledButton(
-            onPressed: busy ? null : controller.submit,
-            child: busy
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Text(signingIn ? 'Sign in' : 'Create account'),
-          ),
+          primary,
           if (config.allowRegistration)
             TextButton(
               onPressed: busy ? null : controller.toggleMode,

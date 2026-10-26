@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/portal_theme_helpers.dart';
 import '../theme/portal_ui_theme.dart';
 import '../theme/portal_typography.dart';
 import '../tokens/design_tokens.dart';
@@ -96,8 +97,12 @@ class PortalButton extends StatelessWidget {
             foreground: scheme.onPrimaryContainer,
           )
         : _styleFor(portal, scheme);
+    // The neutral fill steps off the page it sits on (a grouped light page is
+    // the same tone), so a secondary button is never bare text.
+    final neutral = selected != true && variant == PortalButtonVariant.secondary;
     final style = _ButtonStyle(
-      background: backgroundColor ?? base.background,
+      background: backgroundColor ??
+          (neutral ? portalOffPage(context, base.background) : base.background),
       foreground: foregroundColor ?? base.foreground,
       border: base.border,
     );
@@ -139,7 +144,7 @@ class PortalButton extends StatelessWidget {
         ],
         if (showLabel)
           Flexible(
-            fit: expand ? FlexFit.tight : FlexFit.loose,
+            fit: FlexFit.loose,
             // Shrinks a long or translated label to fit before it ellipsizes,
             // so the word stays readable on a narrow button.
             child: PortalText(
@@ -164,7 +169,7 @@ class PortalButton extends StatelessWidget {
 
     // Ripple stays (it is what a button feels like); the press scale rides on
     // top. `Ink` rather than a DecoratedBox so the splash paints over the fill.
-    final button = PortalPressable(
+    final pressable = PortalPressable(
       onTap: onPressed,
       // A null handler is a disabled button, not plain content.
       enabled: !isLoading && onPressed != null,
@@ -197,6 +202,12 @@ class PortalButton extends StatelessWidget {
         ),
       ),
     );
+
+    // A null handler is a disabled button: dimmed like a disabled row or chip,
+    // so it never reads as live (a loading one keeps its look).
+    final button = onPressed == null && !isLoading
+        ? Opacity(opacity: tokens.motion.disabledOpacity, child: pressable)
+        : pressable;
 
     // A small button paints under the minimum tap target, so the hit area is
     // a box around the paint rather than taller paint (`UI_PATTERNS.md`). A tap

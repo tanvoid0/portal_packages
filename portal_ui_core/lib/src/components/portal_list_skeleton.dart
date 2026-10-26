@@ -30,19 +30,25 @@ class PortalListSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = PortalUiTheme.of(context).tokens;
 
-    return ListView.separated(
-      padding:
-          padding ?? EdgeInsets.symmetric(vertical: tokens.spacing.sm),
-      shrinkWrap: shrinkWrap,
-      physics: physics ?? (shrinkWrap
-          ? const NeverScrollableScrollPhysics()
-          : null),
-      itemCount: itemCount,
-      separatorBuilder: (_, __) => SizedBox(height: tokens.spacing.md),
-      itemBuilder: (_, __) => PortalSkeleton(
-        height: itemHeight,
-        borderRadius: BorderRadius.circular(tokens.radii.md),
-      ),
+    return LayoutBuilder(
+      builder: (_, constraints) {
+        // An unbounded parent (a SliverToBoxAdapter, a Column) cannot host a
+        // scrolling list, so size to the rows there whatever the caller said.
+        final shrink = shrinkWrap || !constraints.hasBoundedHeight;
+        return ListView.separated(
+          padding:
+              padding ?? EdgeInsets.symmetric(vertical: tokens.spacing.sm),
+          shrinkWrap: shrink,
+          physics: physics ??
+              (shrink ? const NeverScrollableScrollPhysics() : null),
+          itemCount: itemCount,
+          separatorBuilder: (_, __) => SizedBox(height: tokens.spacing.md),
+          itemBuilder: (_, __) => PortalSkeleton(
+            height: itemHeight,
+            borderRadius: BorderRadius.circular(tokens.radii.md),
+          ),
+        );
+      },
     );
   }
 }

@@ -5,6 +5,7 @@ import '../theme/portal_form_field.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_pressable.dart';
 import 'portal_prompt.dart';
+import '../theme/portal_theme_helpers.dart';
 
 // What PortalSelect.picker is built from: the value is already a string and
 // the caller opens its own picker.
@@ -120,6 +121,7 @@ class PortalSelect<T> extends StatelessWidget {
       isEmpty: p.shown == null,
       textAlignVertical: TextAlignVertical.center,
       decoration: InputDecoration(
+        fillColor: _fill(context),
         enabled: enabled || readOnly,
         hintText: hint,
         hintStyle:
@@ -183,6 +185,12 @@ class PortalSelect<T> extends StatelessWidget {
     );
   }
 
+  /// The theme's field fill, stepped off the page it sits on.
+  static Color? _fill(BuildContext context) {
+    final fill = Theme.of(context).inputDecorationTheme.fillColor;
+    return fill == null ? null : portalOffPage(context, fill);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_picker case final p?) return _buildPicker(context, p);
@@ -213,8 +221,14 @@ class PortalSelect<T> extends StatelessWidget {
               : Text(hint!,
                   style: tokens.textStyles.body
                       .copyWith(color: cs.onSurfaceVariant)),
-          style: tokens.textStyles.body.copyWith(color: ink),
+          // DropdownButton replaces the ambient style, so merge into it: the
+          // body role names no family, the ambient style carries it.
+          style: DefaultTextStyle.of(context)
+              .style
+              .merge(tokens.textStyles.body)
+              .copyWith(color: ink),
           decoration: InputDecoration(
+            fillColor: _fill(context),
             constraints: BoxConstraints(minHeight: tokens.minTapTarget),
           ).applyDefaults(Theme.of(context).inputDecorationTheme),
           items: [

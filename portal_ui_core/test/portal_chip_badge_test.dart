@@ -104,7 +104,8 @@ void main() {
     await t.tap(find.text('Vegan'));
     expect(taps, 1);
     expect(deletes, 1);
-    expect(t.getSemantics(find.byTooltip('Remove vegan')),
+    expect(
+        t.getSemantics(find.byTooltip('Remove vegan')),
         isSemantics(
             tooltip: 'Remove vegan', isButton: true, hasTapAction: true));
     h.dispose();
@@ -142,5 +143,94 @@ void main() {
     await t.tapAt(Offset(label.right - 2, label.center.dy));
     expect(deletes, 0);
     expect(taps, 1);
+  });
+
+  group('PortalFilterChipRow edge fade', () {
+    Widget row(int n) => host(SizedBox(
+          width: 300,
+          child: PortalFilterChipRow(
+            children: [
+              for (var i = 0; i < n; i++) PortalFilterChip(label: 'Chip $i', selected: false)
+            ],
+          ),
+        ));
+
+    testWidgets('nothing fades while every chip fits', (t) async {
+      await t.pumpWidget(row(2));
+      await t.pump();
+      expect(find.byType(ShaderMask), findsNothing);
+    });
+
+    testWidgets('fades once chips run past the edge, and keeps the offset',
+        (t) async {
+      await t.pumpWidget(row(12));
+      await t.pump();
+      expect(find.byType(ShaderMask), findsOneWidget);
+
+      await t.drag(find.byType(SingleChildScrollView), const Offset(-120, 0));
+      await t.pump();
+      expect(find.byType(ShaderMask), findsOneWidget);
+      final scroll = t.state<ScrollableState>(find.byType(Scrollable));
+      expect(scroll.position.pixels, greaterThan(0));
+
+      await t.drag(find.byType(SingleChildScrollView), const Offset(-5000, 0));
+      await t.pump();
+      // Scrolled to the end: the start edge fades now, not the end.
+      expect(find.byType(ShaderMask), findsOneWidget);
+      expect(scroll.position.pixels, scroll.position.maxScrollExtent);
+    });
+  });
+
+  group('selected chip check', () {
+    testWidgets('a selected chip with no glyph of its own gets a check',
+        (t) async {
+      await t.pumpWidget(host(const PortalFilterChip(label: 'A', selected: true)));
+      expect(find.byIcon(PortalIcons.check_rounded), findsOneWidget);
+    });
+
+    testWidgets('unselected, action, menu and own-icon chips do not',
+        (t) async {
+      await t.pumpWidget(host(const Column(children: [
+        PortalFilterChip(label: 'A', selected: false),
+        PortalFilterChip.action(label: 'B'),
+        PortalFilterChip(label: 'C', selected: true, menu: true),
+        PortalFilterChip(label: 'D', selected: true, icon: Icons.star),
+      ])));
+      expect(find.byIcon(PortalIcons.check_rounded), findsNothing);
+      expect(find.byIcon(Icons.star), findsOneWidget);
+    });
+
+    testWidgets('a chosen selected colour gets a readable ink', (t) async {
+      await t.pumpWidget(host(const PortalFilterChip(
+        label: 'A',
+        selected: true,
+        selectedColor: Color(0xFFFFCA28),
+      )));
+      expect(t.widget<Text>(find.text('A')).style?.color, Colors.black);
+    });
+  });
+
+  testWidgets('a filter chip in a narrow slot ellipsizes its label',
+      (t) async {
+    const label = 'A filter label far wider than the slot it is given';
+    await t.pumpWidget(host(const SizedBox(
+      width: 120,
+      child: PortalFilterChip(label: label, selected: true),
+    )));
+    expect(t.takeException(), isNull);
+    expect(t.getSize(find.byType(PortalFilterChip)).width, lessThanOrEqualTo(120));
+    final text = t.widget<Text>(find.text(label));
+    expect(text.overflow, TextOverflow.ellipsis);
+    expect(text.maxLines, 1);
+  });
+
+  testWidgets('a filter chip in a scroller keeps its whole label', (t) async {
+    const label = 'A filter label far wider than the slot it is given';
+    await t.pumpWidget(host(const SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: PortalFilterChip(label: label, selected: true),
+    )));
+    expect(t.takeException(), isNull);
+    expect(t.getSize(find.byType(PortalFilterChip)).width, greaterThan(300));
   });
 }

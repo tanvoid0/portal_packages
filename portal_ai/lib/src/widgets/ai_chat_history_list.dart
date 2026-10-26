@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:portal_ui_core/portal_ui_core.dart';
 
 import '../chat/ai_chat_session.dart';
@@ -49,6 +50,12 @@ class AiChatHistoryList extends StatefulWidget {
     this.footer,
     this.labels = const AiChatLabels(),
     this.width = 280,
+    this.showNewChat = true,
+    this.leadingTile = false,
+    this.emptyIllustration,
+    this.emptyMessage,
+    this.noMatchesTitleFor,
+    this.noMatchesMessage,
     this.previous7DaysLabel = 'Previous 7 days',
     this.previous30DaysLabel = 'Previous 30 days',
   });
@@ -85,7 +92,25 @@ class AiChatHistoryList extends StatefulWidget {
   final Widget? footer;
 
   final AiChatLabels labels;
-  final double width;
+
+  /// The panel's width; null fills the parent, for the full-page form.
+  final double? width;
+
+  /// False leaves the new-chat button out of the search row, for a host whose
+  /// page bar already carries it.
+  final bool showNewChat;
+
+  /// Draws every row with the chat tile, as an inbox does.
+  final bool leadingTile;
+
+  /// Art, and a line under the title, for the empty state.
+  final Widget? emptyIllustration;
+  final String? emptyMessage;
+
+  /// The no-results state's title for the search typed, and the line under it.
+  /// Falls back to [AiChatLabels.noMatches].
+  final String Function(String query)? noMatchesTitleFor;
+  final String? noMatchesMessage;
 
   /// [AiChatLabels] has no field for these two -- they're new with the
   /// finer-grained grouping, so they land here rather than growing a package
@@ -98,6 +123,7 @@ class AiChatHistoryList extends StatefulWidget {
 }
 
 class _AiChatHistoryListState extends State<AiChatHistoryList> {
+  final _search = TextEditingController();
   String _query = '';
 
   /// Rows hidden while their undo window is open, against the timer that
@@ -116,6 +142,7 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
       widget.onDelete?.call(entry.key);
     }
     _pendingDelete.clear();
+    _search.dispose();
     super.dispose();
   }
 
@@ -211,20 +238,23 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
                   child: Padding(
                     padding: EdgeInsetsDirectional.only(
                       start: t.spacing.lg,
+                      end: t.spacing.sm,
                       top: t.spacing.sm,
                       bottom: t.spacing.sm,
                     ),
                     child: PortalSearchField(
+                      controller: _search,
                       hintText: labels.searchHint,
                       onChanged: (value) => setState(() => _query = value),
                     ),
                   ),
                 ),
-                PortalButton.icon(
-                  icon: PortalIcons.edit_square_rounded,
-                  tooltip: labels.newChat,
-                  onPressed: widget.onNewChat,
-                ),
+                if (widget.showNewChat)
+                  PortalButton.icon(
+                    icon: PortalIcons.edit_square_rounded,
+                    tooltip: labels.newChat,
+                    onPressed: widget.onNewChat,
+                  ),
                 if (widget.onClose != null)
                   PortalButton.icon(
                     icon: PortalIcons.close_rounded,
@@ -236,7 +266,7 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
             ),
             if (widget.quickAccess.isNotEmpty)
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: t.spacing.sm),
+                padding: EdgeInsets.symmetric(horizontal: t.spacing.lg),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -273,16 +303,29 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
     final labels = widget.labels;
     if (widget.sessions.isEmpty) {
       return PortalEmptyState(
-        icon: PortalIcons.forum_rounded,
+        icon: widget.emptyIllustration == null
+            ? PortalIcons.forum_rounded
+            : null,
+        iconWidget: widget.emptyIllustration,
         title: labels.historyEmpty,
+        message: widget.emptyMessage,
         actionLabel: labels.newChat,
         onAction: widget.onNewChat,
         inCard: false,
       );
     }
     return PortalEmptyState(
-      icon: PortalIcons.search_rounded,
-      title: labels.noMatches,
+      icon: widget.emptyIllustration == null
+          ? PortalIcons.search_rounded
+          : null,
+      iconWidget: widget.emptyIllustration,
+      title: widget.noMatchesTitleFor?.call(_query.trim()) ?? labels.noMatches,
+      message: widget.noMatchesMessage,
+      actionLabel: labels.clearSearch,
+      onAction: () {
+        _search.clear();
+        setState(() => _query = '');
+      },
       inCard: false,
     );
   }
@@ -330,9 +373,12 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
           onPressed: () => _delete(item),
         ),
     ];
-    return PortalListItem(
+    final row = PortalListItem(
       title: item.title,
       subtitle: _subtitleFor(item),
+      leading: widget.leadingTile
+          ? PortalListLeading.tile(PortalIcons.forum_rounded)
+          : null,
       trailing: PortalListAccessory.meta(
         f.date(item.updatedAt, short: true),
         spoken: f.date(item.updatedAt),
@@ -352,11 +398,29 @@ class _AiChatHistoryListState extends State<AiChatHistoryList> {
           ? null
           : () => showPortalActionSheet(context, actions, title: item.title),
     );
+    if (actions.isEmpty) return row;
+    // A list row reads as one label and leaves the long press out, so a
+    // screen reader would never find the actions: offer them as an action.
+    void openActions() =>
+        showPortalActionSheet(context, actions, title: item.title);
+    return MergeSemantics(
+      child: Semantics(
+        onLongPress: openActions,
+        onLongPressHint: 'Show chat actions',
+        customSemanticsActions: {
+          const CustomSemanticsAction(label: 'Chat actions'): openActions,
+        },
+        child: row,
+      ),
+    );
   }
 
   String _subtitleFor(AiChatSessionSummary item) {
     if (widget.subtitleFor case final format?) return format(item);
-    if (item.preview.isNotEmpty) return item.preview;
+    // Replies run to paragraphs; a row shows them as one line of text.
+    if (item.preview.isNotEmpty) {
+      return item.preview.replaceAll(RegExp(r'\s+'), ' ');
+    }
     return '${item.turnCount} ${widget.labels.messages}';
   }
 

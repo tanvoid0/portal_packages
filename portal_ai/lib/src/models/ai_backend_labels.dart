@@ -78,10 +78,28 @@ class AiBackendLabels {
     this.done = 'Done',
     this.tryAgain = 'Try again',
     this.startingDownload = 'Starting download',
-    this.downloadKeepOpen = 'Keep this screen open until the download finishes.',
+    this.downloadKeepOpen =
+        'Keep this screen open until the download finishes.',
     this.downloadReadyBody =
         'It now runs on this device, even with no connection.',
     this.customModelHint = 'Or type a model name',
+    this.downloadingModels = 'Downloading',
+    this.modelsEmptyTitle = 'No models yet',
+    this.modelsEmptyMessage =
+        'Download one and the assistant can answer on this device, with no connection.',
+    this.modelsEmptyAction = 'Download a model',
+    this.modelsUnsupportedTitle = 'Not available on this device',
+    this.modelsOfflineTitle = 'Offline',
+    this.modelsOfflineMessage = 'Connect to download models.',
+    this.modelsLoadFailed = "Couldn't load your models.",
+    this.retry = 'Retry',
+    this.activeBadge = 'Active',
+    this.useModel = 'Use this model',
+    this.oneDownloadAtATime = 'One download at a time',
+    this.oneDownloadAtATimeBody = 'Wait for the one in progress to finish.',
+    this.finishingUp = 'Finishing up',
+    this.downloadLeaveBody =
+        'You can leave this screen. The download keeps going while the app is open.',
     this.ollamaNotFound =
         'No Ollama found on this network. Check it is running and reachable, '
         'then enter its address above.',
@@ -155,6 +173,21 @@ class AiBackendLabels {
   final String downloadKeepOpen;
   final String downloadReadyBody;
   final String customModelHint;
+  final String downloadingModels;
+  final String modelsEmptyTitle;
+  final String modelsEmptyMessage;
+  final String modelsEmptyAction;
+  final String modelsUnsupportedTitle;
+  final String modelsOfflineTitle;
+  final String modelsOfflineMessage;
+  final String modelsLoadFailed;
+  final String retry;
+  final String activeBadge;
+  final String useModel;
+  final String oneDownloadAtATime;
+  final String oneDownloadAtATimeBody;
+  final String finishingUp;
+  final String downloadLeaveBody;
   final String assistantTitle;
   final String providerRow;
   final String routingRow;
@@ -169,6 +202,45 @@ class AiBackendLabels {
   String downloadReadyTitle(String model) => '$model is ready';
 
   String timeLeft(String duration) => 'About $duration left';
+
+  String modelsUsing(String size) => 'Using $size';
+
+  String modelOptions(String model) => 'Options for $model';
+
+  String modelDownloadFailed(String size) => 'Download failed · $size';
+
+  String modelDownloadAction(String model, String size) =>
+      'Download $model, $size';
+
+  String modelRetryAction(String model) => 'Retry downloading $model';
+
+  String removeModelTitle(String model) => 'Remove $model?';
+
+  /// What the remove dialog says; [freed] is the size it gives back, null
+  /// when the catalogue does not know it. [active] is the model in use.
+  String removeModelMessage(
+    String model, {
+    String? freed,
+    bool active = false,
+  }) => '${freed == null ? '' : 'Frees $freed. '}$removeModelConfirm';
+
+  String downloadProgressOf(String done, String total) => '$done of $total';
+
+  String downloadFailedTitle(String model) => "Couldn't download $model";
+
+  String downloadFailedBody(String total) =>
+      'Check your connection and that there is room for $total, then try '
+      'again.';
+
+  String downloadStoppedTitle(int percent) => 'Download stopped at $percent%';
+
+  String downloadNoSpaceBody(String total) =>
+      'The device ran out of space. Free up room for $total, then try again.';
+
+  String get downloadOfflineBody =>
+      "You're offline. Connect to the internet, then try again.";
+
+  String downloadReadyBodyFor(String total) => '$downloadReadyBody $total';
 
   String titleFor(AiBackendKind kind) => switch (kind) {
     AiBackendKind.cloudGemini => cloudGeminiTitle,

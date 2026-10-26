@@ -11,6 +11,45 @@ extension PortalThemeContext on BuildContext {
   DesignTokens get portalTokens => portalTheme.tokens;
 }
 
+/// [fill], stepped off the page it sits on when the two read as one colour.
+///
+/// Skins fold surface tones together: a grouped light page, a field, a
+/// secondary button, a stepper pill and a progress track can all be
+/// `surfaceContainerHigh`, and a control the colour of its page reads as bare
+/// text. The page is the nearest [Material] (a Scaffold paints one), so this
+/// asks it: within 1.05:1 of it, [fill] moves 6% toward `onSurface`. A control
+/// on a white card on that page is already clear of it and stays as drawn.
+Color portalOffPage(BuildContext context, Color fill) {
+  final page = Material.maybeOf(context)?.color;
+  if (page == null || page.a < 1) return fill;
+  final seen = Color.alphaBlend(fill, page);
+  final hi = seen.computeLuminance() > page.computeLuminance() ? seen : page;
+  final lo = identical(hi, seen) ? page : seen;
+  if ((hi.computeLuminance() + 0.05) / (lo.computeLuminance() + 0.05) >= 1.05) {
+    return fill;
+  }
+  return Color.alphaBlend(
+    Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
+    seen,
+  );
+}
+
+/// Text and glyph colour for [fill]: [preferred] when it holds 4.5:1, else
+/// whichever of white and black reads better. For a fill an app picked at
+/// runtime (a task's colour), where the skin's own on-colour was never checked.
+Color portalInkOn(Color fill, Color preferred) {
+  double ratio(Color a, Color b) {
+    final hi = a.computeLuminance() > b.computeLuminance() ? a : b;
+    final lo = identical(hi, a) ? b : a;
+    return (hi.computeLuminance() + 0.05) / (lo.computeLuminance() + 0.05);
+  }
+
+  if (ratio(preferred, fill) >= 4.5) return preferred;
+  const white = Color(0xFFFFFFFF);
+  const black = Color(0xFF000000);
+  return ratio(white, fill) >= ratio(black, fill) ? white : black;
+}
+
 /// Shared [InputDecoration] for Portal form controls — mirrors shadcn input styling.
 InputDecoration portalInputDecoration(
   BuildContext context, {

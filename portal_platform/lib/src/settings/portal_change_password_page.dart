@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 import '../services/api_client.dart';
 import 'portal_settings_labels.dart';
@@ -154,7 +155,7 @@ class PortalChangePasswordPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(labels.changePassword)),
+      appBar: PortalAppBar(title: labels.changePassword),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),

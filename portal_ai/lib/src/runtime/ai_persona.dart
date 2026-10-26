@@ -38,9 +38,12 @@ class AiPersona {
   /// What this persona may do. May be empty (a pure-advice role).
   final List<AiTool> tools;
 
-  /// Lower-case words that, if present in the prompt, pick this persona
-  /// without an LLM call. A cheap deterministic fast path before the router
-  /// spends a completion. Empty means "always ask the router".
+  /// Lower-case whole words (a multi-word phrase counts as one) that pick this
+  /// persona without an LLM call when the prompt holds more of them than any
+  /// other persona's. A word also matches its plural and -ed / -ing forms, not
+  /// a longer word that merely contains it. A tie goes to the router, so list
+  /// words specific to this persona: a common one ("list", "show") sends
+  /// unrelated prompts here. Empty means "always ask the router".
   final List<String> keywords;
 
   /// Starter chips to show when this persona is the active one. Optional.

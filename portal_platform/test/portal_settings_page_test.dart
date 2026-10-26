@@ -140,7 +140,7 @@ void main() {
       final order = [
         top(tester, 'Mine'),
         top(tester, 'Appearance'),
-        top(tester, 'Assistant'),
+        top(tester, 'provider list'),
         top(tester, 'About'),
       ];
       expect(order, [...order]..sort());
@@ -303,7 +303,7 @@ void main() {
   });
 
   group('assistant', () {
-    testWidgets('assistantSection is an inline Assistant section', (
+    testWidgets('assistantSection is inline, with no header of the page\'s', (
       tester,
     ) async {
       await pump(
@@ -315,7 +315,11 @@ void main() {
       );
 
       expect(find.text('provider list'), findsOneWidget);
-      expect(find.text('Assistant'), findsOneWidget);
+      expect(
+        find.text('Assistant'),
+        findsNothing,
+        reason: 'the section brings its own header',
+      );
       expect(find.byType(BackButton), findsNothing);
     });
 
@@ -332,7 +336,7 @@ void main() {
       );
 
       expect(find.text('provider list'), findsOneWidget);
-      expect(find.text('Assistant'), findsOneWidget);
+      expect(find.text('Assistant'), findsNothing);
     });
   });
 

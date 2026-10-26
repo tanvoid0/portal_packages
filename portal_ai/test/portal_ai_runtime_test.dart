@@ -170,6 +170,89 @@ void main() {
       final runtime = PortalAiRuntime(client: _ScriptedClient(const []));
       expect(await runtime.route('log my workout'), isNull);
     });
+
+    group('keywords', () {
+      const roster = [
+        AiPersona(id: 'general', label: 'General', description: 'general'),
+        AiPersona(
+          id: 'tasks',
+          label: 'Tasks',
+          description: 'to-dos',
+          keywords: ['plan', 'schedule'],
+        ),
+        AiPersona(
+          id: 'travel',
+          label: 'Travel',
+          description: 'trips',
+          keywords: ['trip', 'hotel', 'itinerary'],
+        ),
+      ];
+      PortalAiRuntime rosterRuntime(_ScriptedClient client) =>
+          PortalAiRuntime(client: client, personas: roster);
+
+      test(
+        'the persona with the most hits wins, not the first listed',
+        () async {
+          // Tasks is listed first and has a hit ("plan"); Travel has three.
+          final client = _ScriptedClient(const []);
+          final persona = await rosterRuntime(
+            client,
+          ).route('Plan a hotel and itinerary for a weekend trip to Paris');
+          expect(persona?.id, 'travel');
+          expect(client.calls, 0);
+        },
+      );
+
+      test(
+        'a tie asks the classifier, and only about the tied personas',
+        () async {
+          // One Tasks word, one Travel word: roster order must not decide it.
+          final client = _ScriptedClient([
+            '{"agent":"travel","confidence":0.9}',
+          ]);
+          final persona = await rosterRuntime(
+            client,
+          ).route('Help me plan a two-day trip by train');
+          expect(persona?.id, 'travel');
+          expect(client.calls, 1);
+          expect(client.lastSystemPrompt, contains('id=tasks'));
+          expect(client.lastSystemPrompt, contains('id=travel'));
+          expect(client.lastSystemPrompt, isNot(contains('id=general')));
+        },
+      );
+
+      test('a tie never lands on a persona it was not offered', () async {
+        final client = _ScriptedClient([
+          '{"agent":"general","confidence":0.9}',
+        ]);
+        expect(
+          await rosterRuntime(client).route('Help me plan a two-day trip'),
+          isNull,
+        );
+      });
+
+      test('a keyword is a whole word, with its inflections', () async {
+        final noHit = _ScriptedClient(const []);
+        // "airplane" holds "plan"; "strip" holds "trip": neither is a hit, so
+        // the classifier is asked (and the empty script makes it throw -> null).
+        expect(
+          await rosterRuntime(noHit).route('my airplane has a strip of paint'),
+          isNull,
+        );
+        expect(noHit.calls, 1);
+
+        for (final prompt in [
+          'I am planning dinner',
+          'two hotels booked',
+          'I am scheduling dinner',
+        ]) {
+          final client = _ScriptedClient(const []);
+          final persona = await rosterRuntime(client).route(prompt);
+          expect(persona, isNotNull, reason: prompt);
+          expect(client.calls, 0, reason: prompt);
+        }
+      });
+    });
   });
 }
 
@@ -178,6 +261,10 @@ class _ScriptedClient implements AiCompletionClient {
 
   final List<String> replies;
   var _index = 0;
+
+  /// How many completions were asked for, and the last system prompt sent.
+  var calls = 0;
+  String? lastSystemPrompt;
 
   @override
   Future<bool> isAvailable() async => true;
@@ -188,7 +275,11 @@ class _ScriptedClient implements AiCompletionClient {
     required String userPrompt,
     AiSamplerConfig sampler = const AiSamplerConfig(),
     bool jsonMode = false,
-  }) async => _index < replies.length ? replies[_index++] : replies.last;
+  }) async {
+    calls++;
+    lastSystemPrompt = systemPrompt;
+    return _index < replies.length ? replies[_index++] : replies.last;
+  }
 
   @override
   Stream<String> completeStream({

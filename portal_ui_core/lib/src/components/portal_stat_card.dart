@@ -6,6 +6,7 @@ import '../theme/portal_ui_theme.dart';
 import 'portal_card.dart';
 import 'portal_icon_tile.dart';
 import 'portal_skeleton.dart';
+import 'portal_gutter_scope.dart';
 
 /// One metric: glyph, value, label, optional footer.
 ///
@@ -140,13 +141,21 @@ class PortalStatCard extends StatelessWidget {
             ),
             SizedBox(height: tokens.spacing.sm),
           ],
-          Text(
-            value,
-            style: tokens.textStyles
-                .numeric(
-                    hero ? tokens.textStyles.hero : tokens.textStyles.title)
-                .copyWith(
-                    color: valueColor ?? skin.valueColor ?? portal.onSurface),
+          // One line, shrunk to fit: a wrapped amount ("£2,500.0 / 0") reads as
+          // a different number. FittedBox for the same reason as the label.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: tokens.textStyles
+                  .numeric(
+                      hero ? tokens.textStyles.hero : tokens.textStyles.title)
+                  .copyWith(
+                      color:
+                          valueColor ?? skin.valueColor ?? portal.onSurface),
+            ),
           ),
           SizedBox(height: tokens.spacing.xs),
           // FittedBox, not PortalText: a stat card sits in PortalStatRow's
@@ -312,7 +321,13 @@ class PortalStatRow extends StatelessWidget {
     final sp = PortalUiTheme.of(context).tokens.spacing;
     final n = _cells ?? stats.length;
     return Padding(
-      padding: padding ?? EdgeInsets.fromLTRB(sp.lg, sp.sm, sp.lg, 0),
+      padding: padding ??
+          EdgeInsets.fromLTRB(
+            PortalGutterScope.inset(context, sp.lg),
+            sp.sm,
+            PortalGutterScope.inset(context, sp.lg),
+            0,
+          ),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,

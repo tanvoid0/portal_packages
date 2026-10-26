@@ -7,6 +7,7 @@ import '../tokens/design_tokens.dart';
 import '../tokens/portal_radii_utils.dart';
 import '../motion/portal_hero.dart';
 import 'portal_pressable.dart';
+import 'portal_gutter_scope.dart';
 
 enum PortalCardVariant {
   /// The card theme's tone on the page, no border. The default.
@@ -257,7 +258,10 @@ class PortalCard extends StatelessWidget {
     final outer = margin ??
         (gutter
             ? EdgeInsets.fromLTRB(
-                t.spacing.lg, t.spacing.sm, t.spacing.lg, 0)
+                PortalGutterScope.inset(context, t.spacing.lg),
+                t.spacing.sm,
+                PortalGutterScope.inset(context, t.spacing.lg),
+                0)
             : null);
     if (outer != null) {
       return Padding(padding: outer, child: decorated);

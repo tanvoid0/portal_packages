@@ -409,11 +409,16 @@ class PortalAiRuntime {
   /// Picks the persona that should answer [prompt], or null when there is
   /// nothing to route (no personas) or routing could not decide.
   ///
-  /// A keyword hit wins first and for free. Otherwise one cheap classify call
-  /// asks the model to choose from the roster and return its confidence; a
-  /// confidence below [minConfidence], an unknown id, or any failure returns
-  /// null so the caller falls back to its default. Never throws -- a broken
-  /// backend must not take the assistant down, same as [suggestPrompts].
+  /// A persona with the most keyword hits wins first and for free. A keyword
+  /// is a whole word ("trip" matches "trips" and "tripping", not "strip"), and
+  /// the roster order never breaks a tie: two personas with the same number of
+  /// hits ("plan a trip" is one Tasks word and one Travel word) are a real
+  /// ambiguity, so they go to the classifier, which then sees only them.
+  /// With no keyword hit at all one cheap classify call asks the model to
+  /// choose from the whole roster and return its confidence. A confidence
+  /// below [minConfidence], an unknown id, or any failure returns null so the
+  /// caller falls back to its default. Never throws -- a broken backend must
+  /// not take the assistant down, same as [suggestPrompts].
   Future<AiPersona?> route(
     String prompt, {
     List<AiChatTurn> history = const [],
@@ -421,15 +426,26 @@ class PortalAiRuntime {
   }) async {
     if (personas.isEmpty) return null;
     final lower = prompt.toLowerCase();
+    var contenders = personas;
+    var best = 0;
+    final tied = <AiPersona>[];
     for (final p in personas) {
-      if (p.keywords.any((k) => lower.contains(k.toLowerCase()))) return p;
+      final hits = p.keywords.where((k) => _hasWord(lower, k)).length;
+      if (hits == 0 || hits < best) continue;
+      if (hits > best) {
+        best = hits;
+        tied.clear();
+      }
+      tied.add(p);
     }
+    if (tied.length == 1) return tied.single;
+    if (tied.length > 1) contenders = List.of(tied);
     try {
       final reply = await client.complete(
         systemPrompt:
             'You route a user request to the one assistant best suited to '
             'it. Choose from this roster:\n'
-            '${personas.map((p) => p.rosterLine).join('\n')}\n'
+            '${contenders.map((p) => p.rosterLine).join('\n')}\n'
             'Reply with JSON only: '
             '{"agent": "<id>", "confidence": 0.0-1.0}. '
             'Use an id exactly as written above. If none clearly fits, pick '
@@ -444,10 +460,32 @@ class PortalAiRuntime {
         _ => 1.0, // A model that named an agent but no number still chose.
       };
       if (id is! String || confidence < minConfidence) return null;
-      return personaById(id.trim());
+      // Only a persona the model was offered: after a tie that is the tied
+      // few, and an id outside them is the same unknown id as any other.
+      return contenders.where((p) => p.id == id.trim()).firstOrNull;
     } catch (_) {
       return null;
     }
+  }
+
+  /// Whether [word] is in [text] as a whole word, allowing the endings a
+  /// keyword picks up in a sentence: "plan" is in "plans", "planning" and
+  /// "planned", "write" is in "writing", and neither is in "airplane" or
+  /// "planet". [text] is already lower-case.
+  static bool _hasWord(String text, String word) {
+    final w = word.trim().toLowerCase();
+    if (w.isEmpty) return false;
+    // A multi-word keyword tolerates any run of whitespace between its words.
+    String pattern(String s) =>
+        s.split(RegExp(r'\s+')).map(RegExp.escape).join(r'\s+');
+    // The last letter may double before -ing / -ed (plan -> planning)...
+    final last = RegExp.escape(w[w.length - 1]);
+    final forms = ['${pattern(w)}$last?(?:s|es|d|ed|ing)?'];
+    // ...and a final e drops before -ing (write -> writing).
+    if (w.length > 2 && w.endsWith('e')) {
+      forms.add('${pattern(w.substring(0, w.length - 1))}ing');
+    }
+    return RegExp('\\b(?:${forms.join('|')})\\b').hasMatch(text);
   }
 
   /// Runs [prompt] through the tool loop. See [AiAgent.run] for [confirm].

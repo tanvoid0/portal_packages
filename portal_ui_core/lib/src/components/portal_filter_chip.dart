@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../motion/portal_haptics.dart';
 import '../theme/portal_component_extensions.dart';
 import '../theme/portal_icons.dart';
+import '../theme/portal_theme_helpers.dart';
 import '../theme/portal_ui_theme.dart';
+import 'portal_gutter_scope.dart';
 import 'portal_pressable.dart';
 import 'portal_skeleton.dart';
 
@@ -143,7 +145,13 @@ class PortalFilterChip extends StatelessWidget {
         ? (selectedColor ?? skin.selectedColor ?? portal.primary)
         : (unselectedColor ?? skin.unselectedColor ?? portal.surfaceVariant);
     final ink = selected
-        ? (onSelectedColor ?? skin.onSelectedColor ?? portal.onPrimary)
+        ? (onSelectedColor ??
+            skin.onSelectedColor ??
+            // A fill the caller chose (a task's colour) was never paired with
+            // an on-colour, so check it rather than assume onPrimary holds.
+            (selectedColor != null
+                ? portalInkOn(fill, portal.onPrimary)
+                : portal.onPrimary))
         : (onUnselectedColor ??
             skin.onUnselectedColor ??
             portal.onSurfaceVariant);
@@ -162,6 +170,12 @@ class PortalFilterChip extends StatelessWidget {
       _ => null,
     };
     final lead = leading ?? mark;
+    // A selected chip says so with a check unless it has a glyph of its own;
+    // an action, menu or input chip is not a selection.
+    final glyph = icon ??
+        (selected && lead == null && !_action && !menu && onDeleted == null
+            ? PortalIcons.check_rounded
+            : null);
 
     // Selection has to reach a screen reader too: the pressable announces
     // the button, but the state the fill and border carry visually would
@@ -211,13 +225,13 @@ class PortalFilterChip extends StatelessWidget {
                 if (lead != null) ...[
                   lead,
                   SizedBox(width: tokens.spacing.xs),
-                ] else if (icon != null) ...[
+                ] else if (glyph != null) ...[
                   TweenAnimationBuilder<double>(
                     tween: Tween(end: selected ? 1 : 0),
                     duration: duration,
                     curve: tokens.motion.standard,
                     builder: (_, fillAxis, __) => Icon(
-                      icon,
+                      glyph,
                       fill: fillAxis.clamp(0.0, 1.0),
                       size: tokens.typeScale.md,
                       color: ink,
@@ -225,12 +239,19 @@ class PortalFilterChip extends StatelessWidget {
                   ),
                   SizedBox(width: tokens.spacing.xs),
                 ],
-                // With a status the label above already says the text.
-                ExcludeSemantics(
-                  excluding: status != null,
-                  child: Text(
-                    label,
-                    style: tokens.textStyles.caption.copyWith(color: ink),
+                // With a status the label above already says the text. Flexible
+                // so a chip in a row narrower than its label ellipsizes instead
+                // of overflowing; in a scroller it still takes its full width.
+                Flexible(
+                  child: ExcludeSemantics(
+                    excluding: status != null,
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.ellipsis,
+                      style: tokens.textStyles.caption.copyWith(color: ink),
+                    ),
                   ),
                 ),
                 if (menu) ...[
@@ -337,13 +358,11 @@ class PortalFilterChipRow extends StatelessWidget {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
     final gap = tokens.spacing.sm;
+    // On a page that already applied the gutter the row starts on it, like
+    // everything else there ([PortalGutterScope]); the edge fade marks the clip.
+    final side = PortalGutterScope.inset(context, tokens.layout.pageHorizontal);
     final inset = padding ??
-        EdgeInsets.fromLTRB(
-          tokens.layout.pageHorizontal,
-          0,
-          tokens.layout.pageHorizontal,
-          tokens.spacing.md,
-        );
+        EdgeInsets.fromLTRB(side, 0, side, tokens.spacing.md);
 
     if (_skeleton case final widths?) {
       final paint = _compact
@@ -412,10 +431,79 @@ class PortalFilterChipRow extends StatelessWidget {
         ],
       );
     }
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: inset,
-      child: group,
+    return _EdgeFade(
+      width: tokens.spacing.xl,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: inset,
+        child: group,
+      ),
+    );
+  }
+}
+
+/// Fades whichever end of a horizontal scroller still has content past it, so
+/// a chip cut off by the viewport reads as "more this way" instead of as the
+/// last one. Nothing is added while everything fits.
+class _EdgeFade extends StatefulWidget {
+  const _EdgeFade({required this.width, required this.child});
+
+  final double width;
+  final Widget child;
+
+  @override
+  State<_EdgeFade> createState() => _EdgeFadeState();
+}
+
+class _EdgeFadeState extends State<_EdgeFade> {
+  // Keeps the scroller (and its offset) when the mask comes and goes.
+  final _scroller = GlobalKey();
+  bool _more = false; // content past the end edge
+  bool _scrolled = false; // content before the start edge
+
+  bool _update(ScrollMetrics m) {
+    final more = m.pixels < m.maxScrollExtent - 1;
+    final scrolled = m.pixels > m.minScrollExtent + 1;
+    if (more != _more || scrolled != _scrolled) {
+      setState(() {
+        _more = more;
+        _scrolled = scrolled;
+      });
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final child = NotificationListener<ScrollMetricsNotification>(
+      onNotification: (n) => _update(n.metrics),
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (n) => _update(n.metrics),
+        child: KeyedSubtree(key: _scroller, child: widget.child),
+      ),
+    );
+    if (!_more && !_scrolled) return child;
+
+    final dir = Directionality.of(context);
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (rect) {
+        final f = (widget.width / rect.width).clamp(0.0, 0.5);
+        const clear = Color(0x00000000);
+        const solid = Color(0xFF000000);
+        return LinearGradient(
+          begin: AlignmentDirectional.centerStart,
+          end: AlignmentDirectional.centerEnd,
+          colors: [
+            _scrolled ? clear : solid,
+            solid,
+            solid,
+            _more ? clear : solid
+          ],
+          stops: [0, f, 1 - f, 1],
+        ).createShader(rect, textDirection: dir);
+      },
+      child: child,
     );
   }
 }

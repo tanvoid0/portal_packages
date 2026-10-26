@@ -1,8 +1,23 @@
 import 'package:flutter/material.dart';
 
 import '../motion/portal_haptics.dart';
+import '../theme/portal_component_extensions.dart';
+import '../theme/portal_theme_helpers.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_text.dart';
+
+/// How [PortalSegmentedTabs] marks the selected segment.
+enum PortalSegmentedTabsStyle {
+  /// A solid fill with on-colour text, the selected state of
+  /// [PortalFilterChip] (and re-skinned by the same [PortalFilterChipTheme]);
+  /// the rest sit outlined on a neutral surface. The default, so the choice
+  /// reads at a glance and never looks disabled.
+  solid,
+
+  /// A soft tint of the accent with accent text. Quieter, but the selected
+  /// segment is only a shade away from the rest.
+  tinted,
+}
 
 /// Full-width segmented control — two to four peer views of the same data.
 ///
@@ -19,6 +34,7 @@ class PortalSegmentedTabs extends StatelessWidget {
     required this.index,
     required this.onChanged,
     this.accentColor,
+    this.style = PortalSegmentedTabsStyle.solid,
     this.scrollable = false,
     this.semanticLabel,
     this.enabled = true,
@@ -28,8 +44,14 @@ class PortalSegmentedTabs extends StatelessWidget {
   final int index;
   final ValueChanged<int> onChanged;
 
-  /// Selected segment tint. Defaults to the app's primary.
+  /// Selected segment colour: the fill when [style] is solid, the tint when
+  /// tinted. Defaults to the chip theme's selected colour, then the app's
+  /// primary.
   final Color? accentColor;
+
+  /// How the selected segment is marked. Defaults to
+  /// [PortalSegmentedTabsStyle.solid].
+  final PortalSegmentedTabsStyle style;
 
   /// Segments at their natural width in a sideways-scrolling row, instead of
   /// equal shares of the width. The default look is unchanged.
@@ -45,7 +67,20 @@ class PortalSegmentedTabs extends StatelessWidget {
   Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
-    final tint = accentColor ?? portal.primary;
+    final skin = PortalFilterChipTheme.of(context);
+    final solid = style == PortalSegmentedTabsStyle.solid;
+    // Solid is the chip's selected state, so it takes the chip's skin; the
+    // tinted look keeps its own, softer, reading of the accent.
+    final tint =
+        accentColor ?? (solid ? skin.selectedColor : null) ?? portal.primary;
+    final onTint = accentColor != null
+        ? portalInkOn(tint, (solid ? skin.onSelectedColor : null) ?? portal.onPrimary)
+        : (solid ? skin.onSelectedColor : null) ?? portal.onPrimary;
+    final restFill =
+        (solid ? skin.unselectedColor : null) ?? portal.surfaceVariant;
+    final restInk =
+        (solid ? skin.onUnselectedColor : null) ?? portal.onSurfaceVariant;
+    final restEdge = skin.borderColor ?? portal.outline;
     final radius = BorderRadius.circular(tokens.radii.md);
 
     Widget share({required Widget child}) =>
@@ -79,10 +114,20 @@ class PortalSegmentedTabs extends StatelessWidget {
                   curve: tokens.motion.standard,
                   decoration: BoxDecoration(
                     color: index == i
-                        ? tint.withValues(alpha: 0.15)
-                        : portal.surfaceVariant,
+                        ? (solid ? tint : tint.withValues(alpha: 0.15))
+                        : restFill,
                     borderRadius: radius,
                   ),
+                  // Painted over the segment, so the outline takes no room.
+                  foregroundDecoration: solid
+                      ? BoxDecoration(
+                          borderRadius: radius,
+                          border: Border.all(
+                            color: index == i ? tint : restEdge,
+                            width: tokens.borderWidth,
+                          ),
+                        )
+                      : null,
                   child: Material(
                     type: MaterialType.transparency,
                     child: InkWell(
@@ -101,7 +146,8 @@ class PortalSegmentedTabs extends StatelessWidget {
                           textAlign: TextAlign.center,
                           maxLines: 1,
                           style: tokens.textStyles.caption.copyWith(
-                            color: index == i ? tint : portal.onSurfaceVariant,
+                            color:
+                                index == i ? (solid ? onTint : tint) : restInk,
                           ),
                         ),
                       ),

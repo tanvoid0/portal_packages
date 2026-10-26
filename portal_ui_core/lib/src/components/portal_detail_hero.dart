@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/portal_ui_theme.dart';
+import 'portal_gutter_scope.dart';
 
 /// A detail page's head: a mark, a caption, the page's one hero amount, its
 /// delta, then a wrapping meta line with a status badge. Composed from
@@ -40,9 +41,9 @@ class PortalDetailHero extends StatelessWidget {
     final cap = t.textStyles.caption.copyWith(color: muted);
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        t.spacing.lg,
+        PortalGutterScope.inset(context, t.spacing.lg),
         t.spacing.sm,
-        t.spacing.lg,
+        PortalGutterScope.inset(context, t.spacing.lg),
         t.spacing.lg,
       ),
       child: Column(

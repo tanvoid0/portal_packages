@@ -1,3 +1,52 @@
+## Unreleased
+
+- **Gutter convention: the page gutter is applied once.** New `PortalGutterScope`,
+  published by `PortalScrollPage` when it pads its children (default `padding`).
+  Inside it, `PortalListSection` (inset) and its header, `PortalCard(gutter: true)`
+  (so `PortalFeatureCard`), `PortalStatRow`, `PortalFormStack`, `PortalDetailHero`
+  and `PortalFilterChipRow` add no inset of their own, so they share the page's
+  left edge instead of sitting 16dp inside it. Off a scroll page (a sheet, a custom
+  body, a page with its own `padding`) they keep their own gutter. **Visual
+  change**; apps that hand-padded bare content to line up with the old inset
+  list cards should drop that padding.
+- `PortalTextField`'s themed (non-pill) fill steps off the page too, so fields no
+  longer read as bare text on a grouped light page.
+- Visual sweep fixes (docs/ui-kit/notes/visual-sweep-2026-10-25.md in the app repo):
+  - `portalOffPage(context, fill)` (new): a neutral fill within 1.05:1 of the page
+    behind it steps 6% toward `onSurface`. Applied to the secondary / icon
+    `PortalButton`, the grouped `PortalStepper`, the neutral `PortalPrompt`, the
+    default `PortalProgress` track, the neutral `PortalBadge`, `PortalTextField`,
+    `PortalSelect` and `PortalComposer`, so they no longer vanish on a grouped
+    light page or where a skin folds surface tones together.
+  - `portalInkOn(fill, preferred)` (new). `PortalFilterChip.selectedColor` /
+    `PortalSegmentedTabs.accentColor` with no on-colour now pick a readable ink.
+  - `PortalFilterChip`: a selected chip with no glyph of its own draws a check
+    (not action, menu or input chips). **Visual change**, selected chips get wider.
+  - `PortalButton`: `onPressed == null` (and not loading) dims like a disabled row;
+    `expand` no longer strands the icon from its label.
+  - Switch: selected track is solid primary (was 55% alpha, read as disabled); a
+    disabled track is onSurface 12%.
+  - Material filled / elevated / outlined / text button labels and `PortalPrompt`
+    actions carry the app typeface; `PortalSelect` value and hint too.
+  - `PortalFeatureCard` eyebrow kept readable on its wash; `PortalStartupSplash`
+    failure centres; `PortalChevronLink` ellipsizes; `PortalChoiceGrid` never
+    makes more columns than choices; `PortalStepper` value uses `onSurface`;
+    `PortalListItem` centres short rows' content.
+- `PortalSegmentedTabs`: new `style` (`PortalSegmentedTabsStyle.solid`, the
+  default, or `.tinted`). Solid marks the selected segment with a solid fill and
+  on-colour text and outlines the rest -- the selected state of
+  `PortalFilterChip`, and re-skinned by the same `PortalFilterChipTheme`, so an
+  app sets its selected colour once for chips and segmented controls alike.
+  **Visual change:** the old soft-tint look is now `style: .tinted`.
+- `PortalFilterChipRow`: fades whichever end of the strip still has chips past
+  it (nothing while they all fit), so a chip clipped by the viewport reads as
+  scrollable instead of as the last one.
+- `PortalOnboardingPage`: optional `busy` (default false) and `busyLabel`. When
+  `busy` is true the sign-in button shows an in-button spinner and refuses taps
+  (wired to `PortalButton.isLoading`/`busyLabel`), so a connect flow can guard a
+  double-tap / duplicate OAuth without faking it through the label. Default
+  false is unchanged, today's behaviour.
+
 ## 0.4.0
 
 - `PortalTimelineTile` (new): a pure layout tile (`isFirst`/`isLast`/`node`/

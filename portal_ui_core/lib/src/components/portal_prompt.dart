@@ -5,6 +5,7 @@ import '../../contrast_gate.dart';
 import '../theme/portal_sentiment.dart';
 import '../theme/portal_ui_theme.dart';
 import '../tokens/design_tokens.dart';
+import '../theme/portal_theme_helpers.dart';
 
 export '../theme/portal_sentiment.dart' show PortalSentiment, PortalSentimentColors;
 
@@ -208,7 +209,7 @@ class _PromptBody extends StatelessWidget {
     final onBase = p.sentiment.onBase(context);
     final glyph = p.sentiment.glyph;
     final fill = p.sentiment == PortalSentiment.neutral
-        ? cs.surfaceContainerHigh
+        ? portalOffPage(context, cs.surfaceContainerHigh)
         : Color.alphaBlend(base.withValues(alpha: .12), portal.card);
     final ink = cs.onSurface;
     final muted = _clear(cs.onSurfaceVariant, fill, ink, 4.5);
@@ -247,7 +248,10 @@ class _PromptBody extends StatelessWidget {
           tapTargetSize: MaterialTapTargetSize.padded,
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(radius)),
-          textStyle: TextStyle(fontSize: size, fontWeight: FontWeight.w600),
+          textStyle: Theme.of(context)
+              .textTheme
+              .labelLarge
+              ?.copyWith(fontSize: size, fontWeight: FontWeight.w600),
         ),
         child: Text(a.label),
       );
@@ -420,9 +424,12 @@ class _PromptBody extends StatelessWidget {
                             shape: RoundedRectangleBorder(
                                 borderRadius:
                                     BorderRadius.circular(tokens.radii.md)),
-                            textStyle: TextStyle(
-                                fontSize: tokens.typeScale.md,
-                                fontWeight: FontWeight.w600),
+                            textStyle: Theme.of(context)
+                                .textTheme
+                                .labelLarge
+                                ?.copyWith(
+                                    fontSize: tokens.typeScale.md,
+                                    fontWeight: FontWeight.w600),
                           ),
                           child: Text(p.secondaryAction!.label),
                         ),

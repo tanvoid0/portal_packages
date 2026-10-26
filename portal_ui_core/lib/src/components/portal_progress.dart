@@ -6,6 +6,7 @@ import '../theme/portal_ui_theme.dart';
 import 'portal_prompt.dart';
 import 'portal_skeleton.dart';
 import 'portal_text.dart';
+import '../theme/portal_theme_helpers.dart';
 
 /// A budget meter's sentiment by how much of it is used: positive under 75%,
 /// warning to the limit, negative over it. [value] is spent over budget, 1.0
@@ -322,7 +323,8 @@ class PortalProgress extends StatelessWidget {
     final tokens = portal.tokens;
     final skin = PortalProgressTheme.of(context);
     final h = height ?? skin.height ?? tokens.spacing.sm;
-    final track = trackColor ?? skin.trackColor ?? portal.muted;
+    final track =
+        trackColor ?? skin.trackColor ?? portalOffPage(context, portal.muted);
     final fill = fillColor ?? skin.fillColor ?? portal.primary;
     final radius = BorderRadius.circular(tokens.radii.full);
 

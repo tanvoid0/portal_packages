@@ -100,7 +100,10 @@ void main() {
                 )
                 .decoration!
             as BoxDecoration;
-    expect(decoration.color, scheme.surfaceContainerHigh);
+    // Neutral, never a brand role. (The fill is the scheme's High, stepped off
+    // a page it nearly matches: see portal_off_page_test.dart.)
+    expect(decoration.color, isNot(scheme.primary));
+    expect(decoration.color, isNot(scheme.secondary));
 
   });
 }

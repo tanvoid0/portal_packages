@@ -4,6 +4,7 @@ import '../theme/portal_ui_theme.dart';
 import 'portal_badge.dart';
 import 'portal_button.dart';
 import 'portal_card.dart';
+import '../../contrast_gate.dart';
 
 /// The one thing to do now: an overline, a title, a detail line, optional
 /// chips, and the action inside the card. [demoted] steps it back to a quiet
@@ -61,7 +62,10 @@ class PortalFeatureCard extends StatelessWidget {
                 Text(
                   overline.toUpperCase(),
                   style: t.textStyles.overline.copyWith(
-                    color: demoted ? cs.onSurfaceVariant : accent,
+                    // The raw hue on its own 12% wash is under AA in dark.
+                    color: demoted
+                        ? cs.onSurfaceVariant
+                        : portalReadable(accent, _wash(cs, accent), cs.onSurface),
                   ),
                 ),
                 SizedBox(height: t.spacing.xs),
