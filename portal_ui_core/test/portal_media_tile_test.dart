@@ -50,6 +50,32 @@ void main() {
     expect(t.getSize(find.byType(SingleChildScrollView)).height, 102 * 3 / 4);
   });
 
+  testWidgets('topEnd and bottomStart lay out independently of the original pair',
+      (t) async {
+    const topEnd = Key('topEnd');
+    const bottomStart = Key('bottomStart');
+    await t.pumpWidget(MaterialApp(
+      theme: buildPortalTheme(brightness: Brightness.light),
+      home: const Scaffold(
+        body: Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: 136,
+            height: 102,
+            child: PortalMediaTile(
+              photo: ColoredBox(color: Colors.teal),
+              topEnd: SizedBox(key: topEnd, width: 8, height: 8),
+              bottomStart: SizedBox(key: bottomStart, width: 8, height: 8),
+            ),
+          ),
+        ),
+      ),
+    ));
+    expect(t.takeException(), isNull);
+    expect(find.byKey(topEnd), findsOneWidget);
+    expect(find.byKey(bottomStart), findsOneWidget);
+  });
+
   testWidgets('a footer taller than the tile does not eat taps meant for it',
       (t) async {
     var taps = 0;

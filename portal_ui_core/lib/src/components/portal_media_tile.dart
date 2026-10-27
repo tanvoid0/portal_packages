@@ -4,7 +4,9 @@ import '../theme/portal_ui_theme.dart';
 import 'portal_card.dart';
 
 /// A photo tile with `tokens.gradients.imageScrim` for legibility: corner
-/// badges ([topStart]/[bottomEnd]), a bottom [overlay] (a label living in the
+/// badges ([topStart]/[bottomEnd], and [topEnd]/[bottomStart] for a second
+/// pair when one corner's badge isn't enough — games' play-time pill
+/// alongside its kind badge, say), a bottom [overlay] (a label living in the
 /// scrim's own white-on-photo ink), or a [footer] panel below the photo
 /// instead (title/meta in the page's own ink) — gym's explore-program cards
 /// and quick-start tiles, and lifestyle's outfit picks, each drew their own
@@ -15,6 +17,8 @@ class PortalMediaTile extends StatelessWidget {
     required this.photo,
     this.scrim = true,
     this.topStart,
+    this.topEnd,
+    this.bottomStart,
     this.bottomEnd,
     this.overlay,
     this.footer,
@@ -28,11 +32,17 @@ class PortalMediaTile extends StatelessWidget {
   final Widget photo;
 
   /// `tokens.gradients.imageScrim` over [photo]. Off only when nothing is
-  /// drawn over it ([topStart]/[bottomEnd]/[overlay] all null).
+  /// drawn over it (every corner slot and [overlay] all null).
   final bool scrim;
 
-  /// Badges pinned to the photo's corners (a 'Top Picks'/'Preview' mark).
+  /// Badges pinned to the photo's corners (a 'Top Picks'/'Preview' mark, a
+  /// kind tag). [topEnd] and [bottomStart] are the second pair, for a module
+  /// that needs more than one badge in the same corner pair — they lay out
+  /// independently of [topStart]/[bottomEnd], so a caller using only the
+  /// original two sees no change.
   final Widget? topStart;
+  final Widget? topEnd;
+  final Widget? bottomStart;
   final Widget? bottomEnd;
 
   /// Laid over the scrim at the bottom — the tile's own label, meant to read
@@ -72,6 +82,18 @@ class PortalMediaTile extends StatelessWidget {
             start: t.spacing.sm,
             top: t.spacing.sm,
             child: topStart!,
+          ),
+        if (topEnd != null)
+          PositionedDirectional(
+            end: t.spacing.sm,
+            top: t.spacing.sm,
+            child: topEnd!,
+          ),
+        if (bottomStart != null)
+          PositionedDirectional(
+            start: t.spacing.sm,
+            bottom: t.spacing.sm,
+            child: bottomStart!,
           ),
         if (bottomEnd != null)
           PositionedDirectional(
