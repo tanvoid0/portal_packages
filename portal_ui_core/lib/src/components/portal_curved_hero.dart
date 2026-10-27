@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/portal_ui_theme.dart';
+import '../tokens/portal_contrast.dart';
 
 /// Bows the bottom edge of its child down by [depth] -- a quadratic bezier
 /// with its control point below bottom-centre. [PortalCurvedHero]'s media
@@ -60,6 +61,7 @@ class PortalCurvedHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = PortalUiTheme.of(context).tokens;
+    final cs = Theme.of(context).colorScheme;
     final d = depth ?? t.radii.xl * 2;
     return Stack(
       children: [
@@ -83,18 +85,9 @@ class PortalCurvedHero extends StatelessWidget {
                 t.spacing.lg,
                 t.spacing.md,
               ),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0),
-                    Colors.black.withValues(alpha: .45),
-                  ],
-                ),
-              ),
+              decoration: BoxDecoration(gradient: t.gradients.imageScrim(cs)),
               child: DefaultTextStyle.merge(
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: portalOnColorFor(cs.scrim)),
                 child: c,
               ),
             ),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/portal_icons.dart';
 import '../theme/portal_ui_theme.dart';
+import '../tokens/portal_contrast.dart';
 import 'portal_network_image.dart';
 
 /// A swipeable photo hero: a `PageView` of [urls] with a glass pill of
@@ -147,16 +148,18 @@ class _CarouselDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final portal = PortalUiTheme.of(context);
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
-        : PortalUiTheme.of(context).tokens.motion.fast;
+        : portal.tokens.motion.fast;
+    final ink = portalOnColorFor(portal.surface);
     return AnimatedContainer(
       duration: duration,
       margin: const EdgeInsets.symmetric(horizontal: 3),
       width: active ? 18 : 6,
       height: 6,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: active ? 1 : .5),
+        color: ink.withValues(alpha: active ? 1 : .5),
         borderRadius: BorderRadius.circular(3),
       ),
     );
