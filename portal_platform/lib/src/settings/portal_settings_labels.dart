@@ -53,6 +53,7 @@ class PortalSettingsLabels {
     this.checkForUpdates = 'Check for updates',
     this.upToDate = 'Up to date',
     this.updateCheckFailed = 'The update check did not complete',
+    this.updateAvailable = 'Update available',
     this.changePassword = 'Change password',
     this.changePasswordIntro =
         'Your Portal account password, the same one every Portal app signs '
@@ -163,6 +164,9 @@ class PortalSettingsLabels {
   final String checkForUpdates;
   final String upToDate;
   final String updateCheckFailed;
+
+  /// The App version row's value when a newer build is waiting.
+  final String updateAvailable;
 
   // Account.
   final String changePassword;

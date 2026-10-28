@@ -6,6 +6,7 @@ import 'package:portal_ui_core/portal_ui_core.dart';
 import '../config/portal_server_prefs.dart';
 import '../services/api_client.dart';
 import '../session/session_controller.dart';
+import '../update/portal_release.dart';
 import '../update/portal_update_service.dart';
 import '../update/portal_update_tile.dart';
 import '../widgets/portal_app_version.dart';
@@ -44,7 +45,8 @@ class PortalSettingsSection {
 ///
 /// Each group is an inline section of the one flat page:
 /// [assistant] is the slot for [PortalSettingsPage.assistantSection];
-/// [status] is the About section (Mode, App version, Check for updates);
+/// [status] is the About section (Mode, App version -- which reads "Update
+/// available" and opens the update prompt when a newer build is waiting);
 /// [about] is the Account section (change password, sign out, delete
 /// account).
 enum PortalSettingsGroup {
@@ -644,8 +646,10 @@ class _AppearancePage extends StatelessWidget {
   );
 }
 
-/// The About section: Mode, App version (still the 7-tap dev-unlock) and
-/// Check for updates. Inline on the page, and the body of [_AboutPage].
+/// The About section: Mode and App version. The version row is the 7-tap
+/// dev-unlock, or, when a newer build is waiting, an "Update available" row
+/// that opens the update prompt. Inline on the page, and the body of
+/// [_AboutPage].
 class _AboutRows extends StatefulWidget {
   const _AboutRows({
     required this.labels,
@@ -670,7 +674,7 @@ class _AboutRows extends StatefulWidget {
 }
 
 class _AboutRowsState extends State<_AboutRows> {
-  bool _checkingUpdate = false;
+  PortalRelease? _update;
   bool? _loadedReachable;
   String? _loadedVersion;
 
@@ -686,9 +690,15 @@ class _AboutRowsState extends State<_AboutRows> {
 
   PortalSettingsLabels get _labels => widget.labels;
 
+  PortalUpdateService? get _updates =>
+      Get.isRegistered<PortalUpdateService>()
+          ? Get.find<PortalUpdateService>()
+          : null;
+
   @override
   void initState() {
     super.initState();
+    _checkForUpdate();
     if (!_devToolsUnlocked) {
       PortalServerPrefs.devToolsUnlocked().then((unlocked) {
         if (unlocked && mounted) setState(() => _devToolsUnlocked = true);
@@ -727,32 +737,24 @@ class _AboutRowsState extends State<_AboutRows> {
     }
   }
 
-  Future<void> _checkForUpdates(PortalUpdateService service) async {
-    setState(() => _checkingUpdate = true);
+  // Quiet on purpose: up to date, offline or a failed check all leave the row
+  // showing the version, as it did before anyone asked.
+  Future<void> _checkForUpdate() async {
+    final service = _updates;
+    if (service == null || !service.isEnabled) return;
     final result = await service.check();
-    if (!mounted) return;
-    setState(() => _checkingUpdate = false);
-
-    if (result.status == PortalUpdateStatus.updateAvailable) {
-      await showPortalUpdateDialog(context, service, result.release!);
-      return;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          result.status == PortalUpdateStatus.upToDate
-              ? _labels.upToDate
-              : result.message ?? _labels.updateCheckFailed,
-        ),
-      ),
-    );
+    if (!mounted || result.status != PortalUpdateStatus.updateAvailable) return;
+    setState(() => _update = result.release);
   }
 
   @override
   Widget build(BuildContext context) {
-    final updates = Get.isRegistered<PortalUpdateService>()
-        ? Get.find<PortalUpdateService>()
-        : null;
+    final updates = _updates;
+    final update = _update;
+    final versionLeading = PortalListLeading.tile(
+      PortalIcons.info_rounded,
+      tone: PortalListTone.tertiary,
+    );
     // ponytail: Mode reflects reachability only; routing-aware text needs a modeLabel callback — add when an app asks.
     final mode = switch (_reachable) {
       null => _labels.checking,
@@ -775,32 +777,28 @@ class _AboutRowsState extends State<_AboutRows> {
               sentiment: PortalValueSentiment.dim,
             ),
           ),
-        _HiddenTapRow(
-          title: _labels.appVersion,
-          leading: PortalListLeading.tile(
-            PortalIcons.info_rounded,
-            tone: PortalListTone.tertiary,
-          ),
-          trailing: PortalListAccessory.value(
-            _version ?? '…',
-            sentiment: PortalValueSentiment.dim,
-          ),
-          onHiddenTap: _onVersionTap,
-        ),
-        if (updates != null && updates.isEnabled)
+        // A waiting update makes the row a real, announced action; the hidden
+        // dev-unlock taps come back once the app is current.
+        if (updates != null && update != null)
           PortalListItem(
-            title: _labels.checkForUpdates,
-            leading: PortalListLeading.tile(
-              PortalIcons.system_update_rounded,
-              tone: PortalListTone.tertiary,
+            title: _labels.appVersion,
+            subtitle: _version,
+            leading: versionLeading,
+            trailing: PortalListAccessory.value(
+              _labels.updateAvailable,
+              sentiment: PortalValueSentiment.positive,
             ),
-            trailing: _checkingUpdate
-                ? PortalListAccessory.value(
-                    _labels.checking,
-                    sentiment: PortalValueSentiment.dim,
-                  )
-                : PortalListAccessory.none,
-            onTap: _checkingUpdate ? null : () => _checkForUpdates(updates),
+            onTap: () => showPortalUpdateDialog(context, updates, update),
+          )
+        else
+          _HiddenTapRow(
+            title: _labels.appVersion,
+            leading: versionLeading,
+            trailing: PortalListAccessory.value(
+              _version ?? '…',
+              sentiment: PortalValueSentiment.dim,
+            ),
+            onHiddenTap: _onVersionTap,
           ),
       ],
     );

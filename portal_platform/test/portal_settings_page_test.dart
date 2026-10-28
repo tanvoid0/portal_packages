@@ -21,6 +21,18 @@ class _FakeApi extends ApiClient {
   }) => readiness.future;
 }
 
+/// An update service whose check the test answers, since the real one only
+/// reports an update on Android.
+class _FakeUpdates extends PortalUpdateService {
+  _FakeUpdates(this.result)
+    : super(manifestUrl: 'https://example.test/updates.json', appName: 'Gym');
+
+  final PortalUpdateCheck result;
+
+  @override
+  Future<PortalUpdateCheck> check() async => result;
+}
+
 /// A signed-in (or out) session that records what the page asked of it.
 class _FakeSession extends SessionController {
   _FakeSession(Map<String, dynamic>? signedInAs) {
@@ -396,20 +408,49 @@ void main() {
       expect(find.byType(PortalServerPage), findsOneWidget);
     });
 
-    testWidgets('Check for updates only with an update service', (
+    testWidgets('no Check for updates row; App version stays quiet when current', (
       tester,
     ) async {
+      Get.put<PortalUpdateService>(
+        _FakeUpdates(const PortalUpdateCheck(PortalUpdateStatus.upToDate)),
+      );
       await pump(tester, const PortalSettingsPage(include: status));
-      expect(find.text('Check for updates'), findsNothing);
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
 
-      Get.put(
-        PortalUpdateService(
-          manifestUrl: 'https://example.test/updates.json',
-          appName: 'Portal Gym',
+      expect(find.text('Check for updates'), findsNothing);
+      expect(find.text('Update available'), findsNothing);
+      expect(find.text('1.3.0 (412)'), findsOneWidget);
+    });
+
+    testWidgets('a waiting update turns App version into the update prompt', (
+      tester,
+    ) async {
+      Get.put<PortalUpdateService>(
+        _FakeUpdates(
+          PortalUpdateCheck(
+            PortalUpdateStatus.updateAvailable,
+            release: PortalRelease(
+              slug: 'gym',
+              versionCode: 500,
+              versionName: '1.4.0',
+              apkUrl: Uri.parse('https://example.test/gym.apk'),
+              sha256: 'a' * 64,
+              sizeBytes: 1,
+            ),
+          ),
         ),
       );
       await pump(tester, const PortalSettingsPage(include: status));
-      expect(find.text('Check for updates'), findsOneWidget);
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Update available'), findsOneWidget);
+      expect(find.text('1.3.0 (412)'), findsOneWidget);
+
+      await tester.tap(find.text('App version'));
+      await tester.pumpAndSettle();
+      expect(find.text('Update to 1.4.0'), findsOneWidget);
     });
   });
 
