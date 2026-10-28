@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:portal_ui_core/portal_ui_core.dart';
 
 import '../chat/ai_chat_session.dart';
@@ -74,7 +73,7 @@ class AiUserTurn extends StatelessWidget {
           onLongPress: actions.isEmpty
               ? null
               : () {
-                  HapticFeedback.selectionClick();
+                  PortalHaptics.selection();
                   showPortalActionSheet(context, actions);
                 },
           // The bubble owns the user turn's text colour: onSurface by default,

@@ -1642,7 +1642,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
 
   void _copyText(String text) {
     Clipboard.setData(ClipboardData(text: text));
-    HapticFeedback.selectionClick();
+    PortalHaptics.selection();
     ScaffoldMessenger.maybeOf(
       context,
     )?.showSnackBar(SnackBar(content: Text(widget.labels.copied)));
