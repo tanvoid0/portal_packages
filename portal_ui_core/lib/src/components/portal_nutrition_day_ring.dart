@@ -5,6 +5,10 @@ import '../theme/portal_semantic_colors.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_avatar_mark.dart';
 
+// The goals sheet is the ring's editor; it rides this export so the top barrel
+// needs no line of its own.
+export 'portal_nutrition_goals_sheet.dart';
+
 /// A day's nutrition total: calories as a ring against [targetCalories], the
 /// three macros under it.
 ///

@@ -50,4 +50,31 @@ void main() {
     expect(find.text('x1'), findsNothing);
     expect(find.byTooltip('Delete entry'), findsNothing);
   });
+
+  testWidgets('goals sheet: whole kcal, decimal macros, empty clears',
+      (t) async {
+    final saved = <List<num>>[];
+    await t.pumpWidget(host(PortalNutritionGoalsSheet(
+      onSave: (c, p, cb, f) async => saved.add([c, p, cb, f]),
+      onClose: () {},
+    )));
+    Finder field(int i) => find.byType(TextField).at(i);
+    Future<void> save() async {
+      await t.tap(find.text('Save goals'));
+      // pump, not settle: the dock keeps spinning once the (inert) onClose returns.
+      await t.pump(const Duration(milliseconds: 300));
+    }
+
+    await t.enterText(field(0), '2000.5');
+    await save();
+    expect(find.text('Enter whole calories, or leave it empty.'), findsOneWidget);
+    expect(saved, isEmpty);
+
+    await t.enterText(field(0), '2000');
+    await t.enterText(field(1), '12.5');
+    await save();
+    expect(saved, [
+      [2000, 12.5, 0, 0],
+    ]);
+  });
 }

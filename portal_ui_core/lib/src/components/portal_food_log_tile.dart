@@ -5,6 +5,18 @@ import '../theme/portal_icons.dart';
 import 'portal_list_item.dart';
 import 'portal_network_image.dart';
 
+/// Where a diary entry came from: the glyph and the spoken label every app's
+/// diary row shows for it. Named like the model's `FoodLogSource`.
+enum PortalFoodSource {
+  manual(PortalIcons.edit_rounded, 'Logged by hand'),
+  vision(PortalIcons.photo_camera_rounded, 'Logged from a photo'),
+  recipe(PortalIcons.menu_book_rounded, 'Logged from a recipe');
+
+  const PortalFoodSource(this.icon, this.label);
+  final IconData icon;
+  final String label;
+}
+
 /// One logged food in a diary list: name, calories, servings, meal and where
 /// the entry came from.
 ///
