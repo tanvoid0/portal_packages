@@ -116,6 +116,7 @@ export 'src/components/portal_swipe_row.dart';
 export 'src/components/portal_typing_dots.dart';
 export 'src/motion/portal_haptics.dart';
 export 'src/motion/portal_hero.dart';
+export 'src/motion/portal_load_fade.dart';
 export 'src/motion/portal_page_transitions.dart';
 export 'src/motion/portal_shimmer.dart';
 export 'src/motion/portal_spring_curve.dart';
