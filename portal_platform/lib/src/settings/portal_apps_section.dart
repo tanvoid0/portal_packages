@@ -624,39 +624,23 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
 /// https/same-host check in [PortalRelease], or a fetch that failed on the
 /// device. A row therefore never renders an empty circle.
 Widget portalAppAvatar(PortalRelease release, Color color) {
-  final fallback = Icon(portalAppIconFor(release.slug), color: color);
-  final url = release.iconUrl;
-  if (url == null) return fallback;
-  return ClipOval(
-    child: Image.network(
-      url.toString(),
-      width: 40,
-      height: 40,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => fallback,
-    ),
+  return PortalNetworkImage(
+    url: release.iconUrl?.toString(),
+    size: 40,
+    shape: BoxShape.circle,
+    fallbackIcon: portalAppIconFor(release.slug),
+    fallbackIconColor: color,
   );
 }
 
 /// [portalAppAvatar] for a list row's 40 dp thumbnail: the same published icon
 /// and the same fallback glyph, square-cropped instead of a circle.
 PortalListLeading _appThumbnail(BuildContext context, PortalRelease release) {
-  final cs = Theme.of(context).colorScheme;
-  final fallback = ColoredBox(
-    color: cs.surfaceContainerHighest,
-    child: Center(
-      child: Icon(portalAppIconFor(release.slug), color: cs.onSurfaceVariant),
-    ),
-  );
-  final url = release.iconUrl;
   return PortalListLeading.thumbnail(
-    url == null
-        ? fallback
-        : Image.network(
-            url.toString(),
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => fallback,
-          ),
+    PortalNetworkImage(
+      url: release.iconUrl?.toString(),
+      fallbackIcon: portalAppIconFor(release.slug),
+    ),
   );
 }
 

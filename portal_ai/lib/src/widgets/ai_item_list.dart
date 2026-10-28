@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 import '../tools/ai_tool.dart';
 
@@ -64,28 +65,16 @@ class _AiItemRow extends StatelessWidget {
   }
 
   Widget _row() {
-    final image = item.imageUrl;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(14),
-            child: SizedBox(
-              width: 52,
-              height: 52,
-              child: image == null || image.isEmpty
-                  ? _placeholder
-                  : Image.network(
-                      image,
-                      fit: BoxFit.cover,
-                      // A dead or slow image must not blank the row: the text
-                      // beside it is the actual answer.
-                      errorBuilder: (_, _, _) => _placeholder,
-                      loadingBuilder: (_, child, progress) =>
-                          progress == null ? child : _placeholder,
-                    ),
-            ),
+            // A dead or slow image must not blank the row: the text beside
+            // it is the actual answer, and PortalNetworkImage's own fallback
+            // already covers both cases.
+            child: PortalNetworkImage(url: item.imageUrl, size: 52),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -146,13 +135,4 @@ class _AiItemRow extends StatelessWidget {
       ),
     );
   }
-
-  Widget get _placeholder => ColoredBox(
-    color: theme.colorScheme.surfaceContainerHighest,
-    child: Icon(
-      Icons.image_outlined,
-      size: 20,
-      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-    ),
-  );
 }

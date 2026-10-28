@@ -160,13 +160,11 @@ class AiConfirmCard extends StatelessWidget {
           if (cover != null)
             AspectRatio(
               aspectRatio: 16 / 9,
-              child: Image.network(
-                cover,
-                fit: BoxFit.cover,
-                // A cover photo is decoration. A broken link must not take
-                // the card -- and the decision it is asking for -- with it.
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
-              ),
+              // A cover photo is decoration. A broken link must not take
+              // the card -- and the decision it is asking for -- with it;
+              // PortalNetworkImage's own muted fallback keeps the card whole
+              // instead of collapsing it to nothing.
+              child: PortalNetworkImage(url: cover),
             ),
           if (headed)
             AiCardHead(

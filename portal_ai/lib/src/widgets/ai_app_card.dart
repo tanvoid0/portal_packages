@@ -179,7 +179,6 @@ class AiCardRows extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return PortalListSection(
       style: PortalListStyle.fullBleed,
       children: [
@@ -190,14 +189,10 @@ class AiCardRows extends StatelessWidget {
             leading: row.imageUrl == null
                 ? null
                 : PortalListLeading.thumbnail(
-                    Image.network(
-                      row.imageUrl!,
-                      fit: BoxFit.cover,
-                      // A dead image must not blank the row: the text is the
-                      // answer.
-                      errorBuilder: (_, _, _) =>
-                          ColoredBox(color: cs.surfaceContainerHighest),
-                    ),
+                    // A dead or repeat image must not blank the row: the
+                    // text is the answer, and PortalNetworkImage already
+                    // falls back the same way cached_network_image fails.
+                    PortalNetworkImage(url: row.imageUrl),
                   ),
             trailing: row.value == null
                 ? PortalListAccessory.none
