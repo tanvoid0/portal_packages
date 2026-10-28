@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/portal_component_extensions.dart';
+import '../theme/portal_icons.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_button.dart';
 import 'portal_card.dart';
@@ -56,10 +57,10 @@ class PortalEmptyState extends StatelessWidget {
     this.message,
     required VoidCallback onRetry,
     String retryLabel = 'Retry',
-    this.icon = Icons.cloud_off_rounded,
+    this.icon = PortalIcons.cloud_off_rounded,
+    this.iconWidget,
     this.inCard = true,
-  })  : iconWidget = null,
-        actionLabel = retryLabel,
+  })  : actionLabel = retryLabel,
         onAction = onRetry,
         actionIcon = null,
         secondaryActionLabel = null,
