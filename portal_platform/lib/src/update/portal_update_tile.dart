@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:portal_ui_core/portal_ui_core.dart';
 
 import '../widgets/portal_app_version.dart';
 import 'portal_release.dart';
@@ -280,6 +282,45 @@ Future<bool> showPortalUpdateDialog(
   return portalInstallAndReport(context, service, release);
 }
 
+/// The download meter: a sheet that cannot be dismissed, for work that must not
+/// be walked away from. The caller closes it with `Navigator.pop` when the work
+/// ends. [progress] is 0..1, negative while the size is not yet known; [status]
+/// captions the bar's start (which app, how far through a batch) and the end
+/// carries the percentage.
+void portalShowDownloadSheet(
+  BuildContext context, {
+  required String title,
+  required ValueListenable<double> progress,
+  ValueListenable<String>? status,
+}) {
+  // Merged once, not per build: a fresh one would re-subscribe to notifiers the
+  // caller has already disposed.
+  final listenable = Listenable.merge([progress, ?status]);
+  final sp = PortalUiTheme.of(context).tokens.spacing;
+  // Not awaited: it resolves when the caller pops it.
+  unawaited(
+    PortalSheet.show<void>(
+      context,
+      title: title,
+      isDismissible: false,
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(bottom: sp.lg),
+        child: ListenableBuilder(
+          listenable: listenable,
+          builder: (_, __) => PortalProgress(
+            value: progress.value < 0 ? null : progress.value,
+            semanticLabel: title,
+            startLabel: status?.value,
+            endLabel: progress.value < 0
+                ? null
+                : '${(progress.value * 100).round()}%',
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 /// Downloads [release] through [service] and hands it to the PackageInstaller,
 /// showing progress and the result. True when the install session was
 /// launched.
@@ -293,29 +334,10 @@ Future<bool> portalInstallAndReport(
   PortalRelease release,
 ) async {
   final progress = ValueNotifier<double>(-1);
-  // Not awaited: this dialog stays up until the download finishes and the
-  // `finally` below pops it. barrierDismissible is false, so it cannot close
-  // on its own and leave that pop to dismiss the wrong route.
-  unawaited(
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Downloading'),
-        content: ValueListenableBuilder<double>(
-          valueListenable: progress,
-          builder: (context, value, _) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              LinearProgressIndicator(value: value < 0 ? null : value),
-              const SizedBox(height: 12),
-              Text(value < 0 ? '' : '${(value * 100).round()}%'),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
+  // The sheet stays up until the download finishes and the `finally` below
+  // pops it; it cannot be dismissed, so nothing else can close it first and
+  // leave that pop to dismiss the wrong route.
+  portalShowDownloadSheet(context, title: 'Downloading', progress: progress);
 
   String? error;
   File? apk;

@@ -45,8 +45,9 @@ bool portalCanInstallApps(PortalUpdateService service) =>
 ///
 /// [PortalAppsSection.grouped] is the same list as a kit section for
 /// `PortalSettingsPage`: it carries its own header, Check again lives on that
-/// header, an installed row's More (or a long press) holds Uninstall, and
-/// Install / Update ask first in a sheet. Same load, probe and install logic.
+/// header, a long press on an installed row holds Uninstall (the row shows only
+/// its one button, as the kit's settings recipe does), and Install / Update ask
+/// first in a sheet. Same load, probe and install logic.
 class PortalAppsSection extends StatefulWidget {
   const PortalAppsSection({
     super.key,
@@ -244,8 +245,7 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
     await _probeInstalled();
   }
 
-  /// An installed row's More, or a long press on it: its own action again,
-  /// then Uninstall. Nothing to uninstall until it is installed.
+  /// A long press on an installed row: its own action again, then Uninstall. Nothing to uninstall until it is installed.
   Future<void> _showActions(PortalRelease release) {
     final labels = widget.labels;
     final action = _actionFor(release);
@@ -302,29 +302,11 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
     final status = ValueNotifier<String>('');
     final progress = ValueNotifier<double>(-1);
 
-    unawaited(
-      showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: Text(labels.installAll),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ValueListenableBuilder<String>(
-                valueListenable: status,
-                builder: (context, value, _) => Text(value),
-              ),
-              const SizedBox(height: 12),
-              ValueListenableBuilder<double>(
-                valueListenable: progress,
-                builder: (context, value, _) =>
-                    LinearProgressIndicator(value: value < 0 ? null : value),
-              ),
-            ],
-          ),
-        ),
-      ),
+    portalShowDownloadSheet(
+      context,
+      title: labels.installAll,
+      progress: progress,
+      status: status,
     );
 
     // Kept in order so the install prompts arrive in the order the list showed.
@@ -460,7 +442,6 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
   }
 
   PortalListItem _groupedRow(BuildContext context, PortalRelease app) {
-    final labels = widget.labels;
     final action = _actionFor(app);
     final installed = _installed.containsKey(app.slug);
     final name = app.displayName;
@@ -477,24 +458,13 @@ class _PortalAppsSectionState extends State<PortalAppsSection>
       leading: _appThumbnail(context, app),
       onLongPress: installed ? () => _showActions(app) : null,
       trailing: PortalListAccessory.widget(
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Tooltip(
-              message: '$label $name',
-              child: PortalButton(
-                label: label,
-                variant: PortalButtonVariant.secondary,
-                onPressed: () => _tap(app),
-              ),
-            ),
-            if (installed)
-              IconButton(
-                icon: const Icon(PortalIcons.more_vert_rounded),
-                tooltip: '${labels.more} for $name',
-                onPressed: () => _showActions(app),
-              ),
-          ],
+        Tooltip(
+          message: '$label $name',
+          child: PortalButton(
+            label: label,
+            variant: PortalButtonVariant.secondary,
+            onPressed: () => _tap(app),
+          ),
         ),
         interactive: true,
       ),

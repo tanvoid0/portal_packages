@@ -212,8 +212,39 @@ void main() {
       expect(find.byTooltip('Install Gym'), findsOneWidget);
       expect(find.byTooltip('Install Recipe'), findsOneWidget);
       expect(find.text('Check again'), findsOneWidget);
-      // Nothing installed, so nothing to open a More for.
+      // One button per row; Uninstall is a long press, not a second control.
       expect(find.byTooltip('More for Gym'), findsNothing);
+    });
+
+    testWidgets('the download meter fills and shows its percentage',
+        (tester) async {
+      final progress = ValueNotifier<double>(-1);
+      final status = ValueNotifier<String>('Downloading 1/2 — Gym');
+      late BuildContext context;
+      await tester.pumpWidget(MaterialApp(
+        theme: buildPortalTheme(brightness: Brightness.light),
+        home: Builder(builder: (c) {
+          context = c;
+          return const Scaffold();
+        }),
+      ));
+      portalShowDownloadSheet(
+        context,
+        title: 'Install all',
+        progress: progress,
+        status: status,
+      );
+      // Indeterminate until the size is known, which never settles.
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.text('Downloading 1/2 — Gym'), findsOneWidget);
+      expect(find.textContaining('%'), findsNothing);
+
+      progress.value = .4;
+      await tester.pump();
+
+      expect(find.text('40%'), findsOneWidget);
     });
 
     testWidgets('Install all appears from two waiting apps', (tester) async {
