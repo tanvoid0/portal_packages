@@ -1,7 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../contrast_gate.dart';
 import '../motion/portal_haptics.dart';
+import '../motion/portal_spring_curve.dart';
 import '../theme/portal_component_extensions.dart';
 import '../theme/portal_ui_theme.dart';
 import 'portal_text.dart';
@@ -29,12 +32,6 @@ class PortalNavDestination {
   final int? badgeCount;
 }
 
-/// [PortalBottomNavBar.variant]: [standard] is the shipped docked-well bar
-/// (unchanged); [pill] is the 2026-10 redesign — a fully-rounded pill with a
-/// single capsule that slides to the selected tab (covering icon *and*
-/// label) and a scrim that fades page content out behind it.
-enum PortalBottomNavVariant { standard, pill }
-
 /// Floating pill navigation — icon over an **always-visible** label.
 ///
 /// Extracted from portal_recipe so every Portal app navigates the same way.
@@ -57,7 +54,6 @@ class PortalBottomNavBar extends StatelessWidget {
     this.selectedMarkColor,
     this.boxShadow,
     this.height = barHeight,
-    this.variant = PortalBottomNavVariant.standard,
   });
 
   final int selectedIndex;
@@ -71,7 +67,7 @@ class PortalBottomNavBar extends StatelessWidget {
   /// opacity — still above the 4.5:1 floor for the label.
   final Color? markColor;
 
-  /// The well behind the selected icon.
+  /// The capsule behind the selected tab.
   final Color? selectedWellColor;
 
   /// Mark color when selected, if it must differ from [markColor] — e.g. an
@@ -80,10 +76,6 @@ class PortalBottomNavBar extends StatelessWidget {
 
   final List<BoxShadow>? boxShadow;
   final double height;
-
-  /// Defaults to [PortalBottomNavVariant.standard] — every existing caller
-  /// renders exactly as before. Pass `.pill` for the redesign.
-  final PortalBottomNavVariant variant;
 
   static const double barHeight = 68;
   static const double outerBottomPadding = 10;
@@ -100,77 +92,7 @@ class PortalBottomNavBar extends StatelessWidget {
   static const double contentBottomInsetWithFab = fabBottomPadding + 56 + 12;
 
   @override
-  Widget build(BuildContext context) => switch (variant) {
-        PortalBottomNavVariant.standard => _buildStandard(context),
-        PortalBottomNavVariant.pill => _buildPill(context),
-      };
-
-  Widget _buildStandard(BuildContext context) {
-    final portal = PortalUiTheme.of(context);
-    final tokens = portal.tokens;
-    final brightness = Theme.of(context).brightness;
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-
-    final skin = PortalNavBarTheme.of(context);
-    final bg = backgroundColor ?? skin.backgroundColor ?? portal.card;
-    final border = borderColor ?? skin.borderColor ?? portal.border;
-    final mark = markColor ?? skin.markColor ?? portal.onCard;
-    final well = selectedWellColor ?? skin.selectedWellColor ?? portal.muted;
-    final duration = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : tokens.motion.medium;
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        outerHorizontalPadding,
-        0,
-        outerHorizontalPadding,
-        outerBottomPadding + bottomInset * 0.35,
-      ),
-      child: AnimatedContainer(
-        duration: duration,
-        curve: tokens.motion.standard,
-        height: height,
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(tokens.radii.xl),
-          border: Border.all(color: border),
-          boxShadow: boxShadow ??
-              skin.boxShadow ??
-              tokens.elevation.medium(brightness),
-        ),
-        child: Row(
-          children: [
-            for (var i = 0; i < destinations.length; i++)
-              Expanded(
-                child: _NavItem(
-                  destination: destinations[i],
-                  isSelected: i == selectedIndex,
-                  onTap: () {
-                    if (i != selectedIndex) PortalHaptics.selection();
-                    onDestinationSelected(i);
-                  },
-                  mark: mark,
-                  selectedMark:
-                      selectedMarkColor ?? skin.selectedMarkColor ?? mark,
-                  well: well,
-                  radius: tokens.radii.lg,
-                  duration: duration,
-                  curve: tokens.motion.standard,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// The redesign: one capsule slides behind the selected tab and holds its
-  /// icon *and* label (the standard variant's well sits behind the icon
-  /// alone); the selected glyph fills and its label goes bold, in the
-  /// selected mark color. A scrim fades page content out behind the pill so
-  /// rows no longer hit a hard edge under it.
-  Widget _buildPill(BuildContext context) {
+  Widget build(BuildContext context) {
     final portal = PortalUiTheme.of(context);
     final tokens = portal.tokens;
     final theme = Theme.of(context);
@@ -188,10 +110,20 @@ class PortalBottomNavBar extends StatelessWidget {
         skin.selectedWellColor ??
         portalWellOn(bg, selectedMark);
     final n = destinations.length;
-    final duration = MediaQuery.disableAnimationsOf(context)
+    final still = MediaQuery.disableAnimationsOf(context);
+    final duration = still ? Duration.zero : tokens.motion.medium;
+    // The capsule *moves*, so it takes the spatial spring (a slight settle)
+    // on that spring's own settle time; fill and colour keep `standard`.
+    final slide = tokens.motion.emphasized;
+    final slideDuration = still
         ? Duration.zero
-        : tokens.motion.medium;
+        : slide is PortalSpringCurve
+            ? slide.duration
+            : tokens.motion.medium;
     final page = theme.scaffoldBackgroundColor;
+    // Clear a gesture-nav handle the way the old docked bar did; the bar
+    // removes the inset below so nothing else pads for it twice.
+    final lift = bottom - floor + MediaQuery.paddingOf(context).bottom * .35;
     final x = n < 2 ? 0.0 : -1 + 2 * selectedIndex / (n - 1);
 
     Widget tab(int i) {
@@ -225,30 +157,45 @@ class PortalBottomNavBar extends StatelessWidget {
                         tween: Tween(end: on ? 1.0 : 0.0),
                         duration: duration,
                         curve: tokens.motion.standard,
-                        builder: (_, fill, __) => Icon(
-                          on ? d.selectedIcon ?? d.icon : d.icon,
-                          fill: fill,
-                          size: 24,
-                          color: fg,
+                        builder: (_, fill, __) => Transform.scale(
+                          // A small bump on the way in; never on the way out.
+                          scale: on
+                              ? 1 + .08 * math.sin(math.pi * fill.clamp(0.0, 1.0))
+                              : 1,
+                          child: Icon(
+                            on ? d.selectedIcon ?? d.icon : d.icon,
+                            fill: fill.clamp(0.0, 1.0),
+                            size: 24,
+                            color: fg,
+                          ),
                         ),
                       ),
-                      if (count > 0)
-                        Positioned(
-                          right: -8,
-                          top: -4,
-                          child: _Badge(count: count),
+                      Positioned(
+                        right: -8,
+                        top: -4,
+                        child: AnimatedSwitcher(
+                          duration: duration,
+                          switchInCurve: tokens.motion.emphasized,
+                          transitionBuilder: (child, a) =>
+                              ScaleTransition(scale: a, child: child),
+                          child: count > 0
+                              ? _Badge(key: ValueKey(count), count: count)
+                              : const SizedBox.shrink(),
                         ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 2),
                   PortalText(
                     d.label,
                     maxLines: 1,
+                    // One weight both ways: a bolder selected label is wider
+                    // and nudges its neighbours on every switch.
                     style: tokens.textStyles.caption.copyWith(
                       fontSize: 12,
                       height: 1.1,
                       letterSpacing: 0,
-                      fontWeight: on ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                       color: fg,
                     ),
                   ),
@@ -264,7 +211,7 @@ class PortalBottomNavBar extends StatelessWidget {
       context: context,
       removeBottom: true,
       child: Padding(
-        padding: const EdgeInsets.only(bottom: bottom - floor),
+        padding: EdgeInsets.only(bottom: lift),
         child: Stack(
           // The pill's shadow must show past the Stack.
           clipBehavior: Clip.none,
@@ -274,7 +221,7 @@ class PortalBottomNavBar extends StatelessWidget {
               left: 0,
               right: 0,
               top: -scrim,
-              bottom: -(bottom - floor),
+              bottom: -lift,
               child: IgnorePointer(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
@@ -318,6 +265,9 @@ class PortalBottomNavBar extends StatelessWidget {
               child: SizedBox(
                 height: height,
                 child: Stack(
+                  // The spring settles a few px past an end tab; the pill's
+                  // inner padding has room for it.
+                  clipBehavior: Clip.none,
                   children: [
                     // One capsule slides to the selected tab.
                     Positioned.fill(
@@ -326,8 +276,8 @@ class PortalBottomNavBar extends StatelessWidget {
                           vertical: thumbInset,
                         ),
                         child: AnimatedAlign(
-                          duration: duration,
-                          curve: tokens.motion.standard,
+                          duration: slideDuration,
+                          curve: slide,
                           alignment: AlignmentDirectional(x, 0),
                           child: FractionallySizedBox(
                             widthFactor: 1 / n,
@@ -361,112 +311,8 @@ class PortalBottomNavBar extends StatelessWidget {
   }
 }
 
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.destination,
-    required this.isSelected,
-    required this.onTap,
-    required this.mark,
-    required this.selectedMark,
-    required this.well,
-    required this.radius,
-    required this.duration,
-    required this.curve,
-  });
-
-  final PortalNavDestination destination;
-  final bool isSelected;
-  final VoidCallback onTap;
-  final Color mark;
-  final Color selectedMark;
-  final Color well;
-  final double radius;
-  final Duration duration;
-  final Curve curve;
-
-  @override
-  Widget build(BuildContext context) {
-    final count = destination.badgeCount ?? 0;
-    final fg = isSelected ? selectedMark : mark.withValues(alpha: 0.68);
-
-    return Semantics(
-      button: true,
-      selected: isSelected,
-      label: count > 0 ? '${destination.label}, $count' : destination.label,
-      excludeSemantics: true,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(radius),
-          splashColor: mark.withValues(alpha: 0.12),
-          highlightColor: mark.withValues(alpha: 0.08),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  AnimatedContainer(
-                    duration: duration,
-                    curve: curve,
-                    width: 48,
-                    height: 30,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: isSelected ? well : Colors.transparent,
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween(end: isSelected ? 1 : 0),
-                      duration: duration,
-                      curve: curve,
-                      builder: (_, fill, __) => Icon(
-                        isSelected
-                            ? destination.selectedIcon ?? destination.icon
-                            : destination.icon,
-                        fill: fill.clamp(0.0, 1.0),
-                        size: 22,
-                        color: fg,
-                      ),
-                    ),
-                  ),
-                  if (count > 0)
-                    Positioned(
-                      right: 2,
-                      top: -2,
-                      child: _Badge(count: count),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 3),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: PortalText(
-                  destination.label,
-                  maxLines: 1,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.1,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    // The label sits outside the well, on the bar itself, so
-                    // it always takes the bar's mark color — never the well's
-                    // foreground, which would be invisible out here.
-                    color: mark.withValues(alpha: isSelected ? 1 : 0.68),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _Badge extends StatelessWidget {
-  const _Badge({required this.count});
+  const _Badge({super.key, required this.count});
 
   final int count;
 
@@ -484,9 +330,10 @@ class _Badge extends StatelessWidget {
       child: Text(
         count > 99 ? '99+' : '$count',
         textAlign: TextAlign.center,
-        style: TextStyle(
+        style: portal.tokens.textStyles.caption.copyWith(
           color: portal.onDestructive,
-          fontSize: 9,
+          fontSize: 10,
+          letterSpacing: 0,
           height: 1.2,
           fontWeight: FontWeight.w700,
         ),

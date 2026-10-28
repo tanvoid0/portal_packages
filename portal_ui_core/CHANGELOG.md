@@ -1,5 +1,11 @@
 ## Unreleased
 
+- **Breaking: `PortalBottomNavBar` is the pill, only.** The docked-well
+  `standard` look, `PortalBottomNavVariant` and the `variant` parameter are
+  gone; drop the argument. The capsule now slides on the spatial spring, the
+  selected icon bumps, labels keep one weight (no reflow on switch), the badge
+  takes the app's typeface and pops in, and the bar lifts over a gesture-nav
+  inset. `selectedWellColor` now defaults to a wash of `selectedMarkColor`.
 - **Gutter convention: the page gutter is applied once.** New `PortalGutterScope`,
   published by `PortalScrollPage` when it pads its children (default `padding`).
   Inside it, `PortalListSection` (inset) and its header, `PortalCard(gutter: true)`

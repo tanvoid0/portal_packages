@@ -93,7 +93,7 @@ void main() {
           ),
         );
     Iterable<Color?> wells(WidgetTester t) => t
-        .widgetList<AnimatedContainer>(find.byType(AnimatedContainer))
+        .widgetList<DecoratedBox>(find.byType(DecoratedBox))
         .map((c) => (c.decoration as BoxDecoration?)?.color);
 
     await t.pumpWidget(bar());
