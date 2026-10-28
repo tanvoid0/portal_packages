@@ -40,6 +40,9 @@ dependencies:
   path_provider: ^2.1.5
   sentry_flutter: ^9.21.0
   package_info_plus: ^10.1.0
+  # Android caps at 60Hz unless a frame is requested at the panel's higher
+  # mode; no-op on iOS/web, where the system already runs ProMotion/vsync.
+  flutter_displaymode: ^0.6.0
   # Only for the settings app list: canLaunchUrl answers "is this sibling
   # Portal app installed", launchUrl opens it. Both need the <queries> block in
   # each app manifest; without it canLaunchUrl is false on Android 11+.

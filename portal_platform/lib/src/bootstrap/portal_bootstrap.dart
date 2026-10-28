@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
@@ -59,6 +61,9 @@ class PortalBootstrap {
     PortalDeviceSecurityStrings? deviceSecurityStrings,
   }) async {
     WidgetsFlutterBinding.ensureInitialized();
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      unawaited(FlutterDisplayMode.setHighRefreshRate().catchError((_) {}));
+    }
     if (!dotenv.isInitialized) {
       await dotenv.load(fileName: envFileName);
     }
