@@ -234,8 +234,14 @@ class PortalTextField extends StatefulWidget {
   }
 
   /// Reads what [formatAmount] and the keyboard produce; garbage is 0.
-  static double parseAmount(String raw) =>
-      double.tryParse(raw.trim().replaceAll(',', '.')) ?? 0;
+  /// Parses an amount the field produced, treating a comma as the decimal
+  /// separator (the [inputFormatters] forbid thousands grouping, so a comma
+  /// can only be a decimal mark). Returns null on anything unparseable, so
+  /// validators can tell "empty/garbage" from a real 0.
+  static double? tryParseAmount(String raw) =>
+      double.tryParse(raw.trim().replaceAll(',', '.'));
+
+  static double parseAmount(String raw) => tryParseAmount(raw) ?? 0;
 
   @override
   State<PortalTextField> createState() => _PortalTextFieldState();
