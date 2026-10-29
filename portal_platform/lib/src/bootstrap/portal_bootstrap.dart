@@ -18,6 +18,9 @@ import '../observability/portal_sentry.dart';
 import '../routing/deep_link_service.dart';
 import '../services/api_client.dart';
 import '../session/session_controller.dart';
+import '../sync/connectivity_service.dart';
+import '../sync/sync_manager.dart';
+import '../sync/sync_queue.dart';
 import '../testing/fake_backend.dart';
 import '../update/portal_update_service.dart';
 import '../update/portal_update_tile.dart';
@@ -27,6 +30,11 @@ class PortalBootstrap {
   PortalBootstrap._();
 
   static bool _isLoggedIn = false;
+
+  /// True once the full shared bootstrap has run (the hub runs it once; a
+  /// standalone app on its single [init]). A later [init] is then a module
+  /// open and takes only the per-module tail ([initModule]).
+  static bool _sharedReady = false;
 
   /// Whether [init] found a valid session. Same value [init] returned.
   static bool get isLoggedIn => _isLoggedIn;
@@ -61,6 +69,13 @@ class PortalBootstrap {
     GetStorage? deviceSecurityPrefs,
     PortalDeviceSecurityStrings? deviceSecurityStrings,
   }) async {
+    // Once shared bootstrap has run, a later init is a module open: run only
+    // the per-module tail so the process-wide singletons (preserved across the
+    // switch by [resetForModuleSwitch]) are reused, not rebuilt. A standalone
+    // app calls init exactly once, so it always takes the full path below.
+    if (_sharedReady) {
+      return initModule(configOverride ?? AppConfig.fromEnv());
+    }
     WidgetsFlutterBinding.ensureInitialized();
     if (defaultTargetPlatform == TargetPlatform.android) {
       unawaited(FlutterDisplayMode.setHighRefreshRate().catchError((_) {}));
@@ -122,7 +137,59 @@ class PortalBootstrap {
     }
 
     _isLoggedIn = isLoggedIn;
+    _sharedReady = true;
     return isLoggedIn;
+  }
+
+  /// The per-module tail of [init], run on every hub module open once shared
+  /// bootstrap is done: register this module's [config] and refresh the
+  /// signed-in answer. The process-wide services were preserved across the
+  /// switch by [resetForModuleSwitch], so they are reused in memory, not
+  /// rebuilt. Also the startup gate's cheap retry path (a retry re-runs [init],
+  /// which lands here).
+  static Future<bool> initModule(AppConfig config) async {
+    Get.put<AppConfig>(config, permanent: true);
+    _isLoggedIn = kPortalFake || await Get.find<ApiClient>().isLoggedIn();
+    _scheduleDeepLinkAttach();
+    return _isLoggedIn;
+  }
+
+  /// Hub only: a [Get.reset] that keeps the process-wide singletons alive
+  /// across a module switch, so they are reused instead of rebuilt from disk.
+  ///
+  /// Re-putting a live instance does not re-run its `onInit` (GetX guards that
+  /// with the instance's own init flag) and runs no constructor, so the kept
+  /// services do not re-listen. The route tree still clears, which is the only
+  /// thing the swap needs. [SyncManager] is the exception: it is force-deleted
+  /// first so its `onClose` cancels the retry timer and removes its reconnect
+  /// listener from the shared [ConnectivityService] (closing the leak the bare
+  /// `Get.reset` left); the opening module recreates it and registers its own
+  /// repos. Per-module state (AppConfig, theme, AI runtime, module services) is
+  /// intentionally dropped and rebuilt by the opening module's startup — only
+  /// add process-wide services to the kept list, or a stale value survives
+  /// silently.
+  static void resetForModuleSwitch() {
+    T? keep<T>() => Get.isRegistered<T>() ? Get.find<T>() : null;
+    final api = keep<ApiClient>();
+    final links = keep<DeepLinkService>();
+    final session = keep<SessionController>();
+    final update = keep<PortalUpdateService>();
+    final security = keep<DeviceSecurityController>();
+    final connectivity = keep<ConnectivityService>();
+    final queue = keep<SyncQueue>();
+    if (Get.isRegistered<SyncManager>()) Get.delete<SyncManager>(force: true);
+    Get.reset();
+    if (api != null) Get.put<ApiClient>(api, permanent: true);
+    if (links != null) Get.put<DeepLinkService>(links, permanent: true);
+    if (session != null) Get.put<SessionController>(session, permanent: true);
+    if (update != null) Get.put<PortalUpdateService>(update, permanent: true);
+    if (security != null) {
+      Get.put<DeviceSecurityController>(security, permanent: true);
+    }
+    if (connectivity != null) {
+      Get.put<ConnectivityService>(connectivity, permanent: true);
+    }
+    if (queue != null) Get.put<SyncQueue>(queue, permanent: true);
   }
 
   /// Starts deep-link handling after the first frame.
