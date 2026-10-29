@@ -7,4 +7,5 @@ export 'src/routing/deep_link_routes.dart'
         DeepLinkEnv,
         DeepLinkResolution,
         normalizeDeepLinkPath,
-        pathFromDeepLinkUri;
+        pathFromDeepLinkUri,
+        portalSlugFromUri;

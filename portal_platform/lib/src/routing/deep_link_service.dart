@@ -21,6 +21,21 @@ class DeepLinkService extends GetxService {
 
   Uri? _pendingWhileLoggedOut;
 
+  /// A link the super app resolved to THIS module before the module's own
+  /// links attached. The hub seeds it with [seedLaunchLink]; the next [attach]
+  /// consumes it once the navigator exists. This carries the warm "switch
+  /// module, then open the deep path" step that [AppLinks.getInitialLink]
+  /// (launch-time only) cannot. Standalone it is never set, so nothing changes.
+  static Uri? _seededLaunch;
+
+  static void seedLaunchLink(Uri uri) => _seededLaunch = uri;
+
+  static Uri? _takeSeededLaunch() {
+    final uri = _seededLaunch;
+    _seededLaunch = null;
+    return uri;
+  }
+
   @override
   void onClose() {
     unawaited(_subscription?.cancel());
@@ -37,6 +52,15 @@ class DeepLinkService extends GetxService {
         await _awaitNavigator();
         await handleUri(initial);
       }
+    }
+
+    // A link the hub resolved to this module (warm module switch): deliver it
+    // once, after the navigator exists. On a cold launch into this module the
+    // seed equals the initial link just handled, so `handleUri` no-ops on it.
+    final seeded = _takeSeededLaunch();
+    if (seeded != null) {
+      await _awaitNavigator();
+      await handleUri(seeded);
     }
 
     await _subscription?.cancel();
@@ -158,4 +182,23 @@ class DeepLinkService extends GetxService {
   void _navigateTo(DeepLinkResolution resolution) {
     _goAll(resolution.routePath, extra: resolution.extra);
   }
+}
+
+/// The raw launch links, read before any module's own [DeepLinkService]
+/// attaches. Only the super app (`apps/portal_hub`) needs this: it reads the
+/// `portal-<slug>://` scheme to pick which module a link belongs to, opens that
+/// module, and seeds the link with [DeepLinkService.seedLaunchLink] so the
+/// module navigates to it once attached. A standalone app never uses this — its
+/// own [DeepLinkService] handles links directly, and the hub keeps `app_links`
+/// out of its own pubspec by going through here.
+class PortalLaunchLinks {
+  PortalLaunchLinks({AppLinks? appLinks}) : _appLinks = appLinks ?? AppLinks();
+
+  final AppLinks _appLinks;
+
+  /// The link the app was launched with, if any (cold start).
+  Future<Uri?> initial() => _appLinks.getInitialLink();
+
+  /// Links that arrive while the app is already running (warm).
+  Stream<Uri> get stream => _appLinks.uriLinkStream;
 }

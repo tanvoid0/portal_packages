@@ -65,6 +65,21 @@ String pathFromDeepLinkUri(Uri uri) {
   return normalizeDeepLinkPath(uri.path);
 }
 
+/// The app slug a `portal-<slug>://…` link targets, or `null` when the URI is
+/// not a per-app Portal link (the hub's own scheme, the legacy `portalwarp`,
+/// an https link, …).
+///
+/// The slug lives in the *scheme*, not the path: Android delivers
+/// `portal-gym://workout` with scheme `portal-gym`, which the super app maps to
+/// its gym module before gym's own resolver turns `/workout` into a route.
+String? portalSlugFromUri(Uri uri) {
+  const prefix = 'portal-';
+  final scheme = uri.scheme.toLowerCase();
+  if (!scheme.startsWith(prefix)) return null;
+  final slug = scheme.substring(prefix.length);
+  return slug.isEmpty ? null : slug;
+}
+
 bool deepLinkUriIsAllowed(Uri uri) {
   final scheme = uri.scheme.toLowerCase();
   if (scheme == DeepLinkEnv.scheme.toLowerCase()) {
