@@ -38,6 +38,7 @@ class PortalAppModule {
     this.themeMode = ThemeMode.system,
     this.onPreStart,
     this.builder,
+    this.unguardedRoutes = const {},
   });
 
   /// URL scheme / package suffix, e.g. `journey` → `portal-journey`,
@@ -88,6 +89,11 @@ class PortalAppModule {
   /// scaffold background). Null uses the fleet's [portalDefaultAppBuilder]. The
   /// super app wraps whichever applies with its launcher chrome.
   final Widget Function(BuildContext context, Widget? child)? builder;
+
+  /// Routes the app lock leaves open besides login (a password-reset or
+  /// device-security page). Passed straight to [PortalAppRoot.unguardedRoutes]
+  /// — finance exempts its auth routes, task its reset/device-security pages.
+  final Set<String> unguardedRoutes;
 }
 
 /// The widget tree [runPortalApp] runs: the [PortalStartupGate] over the
@@ -118,6 +124,7 @@ Widget portalAppView(
       lightTheme: module.lightTheme,
       darkTheme: module.darkTheme,
       getPages: module.pages,
+      unguardedRoutes: module.unguardedRoutes,
       // Standalone: the app's own builder (or null = the fleet default).
       // Under the hub: wrap that same content with the launcher chrome.
       builder: wrapContent == null
