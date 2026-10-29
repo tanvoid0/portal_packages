@@ -4,6 +4,7 @@ import 'package:portal_ui_core/portal_ui_core.dart';
 
 import '../../portal_deep_link.dart';
 import '../config/app_config.dart';
+import '../observability/portal_error_handlers.dart';
 import '../web/portal_url_strategy.dart';
 import 'portal_app_root.dart';
 
@@ -39,6 +40,9 @@ class PortalAppModule {
     this.onPreStart,
     this.builder,
     this.unguardedRoutes = const {},
+    this.guarded = false,
+    this.onMount,
+    this.onDispose,
   });
 
   /// URL scheme / package suffix, e.g. `journey` → `portal-journey`,
@@ -94,6 +98,61 @@ class PortalAppModule {
   /// device-security page). Passed straight to [PortalAppRoot.unguardedRoutes]
   /// — finance exempts its auth routes, task its reset/device-security pages.
   final Set<String> unguardedRoutes;
+
+  // CLAUDE NOTE (2026-10-29, HUB phase 3): [guarded] / [onMount] / [onDispose]
+  // exist because `portal_task` folded in on an older bootstrap generation and
+  // genuinely needs two things the plain gate+module model does not express.
+  // They were added to the SHARED contract as optional, general hooks (not a
+  // task-only fork) so task runs through the exact same `runPortalApp` /
+  // `portalAppView` / `PortalStartupGate` as every other app; any app may use
+  // them. Task's own hand-rolled startup gate was deleted in the same change.
+  // Remove these only once no app sets them.
+
+  /// Wrap the standalone run in [PortalErrorHandlers.runGuarded] — a
+  /// `runZonedGuarded` that routes uncaught async (zone) errors to the shared
+  /// logger, on top of the `FlutterError.onError` hook every app already
+  /// installs. Only task opts in today. Affects [runPortalApp] only; inside the
+  /// hub a module shares the hub's own zone, so guard the hub's `main` instead.
+  final bool guarded;
+
+  /// Run once when the app (after startup) is first mounted / finally torn
+  /// down — for platform wiring tied to the app's lifetime, not to a startup
+  /// step. Task registers its navigation + deep-link adapter with the platform
+  /// and installs its web device-security routing in [onMount], and undoes both
+  /// in [onDispose]; that pairing is what lets the hub swap task out cleanly.
+  final VoidCallback? onMount;
+  final VoidCallback? onDispose;
+}
+
+/// Calls [onMount] once when first built and [onDispose] when torn down, around
+/// [child]. [portalAppView] inserts this only when a module sets either hook,
+/// so every other app's tree is byte-identical to before.
+class _PortalModuleLifecycle extends StatefulWidget {
+  const _PortalModuleLifecycle({this.onMount, this.onDispose, required this.child});
+
+  final VoidCallback? onMount;
+  final VoidCallback? onDispose;
+  final Widget child;
+
+  @override
+  State<_PortalModuleLifecycle> createState() => _PortalModuleLifecycleState();
+}
+
+class _PortalModuleLifecycleState extends State<_PortalModuleLifecycle> {
+  @override
+  void initState() {
+    super.initState();
+    widget.onMount?.call();
+  }
+
+  @override
+  void dispose() {
+    widget.onDispose?.call();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 /// The widget tree [runPortalApp] runs: the [PortalStartupGate] over the
@@ -119,26 +178,34 @@ Widget portalAppView(
     darkTheme: module.darkTheme(null),
     themeMode: module.themeMode,
     steps: module.startup,
-    builder: (_) => PortalAppRoot(
-      title: module.title,
-      lightTheme: module.lightTheme,
-      darkTheme: module.darkTheme,
-      getPages: module.pages,
-      unguardedRoutes: module.unguardedRoutes,
-      // Standalone: the app's own builder (or null = the fleet default).
-      // Under the hub: wrap that same content with the launcher chrome.
-      builder: wrapContent == null
-          ? module.builder
-          : (ctx, child) => wrapContent(
-              ctx,
-              (module.builder ?? portalDefaultAppBuilder)(ctx, child),
-            ),
-      // Both apps passed config.debugShowCheckedModeBanner; the config is
-      // registered by PortalBootstrap.init in a startup step, so it is
-      // available by the time the gate builds the app.
-      debugShowCheckedModeBanner:
-          Get.find<AppConfig>().debugShowCheckedModeBanner,
-    ),
+    builder: (_) {
+      final Widget root = PortalAppRoot(
+        title: module.title,
+        lightTheme: module.lightTheme,
+        darkTheme: module.darkTheme,
+        getPages: module.pages,
+        unguardedRoutes: module.unguardedRoutes,
+        // Standalone: the app's own builder (or null = the fleet default).
+        // Under the hub: wrap that same content with the launcher chrome.
+        builder: wrapContent == null
+            ? module.builder
+            : (ctx, child) => wrapContent(
+                ctx,
+                (module.builder ?? portalDefaultAppBuilder)(ctx, child),
+              ),
+        // Both apps passed config.debugShowCheckedModeBanner; the config is
+        // registered by PortalBootstrap.init in a startup step, so it is
+        // available by the time the gate builds the app.
+        debugShowCheckedModeBanner:
+            Get.find<AppConfig>().debugShowCheckedModeBanner,
+      );
+      if (module.onMount == null && module.onDispose == null) return root;
+      return _PortalModuleLifecycle(
+        onMount: module.onMount,
+        onDispose: module.onDispose,
+        child: root,
+      );
+    },
   );
 }
 
@@ -147,8 +214,19 @@ Widget portalAppView(
 /// startup steps still build the config, register the deep-link resolver and
 /// wire sync.
 void runPortalApp(PortalAppModule module) {
-  WidgetsFlutterBinding.ensureInitialized();
-  usePortalUrlStrategy();
-  module.onPreStart?.call();
-  runApp(portalAppView(module));
+  void start() {
+    WidgetsFlutterBinding.ensureInitialized();
+    usePortalUrlStrategy();
+    module.onPreStart?.call();
+    runApp(portalAppView(module));
+  }
+
+  // [guarded] apps run inside PortalErrorHandlers.runGuarded so uncaught async
+  // (zone) errors reach the shared logger; the binding is set up inside the
+  // zone, which runGuarded requires.
+  if (module.guarded) {
+    PortalErrorHandlers.runGuarded(() async => start());
+  } else {
+    start();
+  }
 }
