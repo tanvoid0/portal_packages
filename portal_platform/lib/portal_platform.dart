@@ -168,6 +168,7 @@ export 'src/media/portal_media_service.dart';
 // ─── Routing ───────────────────────────────────────────────────────
 export 'portal_deep_link.dart';
 export 'src/routing/deep_link_service.dart';
+export 'src/testing/fake_backend.dart';
 export 'src/routing/portal_navigation.dart';
 export 'src/routing/portal_get_navigation.dart';
 export 'src/routing/portal_auth_middleware.dart';

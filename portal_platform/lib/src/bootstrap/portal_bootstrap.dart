@@ -18,6 +18,7 @@ import '../observability/portal_sentry.dart';
 import '../routing/deep_link_service.dart';
 import '../services/api_client.dart';
 import '../session/session_controller.dart';
+import '../testing/fake_backend.dart';
 import '../update/portal_update_service.dart';
 import '../update/portal_update_tile.dart';
 
@@ -78,13 +79,16 @@ class PortalBootstrap {
     final config = configOverride ?? AppConfig.fromEnv();
 
     await Get.putAsync<ApiClient>(
-      () => ApiClient().init(
+      () => (kPortalFake ? FakeApi() : ApiClient()).init(
         baseUrl: config.apiBaseUrl,
         appName: config.appTitle,
       ),
     );
     Get.put<DeepLinkService>(DeepLinkService(), permanent: true);
-    Get.put<SessionController>(SessionController(), permanent: true);
+    Get.put<SessionController>(
+      kPortalFake ? FakeSession(kPortalFakeUser) : SessionController(),
+      permanent: true,
+    );
     Get.put<AppConfig>(config, permanent: true);
     Get.put<PortalUpdateService>(
       PortalUpdateService(
@@ -96,7 +100,9 @@ class PortalBootstrap {
     if (checkForUpdatesOnLaunch) _scheduleUpdateCheck();
     _scheduleDeepLinkAttach();
 
-    var isLoggedIn = await Get.find<ApiClient>().isLoggedIn();
+    // PORTAL_FAKE boots signed in with no tokens: the FakeSession above already
+    // holds the demo user, so skip the storage probe that would report false.
+    var isLoggedIn = kPortalFake || await Get.find<ApiClient>().isLoggedIn();
     if (!isLoggedIn && config.autoLocalAuth) {
       isLoggedIn = await LocalUserAuth.ensureRegistered();
     }
