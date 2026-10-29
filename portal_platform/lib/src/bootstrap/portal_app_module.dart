@@ -37,6 +37,7 @@ class PortalAppModule {
     this.deepLink,
     this.themeMode = ThemeMode.system,
     this.onPreStart,
+    this.builder,
   });
 
   /// URL scheme / package suffix, e.g. `journey` → `portal-journey`,
@@ -81,6 +82,12 @@ class PortalAppModule {
   /// Synchronous work an app must do before `runApp` (gym registers a package
   /// license here). Runs after the binding and URL strategy are set up.
   final VoidCallback? onPreStart;
+
+  /// The app's own [PortalAppRoot.builder], when it needs one (recipe overlays
+  /// a floating cooking panel and sync banner, and paints its own
+  /// scaffold background). Null uses the fleet's [portalDefaultAppBuilder]. The
+  /// super app wraps whichever applies with its launcher chrome.
+  final Widget Function(BuildContext context, Widget? child)? builder;
 }
 
 /// The widget tree [runPortalApp] runs: the [PortalStartupGate] over the
@@ -111,10 +118,14 @@ Widget portalAppView(
       lightTheme: module.lightTheme,
       darkTheme: module.darkTheme,
       getPages: module.pages,
+      // Standalone: the app's own builder (or null = the fleet default).
+      // Under the hub: wrap that same content with the launcher chrome.
       builder: wrapContent == null
-          ? null
-          : (ctx, child) =>
-              wrapContent(ctx, portalDefaultAppBuilder(ctx, child)),
+          ? module.builder
+          : (ctx, child) => wrapContent(
+              ctx,
+              (module.builder ?? portalDefaultAppBuilder)(ctx, child),
+            ),
       // Both apps passed config.debugShowCheckedModeBanner; the config is
       // registered by PortalBootstrap.init in a startup step, so it is
       // available by the time the gate builds the app.
