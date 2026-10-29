@@ -119,6 +119,7 @@ export 'src/auth/device_security/portal_device_security_settings_tile.dart';
 export 'src/auth/device_security/portal_device_security_strings.dart';
 
 // ─── Bootstrap & Config ────────────────────────────────────────────
+export 'src/bootstrap/portal_app_module.dart';
 export 'src/bootstrap/portal_app_root.dart';
 export 'src/bootstrap/portal_bootstrap.dart';
 export 'src/config/app_config.dart';
