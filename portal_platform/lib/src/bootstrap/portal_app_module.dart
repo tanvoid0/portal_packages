@@ -83,6 +83,47 @@ class PortalAppModule {
   final VoidCallback? onPreStart;
 }
 
+/// The widget tree [runPortalApp] runs: the [PortalStartupGate] over the
+/// module's themed [PortalAppRoot]. Exposed (not inlined in [runPortalApp]) so
+/// the super app can mount the exact same tree under its own chrome without
+/// copying the wiring.
+///
+/// [wrapContent] wraps the app's content — the super app injects its launcher
+/// chrome here. It receives the fleet's default-wrapped content
+/// ([portalDefaultAppBuilder]'s output), so the clamp, overlay and toast host
+/// an app relies on are already applied. Null leaves the app exactly as
+/// standalone.
+///
+/// [module.onPreStart] is the caller's responsibility: [runPortalApp] calls it
+/// before `runApp`; the super app calls it before first mounting the module.
+Widget portalAppView(
+  PortalAppModule module, {
+  Widget Function(BuildContext context, Widget content)? wrapContent,
+}) {
+  return PortalStartupGate(
+    identity: module.identity,
+    theme: module.lightTheme(null),
+    darkTheme: module.darkTheme(null),
+    themeMode: module.themeMode,
+    steps: module.startup,
+    builder: (_) => PortalAppRoot(
+      title: module.title,
+      lightTheme: module.lightTheme,
+      darkTheme: module.darkTheme,
+      getPages: module.pages,
+      builder: wrapContent == null
+          ? null
+          : (ctx, child) =>
+              wrapContent(ctx, portalDefaultAppBuilder(ctx, child)),
+      // Both apps passed config.debugShowCheckedModeBanner; the config is
+      // registered by PortalBootstrap.init in a startup step, so it is
+      // available by the time the gate builds the app.
+      debugShowCheckedModeBanner:
+          Get.find<AppConfig>().debugShowCheckedModeBanner,
+    ),
+  );
+}
+
 /// Runs [module] as a standalone app: the exact [PortalStartupGate] +
 /// [PortalAppRoot] its `main()` built by hand. Behaviour-preserving — the
 /// startup steps still build the config, register the deep-link resolver and
@@ -91,25 +132,5 @@ void runPortalApp(PortalAppModule module) {
   WidgetsFlutterBinding.ensureInitialized();
   usePortalUrlStrategy();
   module.onPreStart?.call();
-
-  runApp(
-    PortalStartupGate(
-      identity: module.identity,
-      theme: module.lightTheme(null),
-      darkTheme: module.darkTheme(null),
-      themeMode: module.themeMode,
-      steps: module.startup,
-      builder: (_) => PortalAppRoot(
-        title: module.title,
-        lightTheme: module.lightTheme,
-        darkTheme: module.darkTheme,
-        getPages: module.pages,
-        // Both apps passed config.debugShowCheckedModeBanner; the config is
-        // registered by PortalBootstrap.init in a startup step, so it is
-        // available by the time the gate builds the app.
-        debugShowCheckedModeBanner:
-            Get.find<AppConfig>().debugShowCheckedModeBanner,
-      ),
-    ),
-  );
+  runApp(portalAppView(module));
 }
