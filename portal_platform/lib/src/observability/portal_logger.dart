@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import 'portal_log_severity.dart';
@@ -52,6 +53,16 @@ class PortalLogger {
 
   String? get logFilePath => _logFile?.path;
   String? get lastErrorTraceId => _lastErrorTraceId;
+
+  /// In-memory log history for the on-device debug panel ([TalkerScreen]).
+  /// Console output stays off: this logger already debugPrints in debug
+  /// builds, so talker would double every line. HTTP shows here too — every
+  /// [ApiClient] request logs through this logger, so its entries are routed
+  /// into talker's http section (the panel's HTTP inspector) without a second
+  /// integration in the client.
+  final Talker talker = Talker(
+    settings: TalkerSettings(useConsoleLogs: false),
+  );
 
   String newTraceId() => _uuid.v4();
 
@@ -187,6 +198,8 @@ class PortalLogger {
       debugPrint('[${severity.label}] $component: $message ${traceId ?? ''}'.trim());
     }
 
+    _toTalker(severity, component, message, traceId, context);
+
     if (_logToFile && _logFile != null) {
       try {
         _logFile!.writeAsStringSync('$jsonLine\n', mode: FileMode.append);
@@ -196,5 +209,62 @@ class PortalLogger {
         }
       }
     }
+  }
+
+  /// Mirror a log line into [talker] for the on-device debug panel.
+  ///
+  /// ApiClient is the fleet's one HTTP source and already logs through this
+  /// logger, so rather than wire a second integration into the client its
+  /// entries are keyed into talker's http section here — an error becomes an
+  /// http-error, anything else an http-request — and show in the panel's HTTP
+  /// inspector. Everything else logs by severity.
+  void _toTalker(
+    PortalLogSeverity severity,
+    String component,
+    String message,
+    String? traceId,
+    Map<String, Object?>? context,
+  ) {
+    final level = _talkerLevel(severity);
+    final line = _talkerLine(component, message, traceId, context);
+    if (component == 'ApiClient') {
+      final key = severity == PortalLogSeverity.error
+          ? TalkerKey.httpError
+          : TalkerKey.httpRequest;
+      talker.logCustom(TalkerLog(line, key: key, title: key, logLevel: level));
+    } else {
+      talker.log(line, logLevel: level);
+    }
+  }
+
+  static LogLevel _talkerLevel(PortalLogSeverity severity) {
+    switch (severity) {
+      case PortalLogSeverity.debug:
+        return LogLevel.debug;
+      case PortalLogSeverity.info:
+        return LogLevel.info;
+      case PortalLogSeverity.warn:
+        return LogLevel.warning;
+      case PortalLogSeverity.error:
+        return LogLevel.error;
+    }
+  }
+
+  /// One compact line for the panel: component, message, then the request
+  /// shape and trace id when the entry carries them (ApiClient does).
+  static String _talkerLine(
+    String component,
+    String message,
+    String? traceId,
+    Map<String, Object?>? context,
+  ) {
+    final sb = StringBuffer('$component: $message');
+    final method = context?['method'];
+    final url = context?['url'];
+    final status = context?['status'];
+    if (method != null && url != null) sb.write(' $method $url');
+    if (status != null) sb.write(' → $status');
+    if (traceId != null) sb.write('  [$traceId]');
+    return sb.toString();
   }
 }

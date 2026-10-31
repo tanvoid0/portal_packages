@@ -2,8 +2,10 @@ import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:portal_ui_core/portal_ui_core.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 import '../config/portal_server_prefs.dart';
+import '../observability/portal_logger.dart';
 import '../services/api_client.dart';
 import '../session/session_controller.dart';
 import '../update/portal_release.dart';
@@ -799,6 +801,25 @@ class _AboutRowsState extends State<_AboutRows> {
               sentiment: PortalValueSentiment.dim,
             ),
             onHiddenTap: _onVersionTap,
+          ),
+        // Dev-only, behind the same 7-tap unlock as the server switch. Not
+        // localised on purpose — a developer tool, like PortalServerPage.
+        if (_devToolsUnlocked && PortalLogger.isInitialized)
+          PortalListItem(
+            title: 'Debug logs',
+            leading: PortalListLeading.tile(
+              PortalIcons.bug_report_rounded,
+              tone: PortalListTone.tertiary,
+            ),
+            trailing: const PortalListAccessory.navigate(),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => TalkerScreen(
+                  talker: PortalLogger.I.talker,
+                  appBarTitle: 'Debug logs',
+                ),
+              ),
+            ),
           ),
       ],
     );
