@@ -38,7 +38,13 @@ Future<bool> portalConfirm(
 /// [portalConfirm]'s dialog body, extracted so a design-review book (or any
 /// other screen) can show the same chrome without pushing a route. Unlike
 /// [portalConfirm] there is no `Navigator` to pop by default, so [onConfirm]
-/// is required and [onCancel] is whatever the caller wants Cancel to do.
+/// is the caller's and [onCancel] is whatever the caller wants Cancel to do.
+///
+/// [otherLabel] adds a third, error-styled escape beside Cancel/Confirm — the
+/// "Discard" way out of a dialog whose Confirm keeps the state (e.g. "Workout
+/// already in progress": Resume / Discard / Cancel). A null [onConfirm] (or
+/// [onOther]) renders that action disabled, for a static book preview of a
+/// dialog that cannot act.
 class PortalConfirmDialog extends StatelessWidget {
   const PortalConfirmDialog({
     super.key,
@@ -47,8 +53,10 @@ class PortalConfirmDialog extends StatelessWidget {
     this.confirmLabel = 'Confirm',
     this.cancelLabel = 'Cancel',
     this.isDestructive = false,
-    required this.onConfirm,
+    this.onConfirm,
     this.onCancel,
+    this.otherLabel,
+    this.onOther,
   });
 
   final String title;
@@ -56,24 +64,37 @@ class PortalConfirmDialog extends StatelessWidget {
   final String confirmLabel;
   final String? cancelLabel;
   final bool isDestructive;
-  final VoidCallback onConfirm;
+  final VoidCallback? onConfirm;
   final VoidCallback? onCancel;
+
+  /// The third, error-styled action's label ("Discard"); null hides it.
+  final String? otherLabel;
+  final VoidCallback? onOther;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final msg = message;
+    final onConfirm = this.onConfirm;
     return AlertDialog(
       title: Text(title),
       content: msg == null ? null : Text(msg),
       actions: [
         if (cancelLabel != null)
           TextButton(onPressed: onCancel, child: Text(cancelLabel!)),
+        if (otherLabel case final other?)
+          TextButton(
+            onPressed: onOther,
+            style: TextButton.styleFrom(foregroundColor: scheme.error),
+            child: Text(other),
+          ),
         TextButton(
-          onPressed: () {
-            PortalHaptics.medium();
-            onConfirm();
-          },
+          onPressed: onConfirm == null
+              ? null
+              : () {
+                  PortalHaptics.medium();
+                  onConfirm();
+                },
           style: isDestructive
               ? TextButton.styleFrom(foregroundColor: scheme.error)
               : null,

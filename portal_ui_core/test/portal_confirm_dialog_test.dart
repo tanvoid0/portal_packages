@@ -53,4 +53,46 @@ void main() {
     await t.pumpAndSettle();
     expect(result, isTrue);
   });
+
+  testWidgets('otherLabel adds a third action that fires onOther', (t) async {
+    var discarded = false;
+    await t.pumpWidget(MaterialApp(
+      theme: buildPortalTheme(brightness: Brightness.light),
+      home: Scaffold(
+        body: PortalConfirmDialog(
+          title: 'Workout already in progress',
+          confirmLabel: 'Resume',
+          otherLabel: 'Discard',
+          onConfirm: () {},
+          onOther: () => discarded = true,
+        ),
+      ),
+    ));
+
+    expect(find.text('Resume'), findsOneWidget);
+    expect(find.text('Discard'), findsOneWidget);
+    expect(find.text('Cancel'), findsOneWidget);
+
+    await t.tap(find.text('Discard'));
+    expect(discarded, isTrue);
+  });
+
+  testWidgets('null callbacks disable confirm/other (static book preview)',
+      (t) async {
+    await t.pumpWidget(MaterialApp(
+      theme: buildPortalTheme(brightness: Brightness.light),
+      home: const Scaffold(
+        body: PortalConfirmDialog(
+          title: 'Static preview',
+          confirmLabel: 'Resume',
+          otherLabel: 'Discard',
+        ),
+      ),
+    ));
+
+    TextButton button(String label) =>
+        t.widget<TextButton>(find.widgetWithText(TextButton, label));
+    expect(button('Resume').onPressed, isNull);
+    expect(button('Discard').onPressed, isNull);
+  });
 }

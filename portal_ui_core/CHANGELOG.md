@@ -1,5 +1,11 @@
 ## Unreleased
 
+- `PortalConfirmDialog` gains an optional third action: `otherLabel` / `onOther`
+  render an error-styled escape beside Cancel/Confirm (the "Discard" way out of a
+  dialog whose Confirm keeps the state, e.g. Resume / Discard / Cancel). `onConfirm`
+  is now optional; a null `onConfirm`/`onOther` renders that action disabled, for a
+  static preview of a dialog that cannot act. Additive — `portalConfirm` is
+  unchanged. Folds the design app's divergent `DemoConfirmDialog`.
 - **Breaking: `PortalBottomNavBar` is the pill, only.** The docked-well
   `standard` look, `PortalBottomNavVariant` and the `variant` parameter are
   gone; drop the argument. The capsule now slides on the spatial spring, the
