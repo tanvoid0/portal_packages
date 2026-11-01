@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:portal_ui_core/portal_ui_core.dart';
 
 import '../widgets/portal_app_version.dart';
+import 'portal_installed_apps.dart';
 import 'portal_release.dart';
 import 'portal_update_service.dart';
 
@@ -340,12 +341,14 @@ Future<bool> portalInstallAndReport(
   portalShowDownloadSheet(context, title: 'Downloading', progress: progress);
 
   String? error;
+  var conflict = false;
   File? apk;
   try {
     apk = await service.download(release, onProgress: (p) => progress.value = p);
     await service.install(apk);
   } on PortalUpdateException catch (e) {
     error = e.message;
+    conflict = e.isSignatureConflict;
   } catch (e) {
     error = 'Update failed: $e';
   } finally {
@@ -354,10 +357,48 @@ Future<bool> portalInstallAndReport(
   }
 
   if (error != null && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+    // A signature conflict is the one failure with a way forward: offer to
+    // uninstall the differently-signed copy rather than leave a dead-end
+    // snackbar. The cached APK is still on disk, so the reinstall after is one
+    // instant tap.
+    if (conflict) {
+      await _offerUninstallOnConflict(context, release);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+    }
     return false;
   }
   return error == null;
+}
+
+/// Offers to clear a signature conflict: an installed copy of this app was
+/// signed with a different key, so Android refuses to replace it. Uninstalling
+/// that copy (which wipes its data) is the only way forward; the reinstall is
+/// the user's next tap, once the system uninstall they confirm has gone through
+/// and the list re-probes the app as gone. The downloaded APK stays cached, so
+/// that tap installs with no second download.
+//
+// ponytail: reinstall is a deliberate second tap, not auto-on-resume — resume
+// fires for many reasons and a self-triggering install would surprise the user.
+Future<void> _offerUninstallOnConflict(
+  BuildContext context,
+  PortalRelease release,
+) async {
+  final uninstall = await portalConfirm(
+    context,
+    title: "Can't update ${release.displayName}",
+    message:
+        'The installed copy of ${release.displayName} was signed with a '
+        'different key, so Android will not replace it. Uninstall it, then '
+        'install the new version.\n\n'
+        'Uninstalling erases this app’s data on this device.',
+    confirmLabel: 'Uninstall',
+    cancelLabel: 'Not now',
+    isDestructive: true,
+  );
+  if (uninstall && context.mounted) {
+    await PortalInstalledApps.uninstall(release.slug);
+  }
 }
 
 /// One-shot launch check: prompts only when there is a newer build the user

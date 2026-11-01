@@ -178,9 +178,20 @@ class PortalUpdateService {
   }) async {
     final dir = await getTemporaryDirectory();
     final file = File('${dir.path}/${release.slug}-${release.versionCode}.apk');
-    // A previous half-finished attempt would otherwise be appended to and
-    // then fail its hash for a reason nobody could diagnose.
-    if (await file.exists()) await file.delete();
+    // Reuse a complete prior download of this exact version instead of fetching
+    // it again. The filename pins slug+versionCode, so a file already on disk
+    // that passes the same size and checksum checks is byte-identical to what
+    // this would download — and a retry (a failed install, or a second tap)
+    // then installs straight away instead of re-pulling ~80MB over the network.
+    if (await file.exists()) {
+      if (await _verifies(file, release)) {
+        onProgress?.call(1);
+        return file;
+      }
+      // Not a complete copy — a half-finished attempt would otherwise be
+      // appended to and then fail its hash for a reason nobody could diagnose.
+      await file.delete();
+    }
 
     final request = http.Request('GET', release.apkUrl);
     final response = await _client.send(request);
@@ -259,23 +270,29 @@ class PortalUpdateService {
     final status = PackageInstallerStatus.byCode(code);
     if (status == PackageInstallerStatus.success) return;
 
-    throw PortalUpdateException(switch (status) {
-      PackageInstallerStatus.failureAborted =>
-        'Installation was cancelled.',
-      PackageInstallerStatus.failureBlocked =>
-        'Android blocked the install. Check Play Protect and that this app is '
-            'allowed to install unknown apps.',
-      PackageInstallerStatus.failureConflict =>
-        'A conflicting copy of this app is already installed. Uninstall it, '
-            'then try again.',
-      PackageInstallerStatus.failureIncompatible =>
-        'That build is not compatible with this device.',
-      PackageInstallerStatus.failureStorage =>
-        'Not enough storage to install the update.',
-      PackageInstallerStatus.failureInvalid =>
-        'The downloaded package was rejected as invalid.',
-      _ => 'The install did not complete (${status.name}).',
-    });
+    throw PortalUpdateException(
+      switch (status) {
+        PackageInstallerStatus.failureAborted =>
+          'Installation was cancelled.',
+        PackageInstallerStatus.failureBlocked =>
+          'Android blocked the install. Check Play Protect and that this app '
+              'is allowed to install unknown apps.',
+        PackageInstallerStatus.failureConflict =>
+          'A conflicting copy of this app is already installed. Uninstall it, '
+              'then try again.',
+        PackageInstallerStatus.failureIncompatible =>
+          'That build is not compatible with this device.',
+        PackageInstallerStatus.failureStorage =>
+          'Not enough storage to install the update.',
+        PackageInstallerStatus.failureInvalid =>
+          'The downloaded package was rejected as invalid.',
+        _ => 'The install did not complete (${status.name}).',
+      },
+      // The one failure with a clean recovery: an installed copy signed with a
+      // different key. Android will not replace it, so the UI offers to
+      // uninstall that copy and install fresh.
+      isSignatureConflict: status == PackageInstallerStatus.failureConflict,
+    );
   }
 
   /// Version the user said "Not now" to, so the launch check stays quiet.
@@ -315,6 +332,22 @@ class PortalUpdateService {
     return (prefs.getInt(_dismissedKey) ?? -1) >= versionCode;
   }
 
+  /// Whether [file] already is [release]'s APK — same byte length and SHA-256.
+  /// Lets [download] reuse a prior download of this exact version rather than
+  /// fetch it again. Streamed off disk, so a large APK is never held in memory.
+  Future<bool> _verifies(File file, PortalRelease release) async {
+    if (release.sizeBytes > 0 && await file.length() != release.sizeBytes) {
+      return false;
+    }
+    final hashSink = Sha256().newHashSink();
+    await for (final chunk in file.openRead()) {
+      hashSink.add(chunk);
+    }
+    hashSink.close();
+    final digest = await hashSink.hash();
+    return _hex(digest.bytes) == release.sha256;
+  }
+
   static String _hex(List<int> bytes) =>
       bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 
@@ -322,8 +355,14 @@ class PortalUpdateService {
 }
 
 class PortalUpdateException implements Exception {
-  const PortalUpdateException(this.message);
+  const PortalUpdateException(this.message, {this.isSignatureConflict = false});
   final String message;
+
+  /// True only for INSTALL_FAILED_UPDATE_INCOMPATIBLE — an installed copy
+  /// signed with a different key. Lets the UI offer uninstall-then-reinstall
+  /// instead of a dead-end message.
+  final bool isSignatureConflict;
+
   @override
   String toString() => message;
 }
