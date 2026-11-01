@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 
+import '../auth/device_security/device_security_controller.dart';
 import '../config/app_config.dart';
 import '../observability/portal_sentry.dart';
 import '../routing/deep_link_service.dart';
@@ -71,11 +72,23 @@ class SessionController extends GetxController {
   }
 
   /// Clears tokens, session cache, pending deep links, and returns to login.
+  ///
+  /// The offline ("continue without an account") login force-enables the
+  /// device lock as that session's only credential (see [LocalOnlySession]).
+  /// Once the session ends the lock has nothing left to protect, so leaving it
+  /// on re-gates the user with a PIN/biometric prompt on the next guarded route
+  /// instead of letting them pick local vs cloud at login again. Turn it off so
+  /// sign-out lands on the login page. A cloud user's deliberately-enabled app
+  /// lock is left untouched.
   Future<void> signOut() async {
+    final wasLocalOnly = isLocalOnly;
     await _api.logout();
     user.value = null;
     PortalSentry.syncUser(null);
     Get.find<DeepLinkService>().clearPending();
+    if (wasLocalOnly && Get.isRegistered<DeviceSecurityController>()) {
+      await Get.find<DeviceSecurityController>().setEnabled(false);
+    }
     PortalNavigation.require.go(Get.find<AppConfig>().routeLoggedOut);
   }
 
