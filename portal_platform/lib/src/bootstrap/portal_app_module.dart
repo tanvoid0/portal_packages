@@ -5,6 +5,7 @@ import 'package:portal_ui_core/portal_ui_core.dart';
 import '../../portal_deep_link.dart';
 import '../config/app_config.dart';
 import '../observability/portal_error_handlers.dart';
+import '../services/api_client.dart';
 import '../web/portal_url_strategy.dart';
 import 'portal_app_root.dart';
 
@@ -218,6 +219,10 @@ void runPortalApp(PortalAppModule module) {
     WidgetsFlutterBinding.ensureInitialized();
     usePortalUrlStrategy();
     module.onPreStart?.call();
+    // Without this, PortalAppFeedback.failure(ApiException) reads "Something
+    // went wrong." everywhere -- including a guest's "Sign in to use this."
+    PortalAppFeedback.errorMessageResolver ??=
+        (e) => e is ApiException ? portalErrorMessage(e) : null;
     runApp(portalAppView(module));
   }
 
