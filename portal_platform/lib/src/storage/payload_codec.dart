@@ -48,10 +48,13 @@ final class PlaintextCodec implements PayloadCodec {
 /// sign-out: clearing it would turn the next login's still-intact ciphertext
 /// into an unreadable [StaleDecryptException].
 final class VaultPayloadCodec implements PayloadCodec {
-  VaultPayloadCodec({LocalVaultDekStore? dekStore})
+  /// [userId] pins the key to one user (e.g. the device user, to read a
+  /// guest's data after sign-in); null follows the current user.
+  VaultPayloadCodec({LocalVaultDekStore? dekStore, this.userId})
       : _dekStore = dekStore ?? LocalVaultDekStore();
 
   final LocalVaultDekStore _dekStore;
+  final String? userId;
 
   // Memoised so two concurrent first reads await the same mint instead of
   // each writing their own key — the loser's data would be undecryptable.
@@ -68,7 +71,7 @@ final class VaultPayloadCodec implements PayloadCodec {
   Future<SecretKey> _key() => _keyFuture ??= _loadOrCreateKey();
 
   Future<SecretKey> _loadOrCreateKey() async {
-    final userId = UserStorageScope.currentUserId ?? 'anonymous';
+    final userId = this.userId ?? UserStorageScope.currentUserId ?? 'anonymous';
     final existing = await _dekStore.load(userId: userId);
     if (existing != null) return SecretKey(existing);
     final key = await SecretBoxCodec.randomKey();
@@ -107,7 +110,7 @@ final class VaultPayloadCodec implements PayloadCodec {
   /// ciphertext under the old key has already been wiped — anything still
   /// under it would otherwise become permanently undecryptable.
   Future<void> rotateKey() async {
-    final userId = UserStorageScope.currentUserId ?? 'anonymous';
+    final userId = this.userId ?? UserStorageScope.currentUserId ?? 'anonymous';
     await _dekStore.clear(userId: userId);
     _keyFuture = null;
     resetStaleDecryptState();
