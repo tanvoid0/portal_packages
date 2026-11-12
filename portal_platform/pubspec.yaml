@@ -47,6 +47,8 @@ dependencies:
   # Portal app installed", launchUrl opens it. Both need the <queries> block in
   # each app manifest; without it canLaunchUrl is false on Android 11+.
   url_launcher: ^6.3.1
+  # Guest sign-in with no screen lock: opens the phone's security settings.
+  app_settings: ^5.1.1
   local_auth: ^2.3.0
   local_auth_android: ^1.0.56
   local_auth_darwin: ^1.6.1

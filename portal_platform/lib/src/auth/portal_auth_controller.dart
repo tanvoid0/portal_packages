@@ -34,6 +34,10 @@ class PortalAuthController extends GetxController {
   final obscureConfirmPassword = true.obs;
   final errorMessage = ''.obs;
 
+  /// The last guest attempt failed for want of a device screen lock; the view
+  /// offers a shortcut to the phone's security settings.
+  final needsScreenLock = false.obs;
+
   /// Errors that belong to one field, set from the server's answer: a wrong
   /// password is the password's own error, a taken email the email's. The view
   /// shows them on the field and clears each as it is edited; [errorMessage]
@@ -271,6 +275,7 @@ class PortalAuthController extends GetxController {
     final context = Get.context;
     if (context == null) return;
     errorMessage.value = '';
+    needsScreenLock.value = false;
 
     final proceed = await portalConfirm(
       context,
@@ -303,6 +308,7 @@ class PortalAuthController extends GetxController {
         case LocalOnlySessionOutcome.unavailable:
           errorMessage.value = 'Local-only mode is not available in this app.';
         case LocalOnlySessionOutcome.deviceLockDeclined:
+          needsScreenLock.value = true;
           errorMessage.value = 'Local-only mode needs a screen lock. Set up a '
               'fingerprint, Face ID, or PIN on this device, then try again.';
         case LocalOnlySessionOutcome.started:

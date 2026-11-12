@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:app_settings/app_settings.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -124,6 +125,17 @@ class PortalAuthView extends GetView<PortalAuthController> {
     return [
       if (controller.errorMessage.value.isNotEmpty) ...[
         _errorBanner(cs),
+        if (controller.needsScreenLock.value)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => AppSettings.openAppSettings(
+                type: AppSettingsType.security,
+              ),
+              icon: const Icon(Icons.settings_outlined),
+              label: const Text('Open phone settings'),
+            ),
+          ),
         const SizedBox(height: 16),
       ],
       if (!signingIn) ...[
