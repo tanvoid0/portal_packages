@@ -15,6 +15,11 @@ import 'dart:io';
 String aiErrorMessage(Object error, {required String offline}) {
   if (isAiOfflineError(error)) return offline;
   final text = error.toString().trim();
+  // A guest (local-only) session never reaches the server. portal_ai does not
+  // depend on portal_platform, so match the API client's code by name.
+  if (text.contains('LOCAL_ONLY_SESSION')) {
+    return 'Sign in to use the assistant.';
+  }
   return text.isEmpty ? offline : _sentenceIn(text);
 }
 

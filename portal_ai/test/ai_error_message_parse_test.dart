@@ -31,6 +31,17 @@ void main() {
     expect(aiErrorMessage('Quota exceeded', offline: 'off'), 'Quota exceeded');
   });
 
+  test('a guest session reads as a sign-in prompt, not a raw 401', () {
+    const raw =
+        'ApiException: Sign in to use this. (status: 401) '
+        '[LOCAL_ONLY_SESSION] (traceId: 4a0)';
+
+    expect(
+      aiErrorMessage(raw, offline: 'off'),
+      'Sign in to use the assistant.',
+    );
+  });
+
   test("the API client's own offline wording is recognised", () {
     const raw =
         'ApiException: No connection to the server. (status: 0) '
