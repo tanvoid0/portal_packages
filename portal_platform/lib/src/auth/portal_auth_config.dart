@@ -134,7 +134,61 @@ GetPage portalLoginPage({
       onLocalOnlySessionStarted: onLocalOnlySessionStarted,
     ),
   ),
+  // Fade through a solid background instead of the fleet's shared-axis
+  // cross-fade. Onboarding's big display line and the auth title sit in the
+  // same place; cross-fading them leaves both half-visible mid-push and they
+  // ghost over each other (#338). Linear curve so the fade-through's own
+  // intervals do the shaping.
+  curve: Curves.linear,
+  customTransition: _PortalFadeThroughTransition(),
   binding: PortalAuthBinding(),
   middlewares: middlewares,
   participatesInRootNavigator: participatesInRootNavigator,
 );
+
+/// A fade-through page transition: the screen below fades out to the scaffold
+/// colour over the first half of the push, then this page fades in over the
+/// second — the two are never both visible, so they cannot ghost.
+///
+/// The fleet default ([PortalPageTransitionsBuilder]) is a shared-axis
+/// cross-fade; scoped here to the login route only, every other screen keeps
+/// the slide.
+class _PortalFadeThroughTransition extends CustomTransition {
+  _PortalFadeThroughTransition();
+
+  @override
+  Widget buildTransition(
+    BuildContext context,
+    Curve? curve,
+    Alignment? alignment,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final fill = Theme.of(context).scaffoldBackgroundColor;
+    return AnimatedBuilder(
+      animation: Listenable.merge([animation, secondaryAnimation]),
+      builder: (context, _) {
+        // Entering: cover the page below over the first half, reveal this page
+        // over the second.
+        final cover = const Interval(0.0, 0.5, curve: Curves.easeIn)
+            .transform(animation.value);
+        final reveal = const Interval(0.5, 1.0, curve: Curves.easeOut)
+            .transform(animation.value);
+        // Being covered (login -> home after sign-in): fade out early so that
+        // leg matches the shared-axis outgoing and is left unchanged.
+        final leave = const Interval(0.0, 0.35, curve: Curves.easeIn)
+            .transform(secondaryAnimation.value);
+        final content = (reveal * (1 - leave)).clamp(0.0, 1.0);
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            if (secondaryAnimation.value == 0 && cover > 0)
+              Opacity(opacity: cover, child: ColoredBox(color: fill)),
+            Opacity(opacity: content, child: child),
+          ],
+        );
+      },
+    );
+  }
+}
