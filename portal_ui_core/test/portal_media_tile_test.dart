@@ -100,4 +100,36 @@ void main() {
     expect(taps, 1);
     expect(t.takeException(), isNull);
   });
+
+  // recipe's favourites shelf: a footer tile with onTap inside a horizontal
+  // PortalShelf. Device review reported the tile centre as a dead tap.
+  testWidgets('a footer tile in a horizontal shelf navigates on a centre tap',
+      (t) async {
+    var taps = 0;
+    await t.pumpWidget(MaterialApp(
+      theme: buildPortalTheme(brightness: Brightness.light),
+      home: Scaffold(
+        body: PortalShelf(
+          header: 'Favourites',
+          itemWidth: 176,
+          height: 196,
+          padding: EdgeInsets.zero,
+          children: [
+            PortalMediaTile(
+              scrim: false,
+              photo: const ColoredBox(key: photo, color: Colors.teal),
+              onTap: () => taps++,
+              footer: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Text('Lemon tart'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ));
+    await t.tap(find.byKey(photo));
+    expect(taps, 1, reason: 'centre tap on the photo stage should navigate');
+    expect(t.takeException(), isNull);
+  });
 }
