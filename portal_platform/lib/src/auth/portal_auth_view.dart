@@ -38,15 +38,18 @@ class PortalAuthView extends GetView<PortalAuthController> {
     return Scaffold(
       backgroundColor: cs.surface,
       body: SafeArea(
-        child: Obx(
-          () => Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 460),
+        // Cap and centre the whole form — fields and the pinned footer — so a
+        // wide web/tablet window doesn't stretch the inputs and buttons across
+        // the viewport. A no-op on a phone, where 460 is wider than the screen.
+        child: PortalMaxWidth(
+          maxWidth: 460,
+          child: Obx(
+            () => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
                     child: Form(
                       key: controller.formKey,
                       child: Column(
@@ -60,9 +63,9 @@ class PortalAuthView extends GetView<PortalAuthController> {
                     ),
                   ),
                 ),
-              ),
-              _footer(context, theme, cs),
-            ],
+                _footer(context, theme, cs),
+              ],
+            ),
           ),
         ),
       ),
