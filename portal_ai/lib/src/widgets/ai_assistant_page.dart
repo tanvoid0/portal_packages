@@ -90,6 +90,8 @@ class AiAssistantPage extends StatefulWidget {
     this.onLeaveIncognito,
     this.appMark,
     this.onOpenApp,
+    this.onOpenLink,
+    this.onOpenFile,
     this.onOpenCardRow,
     this.onAsk,
   }) : assert(
@@ -183,6 +185,11 @@ class AiAssistantPage extends StatefulWidget {
   /// Open on an app card, an ask's head or a receipt, with the app's name.
   /// No Open is drawn when null.
   final void Function(String app)? onOpenApp;
+
+  /// Tapped `http(s)` link / file path in a reply; the host opens them in its
+  /// own browser and file explorer. Null falls back to the OS.
+  final void Function(String url)? onOpenLink;
+  final void Function(String path)? onOpenFile;
 
   /// An [AiCardRow] with an `openLabel` was tapped. Those rows are inert when
   /// null.
@@ -1762,6 +1769,8 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
               text: turn.content,
               copyCodeLabel: labels.copy,
               copiedLabel: labels.copied,
+              onOpenLink: widget.onOpenLink,
+              onOpenFile: widget.onOpenFile,
             ),
             _receiptsOf(turn),
           ),
@@ -2293,7 +2302,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                                 child: AiConsentCard(consent: consent),
                               )
                             else if (widget.incognito ||
-                widget.labels.empty.isNotEmpty) ...[
+                                widget.labels.empty.isNotEmpty) ...[
                               // The mark, once, above the greeting -- the one
                               // place in the app the assistant has a face large
                               // enough to be a face. It is not repeated down the
@@ -2389,7 +2398,11 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               child: _replyBubble(
-                                AiMarkdown(text: partial),
+                                AiMarkdown(
+                                  text: partial,
+                                  onOpenLink: widget.onOpenLink,
+                                  onOpenFile: widget.onOpenFile,
+                                ),
                                 footer: _busy ? _liveFoot() : null,
                               ),
                             ),
@@ -2402,12 +2415,19 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               child: _replyBubble(
-                                _replyBody(AiMarkdown(text: reply), [
-                                  for (final step in _steps)
-                                    if (!step.failed &&
-                                        _mutates(step.call.name))
-                                      step.call.name,
-                                ]),
+                                _replyBody(
+                                  AiMarkdown(
+                                    text: reply,
+                                    onOpenLink: widget.onOpenLink,
+                                    onOpenFile: widget.onOpenFile,
+                                  ),
+                                  [
+                                    for (final step in _steps)
+                                      if (!step.failed &&
+                                          _mutates(step.call.name))
+                                        step.call.name,
+                                  ],
+                                ),
                                 footer: _busy
                                     ? null
                                     : _doneFoot(onCopy: () => _copyText(reply)),
@@ -2485,7 +2505,11 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               child: switch (_failedPartial) {
                                 final partial? => _replyBubble(
-                                  AiMarkdown(text: partial),
+                                  AiMarkdown(
+                                    text: partial,
+                                    onOpenLink: widget.onOpenLink,
+                                    onOpenFile: widget.onOpenFile,
+                                  ),
                                   footer: _failedFoot(),
                                 ),
                                 null => _failedFoot(),
