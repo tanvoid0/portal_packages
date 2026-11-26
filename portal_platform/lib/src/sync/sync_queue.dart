@@ -147,10 +147,9 @@ class SyncQueue extends GetxService {
   /// that used to look saved and then silently never sync.
   ///
   /// Returns the id of the operation that now represents this entity: [op]'s
-  /// own, the id of the pending operation it merged into, or `null` when the
-  /// merge cancelled both out (a create then a delete) or eviction dropped it.
-  /// A caller that goes on to push the change immediately must remove *that*
-  /// id, not `op.id`, or it leaves a stale operation to be replayed.
+  /// own (a merged operation takes it over), or `null` when the merge cancelled
+  /// both out (a create then a delete) or eviction dropped it. A caller that
+  /// goes on to push the change immediately removes that id once it lands.
   ///
   /// The lock is taken before the transaction is opened, never the other way
   /// round: SQLite serialises write transactions, so a caller holding the
@@ -324,14 +323,17 @@ class SyncQueue extends GetxService {
 
   SyncOperation? _merge(SyncOperation existing, SyncOperation incoming) {
     switch ((existing.type, incoming.type)) {
+      // A merged edit takes [incoming]'s id: a push of [existing] still in
+      // flight removes the old id when it lands, and a server may remember that
+      // id as applied. Neither may take the newer edit with it.
       case (SyncOperationType.create, SyncOperationType.update):
-        return existing.copyWith(data: incoming.data);
+        return existing.copyWith(id: incoming.id, data: incoming.data);
 
       case (SyncOperationType.create, SyncOperationType.delete):
         return null;
 
       case (SyncOperationType.update, SyncOperationType.update):
-        return existing.copyWith(data: incoming.data);
+        return existing.copyWith(id: incoming.id, data: incoming.data);
 
       case (SyncOperationType.update, SyncOperationType.delete):
         return incoming;

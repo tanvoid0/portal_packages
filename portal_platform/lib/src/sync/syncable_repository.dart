@@ -405,10 +405,9 @@ abstract class SyncableRepository<T> implements Syncable {
 
   /// Drop the operation a just-pushed write left queued.
   ///
-  /// The id comes from [SyncQueue.enqueueWith] rather than from the operation
-  /// that was built here: dedup may have merged it into an existing pending
-  /// operation under that one's id, and removing the id that was never stored
-  /// would leave the merged one to be replayed.
+  /// The id comes from [SyncQueue.enqueueWith], which answers null when dedup
+  /// or eviction left nothing queued. An edit made while this push was in
+  /// flight is queued under its own, newer id, so this does not remove it.
   Future<void> _dropQueued(String? queuedId) async {
     if (queuedId == null) return;
     await syncQueue.remove(queuedId);
@@ -690,9 +689,9 @@ abstract class SyncableRepository<T> implements Syncable {
 
   /// True when every op in [seen] is still queued with the payload the merge
   /// based its decision on. A `save` that lands between reading the stamps
-  /// and dropping the ops merges into the *same* op id with a newer payload
-  /// (see `SyncQueue._merge`), and the stamp we compared is then stale — so
-  /// the drop is refused and the local copy wins, as it would have before.
+  /// and dropping the ops replaces the op under a new id (see
+  /// `SyncQueue._merge`), and the stamp we compared is then stale — so the
+  /// drop is refused and the local copy wins, as it would have before.
   // ponytail: a re-read, not a lock — the window is two SQLite awaits wide;
   // take the merge under SyncQueue's lock if a real race ever shows up.
   Future<bool> _stillQueuedAsSeen(List<SyncOperation> seen) async {

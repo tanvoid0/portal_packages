@@ -53,11 +53,12 @@ class SyncOperation {
 
   /// Returns a shallow copy with optional field overrides.
   SyncOperation copyWith({
+    String? id,
     SyncOperationType? type,
     Map<String, dynamic>? data,
   }) {
     return SyncOperation(
-      id: id,
+      id: id ?? this.id,
       entityType: entityType,
       entityId: entityId,
       type: type ?? this.type,

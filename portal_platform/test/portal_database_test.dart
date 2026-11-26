@@ -114,7 +114,8 @@ void main() {
         dataFor: (t) => {'shape': t.name},
       );
 
-      expect(merged, first);
+      // A new id: a push of the first, still in flight, must not remove this.
+      expect(merged, isNot(first));
       await queue.remove(merged!);
       expect(queue.pendingCount.value, 0);
     });

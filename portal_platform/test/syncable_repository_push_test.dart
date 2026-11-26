@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:portal_platform/portal_platform.dart';
@@ -24,6 +26,13 @@ class _FakeApi extends ApiClient {
   /// The next POST is stored, but its response never arrives.
   bool loseResponse = false;
 
+  /// Statuses the next PUTs fail with, before anything is stored.
+  final putErrors = <int>[];
+
+  /// Keeps the next PUT in flight until completed; [parked] fires once it is.
+  Completer<void>? hold;
+  final parked = Completer<void>();
+
   @override
   Future<dynamic> get(String endpoint, {Map<String, String>? queryParams}) async =>
       [for (final r in rows.entries) {'id': r.key, 'name': r.value}];
@@ -45,6 +54,15 @@ class _FakeApi extends ApiClient {
   @override
   Future<dynamic> put(String endpoint, {dynamic body}) async {
     puts.add(Map<String, dynamic>.from(body as Map));
+    if (putErrors.isNotEmpty) {
+      throw ApiException('put failed', putErrors.removeAt(0));
+    }
+    final held = hold;
+    if (held != null) {
+      hold = null;
+      parked.complete();
+      await held.future;
+    }
     if (body.containsKey('id')) throw ApiException('id should not exist', 400);
     final id = endpoint.split('/').last;
     if (!rows.containsKey(id)) throw ApiException('Not found', 404);
@@ -141,6 +159,34 @@ void main() {
       {'name': 'first'},
     ]);
     expect(await queue.getByEntityType('item'), isEmpty);
+  });
+
+  /// Saves "newer" (its own push failing) while the PUT [push] starts is still
+  /// in flight, then lets that PUT succeed.
+  Future<void> editDuring(Future<void> Function() push) async {
+    final release = api.hold = Completer<void>();
+    final inFlight = push();
+    await api.parked.future;
+    api.putErrors.add(500);
+    await repo.save(const _Item('a', 'newer'));
+    release.complete();
+    await inFlight;
+
+    expect((await queue.getByEntityType('item')).single.data, {'name': 'newer'});
+    await repo.sync();
+    expect(api.rows, {'a': 'newer'});
+  }
+
+  test('an edit made while a save is being pushed is not lost', () async {
+    await repo.save(first);
+    await editDuring(() => repo.save(edited));
+  });
+
+  test('an edit made while a queued op is being replayed is not lost', () async {
+    await repo.save(first);
+    api.putErrors.add(500);
+    await repo.save(edited);
+    await editDuring(repo.sync);
   });
 
   test('a replayed create: POST 5xx then PUT 404 stays queued', () async {
