@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:portal_platform/portal_platform.dart'
     show SyncableRepository, PortalApiPaths;
 
@@ -47,6 +49,49 @@ class AutomationRepository extends SyncableRepository<Automation> {
       'enabled': entity.enabled,
       'trigger': entity.trigger.toJson(),
       'actions': [for (final a in entity.actions) a.toJson()],
+      // Always sent, even when empty: the server only changes conditions when
+      // the key is present, so omitting an empty list could never clear them.
+      'conditions': [for (final c in entity.conditions) c.toJson()],
     };
+  }
+
+  /// Older builds queued writes without `conditions`. Replayed as they are, a
+  /// create stores none on the server and the next pull wipes the local ones,
+  /// so the routine then fires unconditionally. Fill the key in from the cache
+  /// before anything is pushed.
+  // ponytail: upgrade shim, delete once no install can still hold such a queue.
+  @override
+  Future<void> sync() async {
+    final stale = [
+      for (final op in await syncQueue.getByEntityType(entityType))
+        if (op.data != null && !op.data!.containsKey('conditions')) op,
+    ];
+    if (stale.isNotEmpty) {
+      final cached = {for (final a in await readCache()) a.id: a};
+      for (final op in stale) {
+        final conditions = cached[op.entityId]?.conditions ?? const [];
+        // Empty stays unsent, so it cannot clear what another device set.
+        if (conditions.isEmpty) continue;
+        // Re-read right before replacing: a concurrent delete drops the op and
+        // a concurrent edit rewrites it (with `conditions`) — leave both alone.
+        // ponytail: a re-check, not a lock; move into SyncQueue if it races.
+        final current = (await syncQueue.getByEntityType(entityType))
+            .where((queued) => queued.id == op.id);
+        if (current.isEmpty ||
+            jsonEncode(current.first.data) != jsonEncode(op.data)) {
+          continue;
+        }
+        // Same id and type, so this replaces the queued operation in place.
+        await syncQueue.enqueue(
+          op.copyWith(
+            data: {
+              ...op.data!,
+              'conditions': [for (final c in conditions) c.toJson()],
+            },
+          ),
+        );
+      }
+    }
+    await super.sync();
   }
 }
