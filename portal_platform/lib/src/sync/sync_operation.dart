@@ -41,6 +41,10 @@ class SyncOperation {
   /// When this operation was enqueued.
   final DateTime createdAt;
 
+  /// A push of this operation was started, so the server may have it even if
+  /// no response ever arrived.
+  final bool attempted;
+
   SyncOperation({
     String? id,
     required this.entityType,
@@ -48,6 +52,7 @@ class SyncOperation {
     required this.type,
     this.data,
     DateTime? createdAt,
+    this.attempted = false,
   })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now();
 
@@ -56,6 +61,7 @@ class SyncOperation {
     String? id,
     SyncOperationType? type,
     Map<String, dynamic>? data,
+    bool? attempted,
   }) {
     return SyncOperation(
       id: id ?? this.id,
@@ -64,6 +70,7 @@ class SyncOperation {
       type: type ?? this.type,
       data: data ?? this.data,
       createdAt: createdAt,
+      attempted: attempted ?? this.attempted,
     );
   }
 
@@ -76,6 +83,7 @@ class SyncOperation {
         'type': type.name,
         'data': data,
         'createdAt': createdAt.toIso8601String(),
+        if (attempted) 'attempted': true,
       };
 
   factory SyncOperation.fromJson(Map<String, dynamic> json) => SyncOperation(
@@ -87,6 +95,7 @@ class SyncOperation {
             ? Map<String, dynamic>.from(json['data'] as Map)
             : null,
         createdAt: DateTime.parse(json['createdAt'] as String),
+        attempted: json['attempted'] == true,
       );
 
   /// Decode a JSON string into a list of [SyncOperation]s.

@@ -28,10 +28,13 @@ import 'sync_operation.dart';
 /// | Existing  | Incoming  | Result                                   |
 /// |-----------|-----------|------------------------------------------|
 /// | create    | update    | create with latest data                  |
-/// | create    | delete    | **both removed** (never existed remotely) |
+/// | create    | delete    | **both removed**; delete if attempted    |
 /// | update    | update    | update with latest data                  |
 /// | update    | delete    | replaced by delete                       |
 /// | *other*   | *any*     | replaced by incoming                     |
+///
+/// [SyncOperation.attempted] survives every merge: once a push has started the
+/// server may have the entity, so a later delete has to be sent.
 ///
 /// The create+update row applies only when the caller can re-serialise the
 /// payload for the surviving verb (see `dataFor` on [enqueueWith]). Without
@@ -111,6 +114,31 @@ class SyncQueue extends GetxService {
     return result.future;
   }
 
+  /// The last send per entity, while one is running.
+  // ponytail: in memory, so it orders one isolate's sends only; persist an
+  // in-flight marker if a second isolate ever pushes.
+  final _sends = <(String, String), Future<void>>{};
+
+  /// Run [send] once every earlier send for the same entity has finished: a
+  /// DELETE overtaking the POST that creates the row would 404 and leave it.
+  ///
+  /// [send] must not call this again for the same entity, or it waits on itself.
+  Future<T> sendInOrder<T>(
+    String entityType,
+    String entityId,
+    Future<T> Function() send,
+  ) {
+    final key = (entityType, entityId);
+    final result = (_sends[key] ?? Future<void>.value()).then((_) => send());
+    // As in [_withLock], the chain must not carry an error forward.
+    final tail = result.then<void>((_) {}, onError: (_) {});
+    _sends[key] = tail;
+    tail.whenComplete(() {
+      if (_sends[key] == tail) _sends.remove(key);
+    });
+    return result;
+  }
+
   /// Load the persisted queue length and return `this` for use with
   /// [Get.putAsync].
   Future<SyncQueue> init() async {
@@ -148,8 +176,9 @@ class SyncQueue extends GetxService {
   ///
   /// Returns the id of the operation that now represents this entity: [op]'s
   /// own (a merged operation takes it over), or `null` when the merge cancelled
-  /// both out (a create then a delete) or eviction dropped it. A caller that
-  /// goes on to push the change immediately removes that id once it lands.
+  /// both out (an unattempted create then a delete) or eviction dropped it. A
+  /// caller that goes on to push the change immediately removes that id once it
+  /// lands.
   ///
   /// The lock is taken before the transaction is opened, never the other way
   /// round: SQLite serialises write transactions, so a caller holding the
@@ -222,12 +251,21 @@ class SyncQueue extends GetxService {
               ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
           }));
 
-  /// Remove a single completed operation by its [operationId].
-  /// Whether [operationId] is still queued.
-  Future<bool> contains(String operationId) =>
-      _withLock(() => PortalDatabase.transaction((txn) async =>
-          (await _load(txn)).any((o) => o.id == operationId)));
+  /// Record that a push of [operationId] is about to start. False when it is no
+  /// longer queued, so it must not be pushed.
+  Future<bool> markAttempted(String operationId) =>
+      _withLock(() => PortalDatabase.transaction((txn) async {
+            final ops = await _load(txn);
+            final idx = ops.indexWhere((o) => o.id == operationId);
+            if (idx < 0) return false;
+            if (!ops[idx].attempted) {
+              ops[idx] = ops[idx].copyWith(attempted: true);
+              await _save(ops, txn);
+            }
+            return true;
+          }));
 
+  /// Remove a single completed operation by its [operationId].
   Future<void> remove(String operationId) async {
     final count = await _withLock(() => PortalDatabase.transaction((txn) async {
           final ops = await _load(txn);
@@ -322,24 +360,28 @@ class SyncQueue extends GetxService {
       incoming.type == SyncOperationType.update;
 
   SyncOperation? _merge(SyncOperation existing, SyncOperation incoming) {
+    final attempted = existing.attempted || incoming.attempted;
     switch ((existing.type, incoming.type)) {
       // A merged edit takes [incoming]'s id: a push of [existing] still in
       // flight removes the old id when it lands, and a server may remember that
       // id as applied. Neither may take the newer edit with it.
       case (SyncOperationType.create, SyncOperationType.update):
-        return existing.copyWith(id: incoming.id, data: incoming.data);
+      case (SyncOperationType.update, SyncOperationType.update):
+        return existing.copyWith(
+          id: incoming.id,
+          data: incoming.data,
+          attempted: attempted,
+        );
 
-      case (SyncOperationType.create, SyncOperationType.delete):
+      // Only a create nothing has tried to push can be forgotten.
+      case (SyncOperationType.create, SyncOperationType.delete)
+          when !existing.attempted:
         return null;
 
-      case (SyncOperationType.update, SyncOperationType.update):
-        return existing.copyWith(id: incoming.id, data: incoming.data);
-
-      case (SyncOperationType.update, SyncOperationType.delete):
-        return incoming;
-
+      // Including the delete of a tried create: a re-create after it must still
+      // know the server may hold the entity.
       default:
-        return incoming;
+        return incoming.copyWith(attempted: attempted);
     }
   }
 

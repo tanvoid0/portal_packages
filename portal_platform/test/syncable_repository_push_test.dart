@@ -168,9 +168,12 @@ void main() {
     final inFlight = push();
     await api.parked.future;
     api.putErrors.add(500);
-    await repo.save(const _Item('a', 'newer'));
+    // Its push waits for the one in flight, so release once it is queued.
+    final saving = repo.save(const _Item('a', 'newer'));
+    while ((await queue.getByEntityType('item')).single.data?['name'] !=
+        'newer') {}
     release.complete();
-    await inFlight;
+    await Future.wait([inFlight, saving]);
 
     expect((await queue.getByEntityType('item')).single.data, {'name': 'newer'});
     await repo.sync();

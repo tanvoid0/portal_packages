@@ -31,7 +31,7 @@ class _Queue extends SyncQueue {
   Future<List<SyncOperation>> getByEntityType(String entityType) async =>
       List.of(ops);
   @override
-  Future<bool> contains(String operationId) async =>
+  Future<bool> markAttempted(String operationId) async =>
       ops.any((o) => o.id == operationId);
   @override
   Future<void> enqueue(SyncOperation op) async =>

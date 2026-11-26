@@ -293,7 +293,7 @@ abstract class SyncableRepository<T> implements Syncable {
   /// 1. The **local cache is updated immediately** so the UI can
   ///    reflect the change without waiting for the network.
   /// 2. If the device is online the change is pushed to the server
-  ///    right away.
+  ///    right away, after any push of this entity already in flight.
   /// 3. If the push fails — or the device is offline — a
   ///    [SyncOperation] is enqueued and will be retried on the next
   ///    [sync] cycle.
@@ -320,12 +320,15 @@ abstract class SyncableRepository<T> implements Syncable {
     // would never reach the server. Queued-then-pushed costs one extra local
     // write on the happy path and has no such window.
     var createPending = false;
+    // Read once: the op must say "attempted" exactly when this call sends it.
+    final online = connectivity.isOnline;
     final queuedId = await syncQueue.enqueueWith(
       SyncOperation(
         entityType: entityType,
         entityId: getId(entity),
         type: isCreate ? SyncOperationType.create : SyncOperationType.update,
         data: toWireJson(entity, isCreate: isCreate),
+        attempted: online,
       ),
       alsoWrite: (txn) => _writeCacheIn(txn, all),
       // An edit made while a create is still queued is still a create when it
@@ -336,22 +339,26 @@ abstract class SyncableRepository<T> implements Syncable {
       },
     );
 
-    if (connectivity.isOnline) {
+    if (online) {
       try {
-        if (isCreate) {
-          await api.post(apiBasePath, body: toWireJson(entity, isCreate: true));
-        } else if (createPending) {
-          // The server may not have it (a PUT would 404 and drop it) or may,
-          // with only the response lost (a bare POST would 409 and drop the
-          // edit), so push it the way [sync] replays a create.
-          await _pushCreate(getId(entity), toWireJson(entity, isCreate: true));
-        } else {
-          await api.put(
-            '$apiBasePath/${getId(entity)}',
-            body: toWireJson(entity, isCreate: false),
-          );
-        }
-        await _dropQueued(queuedId);
+        await syncQueue.sendInOrder(entityType, getId(entity), () async {
+          if (isCreate) {
+            await api.post(apiBasePath,
+                body: toWireJson(entity, isCreate: true));
+          } else if (createPending) {
+            // The server may not have it (a PUT would 404 and drop it) or may,
+            // with only the response lost (a bare POST would 409 and drop the
+            // edit), so push it the way [sync] replays a create.
+            await _pushCreate(
+                getId(entity), toWireJson(entity, isCreate: true));
+          } else {
+            await api.put(
+              '$apiBasePath/${getId(entity)}',
+              body: toWireJson(entity, isCreate: false),
+            );
+          }
+          await _dropQueued(queuedId);
+        });
         syncQueue.serverFailing.value = false;
         return;
       } catch (e) {
@@ -381,21 +388,19 @@ abstract class SyncableRepository<T> implements Syncable {
       alsoWrite: (txn) => _writeCacheIn(txn, all),
     );
 
-    // Null: the delete cancelled a create still in the queue, so the server
-    // never had the entity and there is nothing to send.
+    // Null: the delete cancelled a create no push had started for, so the server
+    // cannot have the entity and there is nothing to send.
     if (queuedId == null) return;
 
     if (connectivity.isOnline) {
       try {
-        await api.delete('$apiBasePath/$id');
-        await _dropQueued(queuedId);
+        await syncQueue.sendInOrder(entityType, id, () async {
+          await _pushDelete(id);
+          await _dropQueued(queuedId);
+        });
         return;
       } catch (e) {
         debugPrint('[$entityType] API delete failed, queueing: $e');
-        // Already gone server-side is what a delete wanted.
-        if (e is ApiException && e.statusCode == 404) {
-          return _dropQueued(queuedId);
-        }
         if (_refusedNow(e)) return _rejectQueued(queuedId);
       }
     }
@@ -464,8 +469,9 @@ abstract class SyncableRepository<T> implements Syncable {
   /// than looping on a duplicate-key error forever. A create that genuinely
   /// never landed gets a 404 from that update and stays queued.
   ///
-  /// Updates and deletes that 404 are dropped — the entity is gone
-  /// server-side, so there is nothing left to replay against.
+  /// An update that 404s is dropped as rejected — the entity is gone
+  /// server-side, so there is nothing left to replay against. A delete that
+  /// 404s has what it wanted and counts as pushed.
   Future<void> _pushPending() async {
     final ops = await syncQueue.getByEntityType(entityType);
     if (ops.isEmpty) return;
@@ -475,20 +481,25 @@ abstract class SyncableRepository<T> implements Syncable {
     var pushed = 0;
     var rejected = 0;
     for (final op in ops) {
-      // A concurrent refresh may have dropped this op in favour of a newer
-      // server copy since the snapshot above; pushing it anyway would clobber
-      // exactly the write the merge chose to keep.
-      if (!await syncQueue.contains(op.id)) continue;
       try {
-        switch (op.type) {
-          case SyncOperationType.create:
-            await _pushCreate(op.entityId, op.data);
-          case SyncOperationType.update:
-            await api.put('$apiBasePath/${op.entityId}', body: op.data);
-          case SyncOperationType.delete:
-            await api.delete('$apiBasePath/${op.entityId}');
-        }
-        await syncQueue.remove(op.id);
+        final sent =
+            await syncQueue.sendInOrder(entityType, op.entityId, () async {
+          // Gone since the snapshot above: pushed by a save, merged into a
+          // newer op, or dropped by a refresh in favour of a newer server copy.
+          // Pushing it anyway would clobber what replaced it.
+          if (!await syncQueue.markAttempted(op.id)) return false;
+          switch (op.type) {
+            case SyncOperationType.create:
+              await _pushCreate(op.entityId, op.data);
+            case SyncOperationType.update:
+              await api.put('$apiBasePath/${op.entityId}', body: op.data);
+            case SyncOperationType.delete:
+              await _pushDelete(op.entityId);
+          }
+          await syncQueue.remove(op.id);
+          return true;
+        });
+        if (!sent) continue;
         pushed++;
         syncQueue.serverFailing.value = false;
       } catch (e) {
@@ -526,6 +537,16 @@ abstract class SyncableRepository<T> implements Syncable {
       body();
     } catch (e) {
       debugPrint('[$entityType] SyncFeedback.$name threw: $e');
+    }
+  }
+
+  /// DELETE [id]. A 404 is success: it is gone, or the create before it never
+  /// landed.
+  Future<void> _pushDelete(String id) async {
+    try {
+      await api.delete('$apiBasePath/$id');
+    } on ApiException catch (e) {
+      if (e.statusCode != 404) rethrow;
     }
   }
 
