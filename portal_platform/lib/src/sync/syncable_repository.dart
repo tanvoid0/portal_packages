@@ -319,6 +319,7 @@ abstract class SyncableRepository<T> implements Syncable {
     // where the edit was on disk with nothing to push it: it looked saved and
     // would never reach the server. Queued-then-pushed costs one extra local
     // write on the happy path and has no such window.
+    var createPending = false;
     final queuedId = await syncQueue.enqueueWith(
       SyncOperation(
         entityType: entityType,
@@ -329,16 +330,21 @@ abstract class SyncableRepository<T> implements Syncable {
       alsoWrite: (txn) => _writeCacheIn(txn, all),
       // An edit made while a create is still queued is still a create when it
       // is finally sent, and [toWireJson] serialises the two differently.
-      dataFor: (effective) => toWireJson(
-        entity,
-        isCreate: effective == SyncOperationType.create,
-      ),
+      dataFor: (effective) {
+        createPending = effective == SyncOperationType.create;
+        return toWireJson(entity, isCreate: createPending);
+      },
     );
 
     if (connectivity.isOnline) {
       try {
         if (isCreate) {
           await api.post(apiBasePath, body: toWireJson(entity, isCreate: true));
+        } else if (createPending) {
+          // The server may not have it (a PUT would 404 and drop it) or may,
+          // with only the response lost (a bare POST would 409 and drop the
+          // edit), so push it the way [sync] replays a create.
+          await _pushCreate(getId(entity), toWireJson(entity, isCreate: true));
         } else {
           await api.put(
             '$apiBasePath/${getId(entity)}',
@@ -477,7 +483,7 @@ abstract class SyncableRepository<T> implements Syncable {
       try {
         switch (op.type) {
           case SyncOperationType.create:
-            await _pushCreate(op);
+            await _pushCreate(op.entityId, op.data);
           case SyncOperationType.update:
             await api.put('$apiBasePath/${op.entityId}', body: op.data);
           case SyncOperationType.delete:
@@ -527,16 +533,23 @@ abstract class SyncableRepository<T> implements Syncable {
   /// POST a queued create, falling back to PUT when the server already has
   /// the entity — the case where an earlier push committed but its response
   /// never reached the device.
-  Future<void> _pushCreate(SyncOperation op) async {
+  Future<void> _pushCreate(String id, Map<String, dynamic>? body) async {
     Object postError;
     try {
-      await api.post(apiBasePath, body: op.data);
+      await api.post(apiBasePath, body: body);
       return;
     } catch (e) {
       postError = e;
     }
+    // [body] is a create body, which an update route can refuse (for its
+    // `id`, say), so the update is serialised from the cached entity instead.
+    final cached = (await readCache()).where((e) => getId(e) == id);
+    if (cached.isEmpty) throw postError;
     try {
-      await api.put('$apiBasePath/${op.entityId}', body: op.data);
+      await api.put(
+        '$apiBasePath/$id',
+        body: toWireJson(cached.first, isCreate: false),
+      );
     } on ApiException catch (e) {
       // A 404 here means the entity really is absent server-side, so the POST
       // is still the operation that matters and its error is the real cause.
