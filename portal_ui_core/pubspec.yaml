@@ -1,7 +1,16 @@
 name: portal_ui_core
 description: Design tokens, ThemeExtension, and theme factories for the Portal UI kit.
-version: 0.4.0
+version: 0.4.1
 repository: https://github.com/tanvoid0/portal_packages/tree/main/portal_ui_core
+screenshots:
+  - description: 'Buttons, stat cards and cards, light theme'
+    path: doc/screenshots/light.png
+  - description: 'Same page, dark theme'
+    path: doc/screenshots/dark.png
+  - description: 'Filter chips, tabs, search, skeleton and empty state'
+    path: doc/screenshots/light_states.png
+  - description: 'The same states, dark theme'
+    path: doc/screenshots/dark_states.png
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
