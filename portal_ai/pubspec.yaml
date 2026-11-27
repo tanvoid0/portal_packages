@@ -1,7 +1,12 @@
 name: portal_ai
 description: Platform-aware local and cloud AI backend discovery for Portal apps.
-version: 0.4.0
+version: 0.4.1
 repository: https://github.com/tanvoid0/portal_packages/tree/main/portal_ai
+screenshots:
+  - description: 'Assistant page: markdown reply, proposal card and composer'
+    path: doc/screenshots/assistant.png
+  - description: 'The same reply with the thought process expanded'
+    path: doc/screenshots/assistant_thinking.png
 
 environment:
   sdk: ">=3.12.0 <4.0.0"

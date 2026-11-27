@@ -5,13 +5,13 @@ package, published independently.
 
 | package | what |
 |---|---|
-| [portal_ai](portal_ai) | AI backend discovery (on-device, Ollama, cloud, server) and a shared chat runtime |
-| [portal_platform](portal_platform) | auth, session, API client, deep links, in-app updates, offline-first sync |
-| [portal_ui_core](portal_ui_core) | design tokens, `PortalUiTheme`, themed components |
-| [portal_crypto](portal_crypto) | AES-GCM, key wrapping, vault blob format |
-| [portal_notifications](portal_notifications) | local + scheduled notifications with actions |
-| [portal_scanner](portal_scanner) | native document scanner → PDF / JPEG |
-| [portal_core](portal_core) | annotation-driven model codegen, local cache |
+| [portal_ai](portal_ai) ([pub.dev](https://pub.dev/packages/portal_ai)) | AI backend discovery (on-device, Ollama, cloud, server) and a shared chat runtime |
+| [portal_platform](portal_platform) ([pub.dev](https://pub.dev/packages/portal_platform)) | auth, session, API client, deep links, in-app updates, offline-first sync |
+| [portal_ui_core](portal_ui_core) ([pub.dev](https://pub.dev/packages/portal_ui_core)) | design tokens, `PortalUiTheme`, themed components |
+| [portal_crypto](portal_crypto) ([pub.dev](https://pub.dev/packages/portal_crypto)) | AES-GCM, key wrapping, vault blob format |
+| [portal_notifications](portal_notifications) ([pub.dev](https://pub.dev/packages/portal_notifications)) | local + scheduled notifications with actions |
+| [portal_scanner](portal_scanner) ([pub.dev](https://pub.dev/packages/portal_scanner)) | native document scanner → PDF / JPEG |
+| [portal_core](portal_core) ([pub.dev](https://pub.dev/packages/portal_core)) | annotation-driven model codegen, local cache |
 
 `portal_ui_kit` is a Mason brick, not a pub package.
 
