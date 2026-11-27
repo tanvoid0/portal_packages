@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import 'package:portal_ui_core/portal_ui_core.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Assistant prose, rendered as markdown.
 ///
@@ -15,7 +16,15 @@ class AiMarkdown extends StatelessWidget {
     this.style,
     this.copyCodeLabel = 'Copy code',
     this.copiedLabel = 'Copied',
+    this.onOpenLink,
+    this.onOpenFile,
   });
+
+  /// Host handlers (the coder's own browser / file explorer). A tapped
+  /// `http(s)` link goes to [onOpenLink]; a `file:` URI or a scheme-less path
+  /// goes to [onOpenFile] with the path. Null falls back to the OS launcher.
+  final void Function(String url)? onOpenLink;
+  final void Function(String path)? onOpenFile;
 
   final String text;
 
@@ -131,11 +140,43 @@ class AiMarkdown extends StatelessWidget {
               vertical: tokens.spacing.sm,
             ),
           ),
-          LinkConfig(style: body.copyWith(color: theme.colorScheme.primary)),
+          LinkConfig(
+            style: body.copyWith(
+              color: theme.colorScheme.primary,
+              decoration: TextDecoration.underline,
+            ),
+            onTap: (url) => _open(context, url),
+          ),
           HrConfig(color: theme.colorScheme.outlineVariant),
         ],
       ),
     );
+  }
+
+  /// Hands a tapped link to the OS (browser, mail, a sibling app's scheme,
+  /// a `file:` viewer). Shared by every persona, coder included.
+  Future<void> _open(BuildContext context, String url) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final uri = Uri.tryParse(url.trim());
+    if (uri != null &&
+        onOpenFile != null &&
+        (uri.scheme == 'file' || uri.scheme.isEmpty)) {
+      onOpenFile!(uri.scheme == 'file' ? uri.toFilePath() : uri.path);
+      return;
+    }
+    if (uri != null && onOpenLink != null && uri.scheme.startsWith('http')) {
+      onOpenLink!(url.trim());
+      return;
+    }
+    var ok = false;
+    if (uri != null) {
+      try {
+        ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (_) {}
+    }
+    if (!ok) {
+      messenger?.showSnackBar(SnackBar(content: Text("Can't open $url")));
+    }
   }
 
   /// Cheap check for the markers worth running the parser over.
