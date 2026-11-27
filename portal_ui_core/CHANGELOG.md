@@ -59,6 +59,10 @@
   double-tap / duplicate OAuth without faking it through the label. Default
   false is unchanged, today's behaviour.
 
+## 0.4.1
+
+- Screenshots on the pub.dev page. No code changes.
+
 ## 0.4.0
 
 - `PortalTimelineTile` (new): a pure layout tile (`isFirst`/`isLast`/`node`/
